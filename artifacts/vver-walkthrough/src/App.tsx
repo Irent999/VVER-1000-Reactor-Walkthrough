@@ -8,6 +8,7 @@ import type { OrbitControls as OCImpl } from 'three-stdlib';
 import ReactorBuilding from '@/components/ReactorBuilding';
 import SteamGeneratorDeck from '@/components/SteamGeneratorDeck';
 import ServerRoom from '@/components/ServerRoom';
+import CoreCatcher from '@/components/CoreCatcher';
 import ExteriorScene from '@/components/ExteriorScene';
 import POIMarkers from '@/components/POIMarkers';
 import VRControllerManager from '@/components/VRControllerManager';
@@ -65,6 +66,7 @@ function SceneContent({ containmentOpacity, onPOISelect }: SceneContentProps) {
   return (
     <group>
       <ReactorBuilding containmentOpacity={containmentOpacity} />
+      <CoreCatcher />
       <SteamGeneratorDeck />
       <ServerRoom />
       <ExteriorScene />
@@ -116,6 +118,7 @@ function SceneUnavailable({ onRetry }: { onRetry: () => void }) {
 
 export default function App() {
   const [webglAvailable, setWebglAvailable] = useState(canCreateWebGL2);
+  const [pointerLocked, setPointerLocked] = useState(false);
   const [activeView, setActiveView] = useState('orbit-cutaway');
   const [containmentOpacity, setContainmentOpacity] = useState(0.3);
   const [vrSupported, setVrSupported] = useState<boolean | null>(null);
@@ -158,6 +161,9 @@ export default function App() {
 
   const handleFloorArrived = useCallback(() => {
     setFloorTarget(null);
+  }, []);
+  const handlePointerLockChange = useCallback((locked: boolean) => {
+    setPointerLocked(locked);
   }, []);
 
   return (
@@ -227,7 +233,12 @@ export default function App() {
             makeDefault
           />
         ) : (
-          <FirstPersonController targetFloor={floorTarget} onArrived={handleFloorArrived} spawnPosition={activeViewData.cameraPos} />
+          <FirstPersonController
+            targetFloor={floorTarget}
+            onArrived={handleFloorArrived}
+            onLockChange={handlePointerLockChange}
+            spawnPosition={activeViewData.cameraPos}
+          />
         )}
         </Canvas>
       ) : (
@@ -238,6 +249,7 @@ export default function App() {
         activeView={activeView}
         onViewChange={handleViewChange}
         sceneAvailable={webglAvailable}
+        pointerLocked={pointerLocked}
         containmentOpacity={containmentOpacity}
         onContainmentOpacityChange={setContainmentOpacity}
         controlMode={controlMode}

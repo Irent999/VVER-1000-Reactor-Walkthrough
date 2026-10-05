@@ -1,0 +1,31 @@
+Please apply the following two critical updates to fix physics controls and correct the lower structural arrangement according to real VVER-1000/VVER-1200 nuclear power plant engineering layouts:
+
+### 1. Architectural Core Catcher & DCS Elevation Correction
+Re-arrange the lowest subterranean levels strictly according to real plant blueprints:
+
+1. **Lowest Elevation (-10.0m to -6.0m) — Core Catcher (Ловушка расплава / Core Melt Localization Device):**
+   - Positioned directly underneath the Reactor Pressure Vessel cavity axis.
+   - **Geometry:** A large truncated cone / funnel structure made of thick refractory steel filled with sacrificial ceramic material blocks (sacrificially cooling material).
+   - **Cooling System:** Outer water cooling channel jacket surrounding the core catcher vessel.
+
+2. **Sub-basement Level (-5.0m to -2.0m) — I&C / DCS Server Room (АСУ ТП):**
+   - Located directly ABOVE/ADJACENT to the core catcher vault floor level and surrounding the lower reactor pit structure.
+   - Contains rows of server cabinets, raised floor cable trays, fiber optic conduit channels, and monitoring terminals with LED indicators.
+   - Connected via stairs and inspection walkways leading up to the Main Coolant Pump deck (+15.0m).
+
+3. **Reactor Elevation Alignment:**
+   - Reactor Pressure Vessel (RPV) bottom head sits directly above the core catcher cavity opening.
+   - Maintain exact realistic VVER-1000 scaling: Outer containment internal diameter = 44m, RPV height = 12m, PGV-1000 Steam Generators horizontal length = 14m.
+
+### 2. Fix Mouse Look / First-Person Controls (Pointer Lock)
+Fix the first-person mouse controls when entering walk mode:
+- **PointerLockControls Hook:** Ensure clicking anywhere on the 3D canvas calls `controls.lock()` on `PointerLockControls` (or `@react-three/drei` ``).
+- **Mouse Sensitivity & Event Listeners:** Correct mouse movement delta binding (`mousemove`) so pitch (X-axis look up/down) and yaw (Y-axis look left/right) smoothly track mouse movement without locking up or freezing.
+- **Overlay State Management:** When the user selects any "Walk" viewpoint (e.g. `Walk Basement Server Room (-5m)` or `Walk Reactor Deck (+15m)`):
+  - Display a clean UI overlay prompt: *"Click on screen to lock pointer and look around with mouse"*.
+  - Show a small center crosshair (`+`) in the canvas middle.
+  - Listen for the `Escape` key to unlock pointer controls smoothly without breaking the active camera position.
+
+### 3. Realistic Materials & Visual Details
+- Apply metallic/dark grey industrial textures to the Core Catcher cone and surrounding concrete shielding walls.
+- Add visible piping connecting the bottom of the reactor pit to the emergency cooling water sources around the Core Catcher.

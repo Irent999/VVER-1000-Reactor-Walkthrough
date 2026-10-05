@@ -10,6 +10,7 @@ interface UIOverlayProps {
   activeView: string;
   onViewChange: (viewId: string) => void;
   sceneAvailable: boolean;
+  pointerLocked: boolean;
   containmentOpacity: number;
   onContainmentOpacityChange: (v: number) => void;
   controlMode: ViewMode;
@@ -59,7 +60,7 @@ function InfoModal({ poi, onClose }: { poi: POIInfo; onClose: () => void }) {
 }
 
 export default function UIOverlay({
-  activeView, onViewChange, sceneAvailable, containmentOpacity, onContainmentOpacityChange,
+  activeView, onViewChange, sceneAvailable, pointerLocked, containmentOpacity, onContainmentOpacityChange,
   controlMode, onVRClick, vrSupported, telemetry,
 }: UIOverlayProps) {
   const [sidebarOpen, setSidebarOpen] = useState(sceneAvailable);
@@ -93,19 +94,19 @@ export default function UIOverlay({
 
       {controlMode === 'walk' && (
         <>
-          <div data-testid="walk-crosshair" className="pointer-events-none fixed left-1/2 top-1/2 z-30 h-6 w-6 -translate-x-1/2 -translate-y-1/2">
-            <span className="absolute left-1/2 top-0 h-[7px] w-px -translate-x-1/2 bg-[#f6c36b]" />
-            <span className="absolute bottom-0 left-1/2 h-[7px] w-px -translate-x-1/2 bg-[#f6c36b]" />
-            <span className="absolute left-0 top-1/2 h-px w-[7px] -translate-y-1/2 bg-[#f6c36b]" />
-            <span className="absolute right-0 top-1/2 h-px w-[7px] -translate-y-1/2 bg-[#f6c36b]" />
-            <span className="absolute left-1/2 top-1/2 h-1 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#f6c36b]" />
-          </div>
-          <div id="lock-anchor" data-testid="button-click-to-walk" className="panel-enter fixed bottom-5 left-1/2 z-40 flex -translate-x-1/2 cursor-pointer items-center gap-3 rounded-xl border border-[#e2a34f]/35 bg-[#172226]/95 px-4 py-3 shadow-xl backdrop-blur-xl transition hover:border-[#e2a34f]/70 hover:bg-[#243238] sm:bottom-7 sm:px-5">
-            <Crosshair size={16} className="text-[#e2a34f]" />
-            <span className="text-xs font-bold tracking-wide text-[#f1efe4]">Click to Walk Around</span>
-            <span className="hidden h-4 w-px bg-white/15 sm:block" />
-            <span className="mono hidden text-[10px] text-[#a3b1ab] sm:block">WASD + MOUSE</span>
-          </div>
+          <div data-testid="walk-crosshair" aria-hidden="true" className="pointer-events-none fixed left-1/2 top-1/2 z-30 -translate-x-1/2 -translate-y-1/2 font-mono text-2xl leading-none text-[#f6c36b]">+</div>
+          {!pointerLocked && (
+            <button
+              id="lock-anchor"
+              type="button"
+              data-testid="button-click-to-walk"
+              aria-label="Click on screen to lock pointer and look around with mouse"
+              className="panel-enter fixed bottom-5 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-xl border border-[#e2a34f]/35 bg-[#172226]/95 px-4 py-3 text-left shadow-xl backdrop-blur-xl transition hover:border-[#e2a34f]/70 hover:bg-[#243238] sm:bottom-7 sm:px-5"
+            >
+              <Crosshair size={16} className="shrink-0 text-[#e2a34f]" />
+              <span className="text-xs font-bold tracking-wide text-[#f1efe4]">Click on screen to lock pointer and look around with mouse</span>
+            </button>
+          )}
         </>
       )}
 

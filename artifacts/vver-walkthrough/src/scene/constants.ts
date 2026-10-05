@@ -8,13 +8,23 @@ export const FLOOR_LEVELS = {
 export const EYE_HEIGHT = 1.6;
 
 export const CONTAINMENT = {
-  outerRadius: 22.5,
+  outerRadius: 23.2,
   wallThickness: 1.2,
-  innerRadius: 21.3,
+  innerRadius: 22.0,
   baseY: -5.0,
   wallTopY: 32.5,
   domeTopY: 55.0,
   totalHeight: 60.0,
+} as const;
+
+export const CORE_CATCHER = {
+  bottomY: -10.0,
+  topY: -6.0,
+  topRadius: 5.5,
+  bottomRadius: 2.5,
+  openingRadius: 6.5,
+  shieldRadius: 7.5,
+  sourceRadius: 8.3,
 } as const;
 
 export const RPV = {

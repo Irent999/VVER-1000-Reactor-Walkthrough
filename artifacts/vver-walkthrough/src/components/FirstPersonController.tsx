@@ -3,18 +3,18 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { PointerLockControls } from '@react-three/drei';
 import type { PointerLockControls as PLCImpl } from 'three-stdlib';
 import * as THREE from 'three';
-import { EYE_HEIGHT } from '@/scene/constants';
-import { DECK } from '@/scene/constants';
+import { CORE_CATCHER, DECK, EYE_HEIGHT } from '@/scene/constants';
 import { getFloorHeightAt, clampPlayerPosition } from '@/scene/floorDetection';
 
 interface FirstPersonControllerProps {
   targetFloor: number | null;
   onArrived: () => void;
+  onLockChange: (locked: boolean) => void;
   spawnPosition: [number, number, number];
 }
 
-export default function FirstPersonController({ targetFloor, onArrived, spawnPosition }: FirstPersonControllerProps) {
-  const { camera } = useThree();
+export default function FirstPersonController({ targetFloor, onArrived, onLockChange, spawnPosition }: FirstPersonControllerProps) {
+  const { camera, gl } = useThree();
   const controlsRef = useRef<PLCImpl>(null);
   const keys = useRef<Record<string, boolean>>({});
   const velocity = useRef(new THREE.Vector3());
@@ -45,6 +45,35 @@ export default function FirstPersonController({ targetFloor, onArrived, spawnPos
       window.removeEventListener('keyup', onKeyUp);
     };
   }, []);
+
+  useEffect(() => {
+    const controls = controlsRef.current;
+    if (!controls) return;
+
+    const canvas = gl.domElement;
+    const lockFromCanvas = () => controls.lock();
+    const unlockFromEscape = (event: KeyboardEvent) => {
+      if (event.code === 'Escape' && controls.isLocked) {
+        controls.unlock();
+      }
+    };
+    const onLock = () => onLockChange(true);
+    const onUnlock = () => onLockChange(false);
+
+    canvas.addEventListener('click', lockFromCanvas);
+    window.addEventListener('keydown', unlockFromEscape);
+    controls.addEventListener('lock', onLock);
+    controls.addEventListener('unlock', onUnlock);
+
+    return () => {
+      canvas.removeEventListener('click', lockFromCanvas);
+      window.removeEventListener('keydown', unlockFromEscape);
+      controls.removeEventListener('lock', onLock);
+      controls.removeEventListener('unlock', onUnlock);
+      if (controls.isLocked) controls.unlock();
+      onLockChange(false);
+    };
+  }, [gl, onLockChange]);
 
   // Handle floor teleport requests
   useEffect(() => {
@@ -96,7 +125,13 @@ export default function FirstPersonController({ targetFloor, onArrived, spawnPos
       const newZ = camera.position.z + velocity.current.z;
       let [clampedX, clampedZ] = clampPlayerPosition(newX, newZ);
       const level = currentFloorY.current;
-      const holeRadius = level > 25 ? DECK.upperHoleRadius : level > 5 && level < 25 ? DECK.mainHoleRadius : 0;
+      const holeRadius = level > 25
+        ? DECK.upperHoleRadius
+        : level > 5 && level < 25
+          ? DECK.mainHoleRadius
+          : level > -10 && level < 10
+            ? CORE_CATCHER.openingRadius
+            : 0;
       const radialDistance = Math.hypot(clampedX, clampedZ);
       if (holeRadius && radialDistance < holeRadius + 0.45) {
         const safeRadius = holeRadius + 0.45;
