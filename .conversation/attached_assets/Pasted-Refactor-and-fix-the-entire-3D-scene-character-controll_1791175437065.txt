@@ -1,0 +1,38 @@
+Refactor and fix the entire 3D scene, character controller, and visual fidelity. The current build has primitive low-poly shapes, wrong background environment (pyramids), broken camera controls, and incorrect player scaling. 
+
+Apply the following critical fixes:
+
+### 1. Realistic Player Scale & True First-Person Movement (First-Person Controller)
+- **Player Camera Height:** Set the eye-level height strictly to **1.6 meters (1.6 units)** above floor mesh level.
+- **Player Physics & Collisions:** Implement full WASD + Mouse look controls (PointerLockControls). Add floor collision detection so the user can walk directly on floor slabs without floating.
+- **Vertical Navigation (Elevators / Stairs / Teleport):** Add interactive stairs, elevator lifts, or keybindings (Shift/Space or UI buttons "Go to Floor -1", "Floor +15m", "Floor +36m") that smoothly move the player camera to different floor levels:
+  - **Basement Level (-5.0m):** DCS / I&C Server Room with servers and cable trays.
+  - **Middle Level (+15.0m):** Steam Generators deck, Reactor Pressure Vessel, Main Coolant Pumps.
+  - **Upper Level (+36.0m):** Polar Crane walkway, Refueling Machine, and Top Dome platform.
+
+### 2. Correct Proportions & Architectural Scale (True VVER-1000 Geometry)
+- **Scale:** Align 1 unit = 1 meter.
+- **Reactor Pressure Vessel (RPV):** Height ~12 meters, Diameter ~4.5 meters.
+- **Steam Generators (PGV-1000):** Horizontal cylindrical vessels (Length ~14 meters, Diameter ~4 meters).
+- **Containment Building:** Outer diameter ~45 meters, wall thickness 1.2 meters, total height ~60 meters.
+- **Floors & Walls:** Add solid concrete floor slabs (thickness 0.5m) dividing the 3 main levels so the player can actually walk inside the containment shell.
+
+### 3. Realistic Graphics, Lighting & Environment (No Pyramids)
+- **Remove Pyramids:** Replace the background desert/pyramid mesh with a realistic regional nuclear construction site landscape (flat arid terrain with Uzbekistan site context, safety fences, construction cranes, concrete batching equipment, and distant low hills).
+- **PBR Textures & Materials:** Apply physically based rendering materials using Three.js standard/physical materials:
+  - Textured concrete for floor slabs and containment walls with realistic roughness.
+  - Metallic finish with normal maps for reactor pressure vessel, steam generators, and piping.
+  - Bright industrial yellow (`#FFD700`) for the polar crane overhead structure.
+- **Lighting Setup:** Replace basic ambient light with realistic dynamic directional sunlight, soft ambient sky lighting, and point/spotlights inside the containment interior and server room.
+
+### 4. Detailed Basement (I&C / DCS Server Room at -5.0m)
+- Build a fully enclosed basement room under the main reactor building.
+- Populate with server racks arranged in rows, featuring status LEDs, fiber optic cable trays overhead, raised computer flooring, and monitoring terminal screens showing reactor telemetry (Power %, Temperature, Flow Rate).
+
+### 5. UI Controls & Teleport Overlay
+- Add a persistent overlay UI menu with buttons to instantly snap the camera view to:
+  - `[ View: Containment Cutaway Outer Tour ]` (Orbit camera around building exterior)
+  - `[ Walk: Basement Server Room (-5m) ]` (First-person walk mode inside DCS room)
+  - `[ Walk: Reactor & Steam Generators Deck (+15m) ]` (First-person walk mode on main deck)
+  - `[ Walk: Polar Crane Walkway (+36m) ]` (First-person walk mode looking down from top dome)
+- Display a crosshair in First-Person mode and show "Click to Walk Around" overlay.

@@ -1,0 +1,1 @@
+- [WebGL preview limitation](vver-webgl-preview.md) — Capture-browser screenshots here validate the UI fallback, not actual Three.js rendering.

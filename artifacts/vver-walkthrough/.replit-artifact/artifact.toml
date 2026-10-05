@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "VVER-1000 Reactor Walkthrough"
+description = "An interactive 3D walkthrough of a VVER-1000 nuclear plant, with realistic-scale containment, three walkable interior levels, and an exterior site tour."
+version = "1.0.0"
+id = "artifacts/vver-walkthrough"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23114
+
+[services.development]
+run = "pnpm --filter @workspace/vver-walkthrough run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/vver-walkthrough", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/vver-walkthrough/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23114"
+BASE_PATH = "/"
