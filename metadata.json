@@ -1,0 +1,8 @@
+{
+  "name": "VVER-1000 Nuclear Reactor 3D Walkthrough",
+  "description": "Interactive Three.js PBR 3D walkthrough and VR simulation of a VVER-1000 nuclear reactor building based on Rosatom engineering standards (Novovoronezh NPP reference).",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

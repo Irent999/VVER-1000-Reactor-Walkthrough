@@ -2,30 +2,64 @@ import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import {
-  RPV, STEAM_GEN, MCP, DECK, DARK_STEEL_COLOR, GREEN_METAL_COLOR, YELLOW,
+  RPV, STEAM_GEN, MCP, DECK, DARK_STEEL_COLOR, ROSATOM_LIME_GREEN, SAFETY_YELLOW, ECCS_TANKS,
 } from '@/scene/constants';
 import {
   brushedSteelMap, brushedSteelNormalMap, brushedSteelRoughnessMap,
+  diamondPlateMap, diamondPlateNormalMap, diamondPlateRoughnessMap,
 } from '@/scene/pbrTextures';
 
+// Distinct Rosatom safety lime-green / yellow-green glossy finish (Novovoronezh NPP reference standard)
+const rosatomLimeGreenMat = new THREE.MeshStandardMaterial({
+  color: ROSATOM_LIME_GREEN, // '#8DB600'
+  roughness: 0.3,
+  metalness: 0.3,
+  normalMap: brushedSteelNormalMap,
+  normalScale: new THREE.Vector2(0.04, 0.04),
+});
+
 const steelMat = new THREE.MeshStandardMaterial({
-  color: '#ffffff', map: brushedSteelMap, roughnessMap: brushedSteelRoughnessMap,
-  normalMap: brushedSteelNormalMap, normalScale: new THREE.Vector2(0.12, 0.12),
-  roughness: 0.28, metalness: 0.9,
+  color: '#ffffff',
+  map: brushedSteelMap,
+  roughnessMap: brushedSteelRoughnessMap,
+  normalMap: brushedSteelNormalMap,
+  normalScale: new THREE.Vector2(0.12, 0.12),
+  roughness: 0.28,
+  metalness: 0.9,
 });
+
 const darkSteelMat = new THREE.MeshStandardMaterial({
-  color: DARK_STEEL_COLOR, normalMap: brushedSteelNormalMap,
-  normalScale: new THREE.Vector2(0.08, 0.08), roughness: 0.4, metalness: 0.85,
+  color: DARK_STEEL_COLOR,
+  normalMap: brushedSteelNormalMap,
+  normalScale: new THREE.Vector2(0.08, 0.08),
+  roughness: 0.4,
+  metalness: 0.85,
 });
-const greenMetalMat = new THREE.MeshStandardMaterial({
-  color: GREEN_METAL_COLOR, normalMap: brushedSteelNormalMap,
-  normalScale: new THREE.Vector2(0.1, 0.1), roughness: 0.35, metalness: 0.75,
+
+const safetyYellowMat = new THREE.MeshStandardMaterial({
+  color: SAFETY_YELLOW, // '#FFCC00'
+  roughness: 0.35,
+  metalness: 0.25,
+  emissive: '#261e00',
+  emissiveIntensity: 0.05,
 });
-const yellowMat = new THREE.MeshStandardMaterial({ color: YELLOW, roughness: 0.45, metalness: 0.5 });
+
+const diamondWalkwayMat = new THREE.MeshStandardMaterial({
+  color: '#ffffff',
+  map: diamondPlateMap,
+  normalMap: diamondPlateNormalMap,
+  roughnessMap: diamondPlateRoughnessMap,
+  roughness: 0.4,
+  metalness: 0.75,
+});
+
 const pipeMat = new THREE.MeshStandardMaterial({
-  color: '#5a6c7d', normalMap: brushedSteelNormalMap,
-  normalScale: new THREE.Vector2(0.08, 0.08), roughnessMap: brushedSteelRoughnessMap,
-  roughness: 0.3, metalness: 0.92,
+  color: '#657382',
+  normalMap: brushedSteelNormalMap,
+  normalScale: new THREE.Vector2(0.08, 0.08),
+  roughnessMap: brushedSteelRoughnessMap,
+  roughness: 0.3,
+  metalness: 0.88,
 });
 
 /** Blue Cherenkov-like glow inside the reactor vessel top aperture */
@@ -45,6 +79,7 @@ function CherenkovGlow() {
   );
 }
 
+/** Reactor Pressure Vessel (12m high, 4.5m diameter) */
 function ReactorVessel() {
   const studRotRef = useRef<THREE.Group>(null);
   useFrame((_, dt) => { if (studRotRef.current) studRotRef.current.rotation.y += dt * 0.015; });
@@ -64,7 +99,7 @@ function ReactorVessel() {
       </mesh>
       {/* Top flange ring */}
       <mesh position={[0, RPV.flangeY, 0]} castShadow>
-        <cylinderGeometry args={[r + 0.2, r + 0.2, 1.0, 36]} />
+        <cylinderGeometry args={[r + 0.25, r + 0.25, 1.0, 36]} />
         <primitive object={darkSteelMat} attach="material" />
       </mesh>
       {/* Top hemispherical head */}
@@ -79,18 +114,29 @@ function ReactorVessel() {
           return (
             <mesh key={i} position={[Math.cos(a) * (r + 0.25), 0.5, Math.sin(a) * (r + 0.25)]} castShadow>
               <cylinderGeometry args={[0.08, 0.08, 1.5, 8]} />
-              <primitive object={yellowMat} attach="material" />
+              <primitive object={safetyYellowMat} attach="material" />
             </mesh>
           );
         })}
       </group>
-      {/* Inspection aperture (dark, reveals Cherenkov glow) */}
+      {/* Control rod drive mechanism nozzles on top head */}
+      {Array.from({ length: 12 }).map((_, i) => {
+        const a = (i / 12) * Math.PI * 2;
+        const rad = 0.8 + (i % 2) * 0.6;
+        return (
+          <mesh key={`crd-${i}`} position={[Math.cos(a) * rad, RPV.flangeY + 2.2, Math.sin(a) * rad]} castShadow>
+            <cylinderGeometry args={[0.07, 0.07, 2.4, 8]} />
+            <primitive object={darkSteelMat} attach="material" />
+          </mesh>
+        );
+      })}
+      {/* Central inspection aperture with Cherenkov glow */}
       <mesh position={[0, RPV.headTopY, 0]}>
         <cylinderGeometry args={[0.8, 0.8, 0.4, 16]} />
         <meshStandardMaterial color="#0a0a12" roughness={0.2} metalness={0.1} />
       </mesh>
       <CherenkovGlow />
-      {/* 4 inlet/outlet nozzles */}
+      {/* 4 inlet/outlet main coolant nozzles */}
       {Array.from({ length: 4 }).map((_, i) => {
         const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
         const nx = Math.cos(a) * (r + 0.2);
@@ -98,7 +144,7 @@ function ReactorVessel() {
         return (
           <group key={i} position={[nx, RPV.bodyTopY - 1, nz]} rotation={[0, -a, 0]}>
             <mesh castShadow rotation={[0, 0, Math.PI / 2]}>
-              <cylinderGeometry args={[0.6, 0.6, 2, 16]} />
+              <cylinderGeometry args={[0.65, 0.65, 2.2, 16]} />
               <primitive object={darkSteelMat} attach="material" />
             </mesh>
           </group>
@@ -113,7 +159,7 @@ function ReactorVessel() {
   );
 }
 
-/** Horizontal steam generator — 14m long, 4m diameter, oriented tangentially */
+/** Horizontal Steam Generator (PGV-1000) — in distinct Rosatom lime-green glossy finish (#8DB600) */
 function SteamGenerator({ index }: { index: number }) {
   const angle = (index / 4) * Math.PI * 2 + Math.PI / 4;
   const cx = Math.cos(angle) * STEAM_GEN.centerRadius;
@@ -123,21 +169,28 @@ function SteamGenerator({ index }: { index: number }) {
 
   return (
     <group position={[cx, STEAM_GEN.centerY, cz]} rotation={[0, -angle + Math.PI / 2, Math.PI / 2]}>
-      {/* Horizontal cylindrical shell */}
+      {/* Horizontal cylindrical shell in Rosatom safety lime-green (#8DB600) */}
       <mesh castShadow receiveShadow>
-        <cylinderGeometry args={[rad, rad, len, 28]} />
-        <primitive object={greenMetalMat} attach="material" />
+        <cylinderGeometry args={[rad, rad, len, 32]} />
+        <primitive object={rosatomLimeGreenMat} attach="material" />
       </mesh>
-      {/* Dished ends */}
+      {/* Dished ends in Rosatom safety lime-green */}
       <mesh position={[0, len / 2, 0]} castShadow>
-        <sphereGeometry args={[rad, 28, 14, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        <primitive object={greenMetalMat} attach="material" />
+        <sphereGeometry args={[rad, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <primitive object={rosatomLimeGreenMat} attach="material" />
       </mesh>
       <mesh position={[0, -len / 2, 0]} rotation={[Math.PI, 0, 0]} castShadow>
-        <sphereGeometry args={[rad, 28, 14, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        <primitive object={greenMetalMat} attach="material" />
+        <sphereGeometry args={[rad, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <primitive object={rosatomLimeGreenMat} attach="material" />
       </mesh>
-      {/* Support saddles */}
+      {/* Steel reinforcement girth rings */}
+      {[-3, 0, 3].map((yOffset) => (
+        <mesh key={yOffset} position={[0, yOffset, 0]}>
+          <torusGeometry args={[rad + 0.04, 0.08, 8, 32]} />
+          <primitive object={darkSteelMat} attach="material" />
+        </mesh>
+      ))}
+      {/* Heavy support saddles */}
       <mesh position={[0, -len / 3, -rad - 0.5]} castShadow>
         <boxGeometry args={[rad * 2.2, 1.5, 1.5]} />
         <primitive object={steelMat} attach="material" />
@@ -146,15 +199,125 @@ function SteamGenerator({ index }: { index: number }) {
         <boxGeometry args={[rad * 2.2, 1.5, 1.5]} />
         <primitive object={steelMat} attach="material" />
       </mesh>
-      {/* Secondary steam outlet nozzle on top */}
-      <mesh position={[rad - 0.3, len / 4, 0]} rotation={[0, 0, Math.PI / 2.5]} castShadow>
-        <cylinderGeometry args={[0.5, 0.5, 2.5, 12]} />
-        <primitive object={darkSteelMat} attach="material" />
+      {/* Steam collector manifold on top */}
+      <mesh position={[rad - 0.2, len / 4, 0]} rotation={[0, 0, Math.PI / 2.5]} castShadow>
+        <cylinderGeometry args={[0.55, 0.55, 2.5, 16]} />
+        <primitive object={pipeMat} attach="material" />
+      </mesh>
+      {/* Steam relief safety valve cluster */}
+      <mesh position={[rad + 1.2, len / 4, 0]} rotation={[0, 0, Math.PI / 2.5]} castShadow>
+        <cylinderGeometry args={[0.3, 0.3, 0.6, 12]} />
+        <primitive object={safetyYellowMat} attach="material" />
       </mesh>
       {/* Feedwater inlet nozzle on bottom */}
-      <mesh position={[-rad + 0.3, -len / 4, 0]} rotation={[0, 0, -Math.PI / 2.5]} castShadow>
-        <cylinderGeometry args={[0.4, 0.4, 2, 12]} />
+      <mesh position={[-rad + 0.2, -len / 4, 0]} rotation={[0, 0, -Math.PI / 2.5]} castShadow>
+        <cylinderGeometry args={[0.42, 0.42, 2, 14]} />
+        <primitive object={pipeMat} attach="material" />
+      </mesh>
+      {/* Service inspection catwalk alongside steam generator */}
+      <mesh position={[0, 0, rad + 0.6]} rotation={[0, 0, -Math.PI / 2]}>
+        <boxGeometry args={[len * 0.85, 0.08, 0.9]} />
+        <primitive object={diamondWalkwayMat} attach="material" />
+      </mesh>
+      {/* Catwalk yellow safety railing */}
+      <mesh position={[0, 0, rad + 1.1]} rotation={[0, 0, -Math.PI / 2]}>
+        <boxGeometry args={[len * 0.85, 0.04, 0.04]} />
+        <primitive object={safetyYellowMat} attach="material" />
+      </mesh>
+    </group>
+  );
+}
+
+/**
+ * Emergency Core Cooling Tanks (ЕО САОЗ - Емкости САОЗ / ECCS Hydroaccumulators)
+ * 4 high-pressure vertical tanks situated in compartments on the main deck,
+ * finished in distinct Rosatom safety lime-green (#8DB600) with metallic reflections (0.3) and roughness (0.3).
+ */
+function ECCSTank({ index }: { index: number }) {
+  const angle = (index / 4) * Math.PI * 2; // Offset by 45° from steam generators
+  const tx = Math.cos(angle) * ECCS_TANKS.centerRadius;
+  const tz = Math.sin(angle) * ECCS_TANKS.centerRadius;
+  const rad = ECCS_TANKS.radius;
+  const h = ECCS_TANKS.height;
+  const y = ECCS_TANKS.y;
+
+  return (
+    <group position={[tx, y, tz]}>
+      {/* Main vertical cylindrical pressure vessel in Rosatom lime-green (#8DB600) */}
+      <mesh castShadow receiveShadow>
+        <cylinderGeometry args={[rad, rad, h, 28]} />
+        <primitive object={rosatomLimeGreenMat} attach="material" />
+      </mesh>
+      {/* Top hemispherical dome in Rosatom lime-green */}
+      <mesh position={[0, h / 2, 0]} castShadow>
+        <sphereGeometry args={[rad, 28, 14, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <primitive object={rosatomLimeGreenMat} attach="material" />
+      </mesh>
+      {/* Bottom hemispherical head in Rosatom lime-green */}
+      <mesh position={[0, -h / 2, 0]} rotation={[Math.PI, 0, 0]} castShadow>
+        <sphereGeometry args={[rad, 28, 14, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <primitive object={rosatomLimeGreenMat} attach="material" />
+      </mesh>
+      {/* Structural support skirt anchoring to +15m deck */}
+      <mesh position={[0, -h / 2 - 1.2, 0]} castShadow receiveShadow>
+        <cylinderGeometry args={[rad + 0.15, rad + 0.35, 2.4, 28, 1, true]} />
         <primitive object={darkSteelMat} attach="material" />
+      </mesh>
+      {/* Top nitrogen pressurization nozzle & safety valve */}
+      <mesh position={[0, h / 2 + rad + 0.4, 0]} castShadow>
+        <cylinderGeometry args={[0.2, 0.2, 0.8, 12]} />
+        <primitive object={pipeMat} attach="material" />
+      </mesh>
+      <mesh position={[0, h / 2 + rad + 0.9, 0]} castShadow>
+        <boxGeometry args={[0.35, 0.45, 0.35]} />
+        <primitive object={safetyYellowMat} attach="material" />
+      </mesh>
+      {/* Bottom emergency injection discharge pipe leading to RPV downcomer */}
+      <mesh position={[0, -h / 2 - rad - 0.3, 0]} castShadow>
+        <cylinderGeometry args={[0.3, 0.3, 1.2, 16]} />
+        <primitive object={pipeMat} attach="material" />
+      </mesh>
+      {/* Level measurement sight glass / instrumentation column */}
+      <mesh position={[rad + 0.25, 0, 0]}>
+        <cylinderGeometry args={[0.06, 0.06, h * 0.75, 8]} />
+        <primitive object={steelMat} attach="material" />
+      </mesh>
+      {/* Tank inspection ladder with safety cage */}
+      <group position={[-rad - 0.25, 0, 0]}>
+        <mesh position={[0, 0, 0.2]}>
+          <cylinderGeometry args={[0.03, 0.03, h, 6]} />
+          <primitive object={safetyYellowMat} attach="material" />
+        </mesh>
+        <mesh position={[0, 0, -0.2]}>
+          <cylinderGeometry args={[0.03, 0.03, h, 6]} />
+          <primitive object={safetyYellowMat} attach="material" />
+        </mesh>
+        {Array.from({ length: 16 }).map((_, rIdx) => (
+          <mesh key={rIdx} position={[0, -h / 2 + 0.4 + rIdx * 0.45, 0]} rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.02, 0.02, 0.4, 6]} />
+            <primitive object={safetyYellowMat} attach="material" />
+          </mesh>
+        ))}
+      </group>
+      {/* Access platform around tank top */}
+      <mesh position={[0, h / 2 - 0.2, 0]} rotation={[0, 0, 0]}>
+        <ringGeometry args={[rad + 0.1, rad + 0.9, 24]} />
+        <primitive object={diamondWalkwayMat} attach="material" side={THREE.DoubleSide} />
+      </mesh>
+      {/* Platform yellow guardrail */}
+      {Array.from({ length: 16 }).map((_, pIdx) => {
+        const pa = (pIdx / 16) * Math.PI * 2;
+        const pr = rad + 0.9;
+        return (
+          <mesh key={`post-${pIdx}`} position={[Math.cos(pa) * pr, h / 2 + 0.4, Math.sin(pa) * pr]}>
+            <cylinderGeometry args={[0.025, 0.025, 1.1, 6]} />
+            <primitive object={safetyYellowMat} attach="material" />
+          </mesh>
+        );
+      })}
+      <mesh position={[0, h / 2 + 0.95, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[rad + 0.9, 0.03, 6, 24]} />
+        <primitive object={safetyYellowMat} attach="material" />
       </mesh>
     </group>
   );
@@ -178,15 +341,20 @@ function MainCoolantPump({ index }: { index: number }) {
       {/* Motor housing */}
       <mesh position={[0, 1, 0]} castShadow>
         <cylinderGeometry args={[0.7, 0.7, 2.5, 16]} />
-        <meshStandardMaterial color="#4a5a6a" roughness={0.35} metalness={0.85} />
+        <meshStandardMaterial color="#3a4855" roughness={0.35} metalness={0.85} />
       </mesh>
-      {/* Cooling fins on motor */}
+      {/* Motor cooling fins */}
       {Array.from({ length: 8 }).map((_, i) => (
         <mesh key={i} position={[0, 1, 0]} rotation={[0, (i / 8) * Math.PI * 2, 0]}>
           <boxGeometry args={[1.6, 1.8, 0.08]} />
-          <meshStandardMaterial color="#3a4a5a" roughness={0.4} metalness={0.8} />
+          <meshStandardMaterial color="#2d3844" roughness={0.4} metalness={0.8} />
         </mesh>
       ))}
+      {/* Safety yellow coupling shroud */}
+      <mesh position={[0, -0.05, 0]} castShadow>
+        <cylinderGeometry args={[0.82, 0.82, 0.4, 16]} />
+        <primitive object={safetyYellowMat} attach="material" />
+      </mesh>
       {/* Rotating indicator */}
       <mesh ref={rotRef} position={[0, 2.4, 0]}>
         <cylinderGeometry args={[0.3, 0.3, 0.2, 8]} />
@@ -242,11 +410,11 @@ function LoopPipe({ index }: { index: number }) {
   return (
     <group>
       <mesh castShadow>
-        <tubeGeometry args={[hotLeg, 28, 0.4, 12, false]} />
+        <tubeGeometry args={[hotLeg, 28, 0.42, 12, false]} />
         <primitive object={pipeMat} attach="material" />
       </mesh>
       <mesh castShadow>
-        <tubeGeometry args={[coldLeg, 32, 0.35, 12, false]} />
+        <tubeGeometry args={[coldLeg, 32, 0.38, 12, false]} />
         <primitive object={pipeMat} attach="material" />
       </mesh>
       {/* Inner pulsing glow — primary coolant flow */}
@@ -258,11 +426,6 @@ function LoopPipe({ index }: { index: number }) {
         <tubeGeometry args={[coldLeg, 32, 0.15, 8, false]} />
         <meshBasicMaterial color="#ff7744" transparent opacity={0.25} />
       </mesh>
-      {/* Pipe insulation cladding */}
-      <mesh>
-        <tubeGeometry args={[hotLeg, 28, 0.48, 8, false]} />
-        <meshStandardMaterial color="#9aa5b8" roughness={0.4} metalness={0.6} transparent opacity={0.3} />
-      </mesh>
     </group>
   );
 }
@@ -270,22 +433,22 @@ function LoopPipe({ index }: { index: number }) {
 function Pressurizer() {
   return (
     <group position={[-15, DECK.mainY + 3, 8]}>
-      {/* Vertical surge tank */}
+      {/* Vertical surge tank in Rosatom safety lime-green finish */}
       <mesh castShadow>
         <cylinderGeometry args={[1.5, 1.5, 8, 24]} />
-        <primitive object={greenMetalMat} attach="material" />
+        <primitive object={rosatomLimeGreenMat} attach="material" />
       </mesh>
       {/* Top dome */}
       <mesh position={[0, 4.2, 0]} castShadow>
         <sphereGeometry args={[1.5, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        <primitive object={greenMetalMat} attach="material" />
+        <primitive object={rosatomLimeGreenMat} attach="material" />
       </mesh>
       {/* Bottom dome */}
       <mesh position={[0, -4.2, 0]} castShadow>
         <sphereGeometry args={[1.5, 24, 12, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />
-        <primitive object={greenMetalMat} attach="material" />
+        <primitive object={rosatomLimeGreenMat} attach="material" />
       </mesh>
-      {/* Surge line connecting to hot leg of loop 1 */}
+      {/* Surge line connecting to hot leg */}
       <mesh position={[4, 2, -3]} rotation={[Math.PI / 2.5, 0, -Math.PI / 3]} castShadow>
         <cylinderGeometry args={[0.35, 0.35, 8, 12]} />
         <primitive object={pipeMat} attach="material" />
@@ -295,13 +458,6 @@ function Pressurizer() {
         <boxGeometry args={[3, 1.5, 3]} />
         <primitive object={steelMat} attach="material" />
       </mesh>
-      {/* Heating elements at bottom */}
-      {[-0.6, 0.6].map((x) => (
-        <mesh key={x} position={[x, -3.5, 0]} castShadow>
-          <cylinderGeometry args={[0.12, 0.12, 2, 8]} />
-          <meshStandardMaterial color="#cc4422" emissive="#cc4422" emissiveIntensity={0.4} roughness={0.4} metalness={0.5} />
-        </mesh>
-      ))}
     </group>
   );
 }
@@ -310,8 +466,13 @@ export default function SteamGeneratorDeck() {
   return (
     <group>
       <ReactorVessel />
+      {/* 4 Horizontal Steam Generators (PGV-1000) in Rosatom lime-green */}
       {[0, 1, 2, 3].map((i) => <SteamGenerator key={`sg-${i}`} index={i} />)}
+      {/* 4 Emergency Core Cooling Tanks (ЕО САОЗ / ECCS Hydroaccumulators) in Rosatom lime-green */}
+      {[0, 1, 2, 3].map((i) => <ECCSTank key={`eccs-${i}`} index={i} />)}
+      {/* 4 Main Coolant Pumps */}
       {[0, 1, 2, 3].map((i) => <MainCoolantPump key={`mcp-${i}`} index={i} />)}
+      {/* 4 Primary Coolant Loops */}
       {[0, 1, 2, 3].map((i) => <LoopPipe key={`pipe-${i}`} index={i} />)}
       <Pressurizer />
     </group>

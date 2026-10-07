@@ -1,10 +1,8 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useCallback } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { PointerLockControls } from '@react-three/drei';
-import type { PointerLockControls as PLCImpl } from 'three-stdlib';
 import * as THREE from 'three';
 import { CORE_CATCHER, DECK, EYE_HEIGHT } from '@/scene/constants';
-import { getFloorHeightAt, clampPlayerPosition } from '@/scene/floorDetection';
+import { getFloorHeightAt, resolvePlayerMovement } from '@/scene/floorDetection';
 
 interface FirstPersonControllerProps {
   targetFloor: number | null;
@@ -13,28 +11,58 @@ interface FirstPersonControllerProps {
   spawnPosition: [number, number, number];
 }
 
-export default function FirstPersonController({ targetFloor, onArrived, onLockChange, spawnPosition }: FirstPersonControllerProps) {
-  const { camera, gl } = useThree();
-  const controlsRef = useRef<PLCImpl>(null);
+export default function FirstPersonController({
+  targetFloor,
+  onArrived,
+  onLockChange,
+  spawnPosition,
+}: FirstPersonControllerProps) {
+  const { camera, gl, scene } = useThree();
+
   const keys = useRef<Record<string, boolean>>({});
   const velocity = useRef(new THREE.Vector3());
-  const currentFloorY = useRef(camera.position.y - EYE_HEIGHT);
+  const currentFloorY = useRef(spawnPosition[1] - EYE_HEIGHT);
+
+  // Smooth rotation & pointer lock state
+  const isLocked = useRef(false);
+  const targetYaw = useRef(0);
+  const targetPitch = useRef(0);
+  const currentYaw = useRef(0);
+  const currentPitch = useRef(0);
+  const isFirstFrameAfterLock = useRef(true);
+
+  // Elevator transition state
   const transitioning = useRef(false);
   const transitionTarget = useRef<number | null>(null);
   const transitionStart = useRef(0);
-  const transitionDuration = 1.5;
-  const spawnKey = `${spawnPosition[0]}:${spawnPosition[1]}:${spawnPosition[2]}`;
+  const transitionDuration = 1.4;
 
-  // Each walk mode starts inside the containment at a known safe location.
-  // Camera Y is always the floor elevation plus the exact 1.6 m eye height.
+  // Reusable raycaster for floor detection
+  const raycaster = useRef(new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, -1, 0), 0.05, 12));
+  const floorCandidates = useRef<THREE.Mesh[]>([]);
+  const lastCandidateRefresh = useRef(0);
+
+  // Sync camera spawn position & initialize target orientation
+  const spawnKey = `${spawnPosition[0]}:${spawnPosition[1]}:${spawnPosition[2]}`;
   useEffect(() => {
     camera.position.set(spawnPosition[0], spawnPosition[1], spawnPosition[2]);
-    currentFloorY.current = spawnPosition[1] - EYE_HEIGHT;
+    const eyeHeight = spawnPosition[1] >= 34.0 ? 1.8 : EYE_HEIGHT;
+    currentFloorY.current = spawnPosition[1] - eyeHeight;
     velocity.current.set(0, 0, 0);
-  // spawnKey intentionally represents the tuple and avoids unstable array deps.
+
+    // Initial look direction towards center
+    const lookAngle = Math.atan2(-spawnPosition[0], -spawnPosition[2]);
+    targetYaw.current = lookAngle;
+    currentYaw.current = lookAngle;
+    targetPitch.current = -0.05;
+    currentPitch.current = -0.05;
+
+    camera.rotation.order = 'YXZ';
+    camera.rotation.set(-0.05, lookAngle, 0);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [camera, spawnKey]);
 
+  // Keyboard inputs for WASD movement
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => { keys.current[e.code] = true; };
     const onKeyUp = (e: KeyboardEvent) => { keys.current[e.code] = false; };
@@ -46,57 +74,164 @@ export default function FirstPersonController({ targetFloor, onArrived, onLockCh
     };
   }, []);
 
-  useEffect(() => {
-    const controls = controlsRef.current;
-    if (!controls) return;
-
+  // Request pointer lock without camera jumping
+  const requestLock = useCallback(() => {
     const canvas = gl.domElement;
-    const lockFromCanvas = () => controls.lock();
-    const unlockFromEscape = (event: KeyboardEvent) => {
-      if (event.code === 'Escape' && controls.isLocked) {
-        controls.unlock();
+    if (document.pointerLockElement !== canvas) {
+      try {
+        canvas.requestPointerLock();
+      } catch {
+        // Fallback for user gesture activation
+      }
+    }
+  }, [gl]);
+
+  // Pointer lock change and mouse movement handlers with smoothing
+  useEffect(() => {
+    const canvas = gl.domElement;
+
+    const onPointerLockChange = () => {
+      const locked = document.pointerLockElement === canvas;
+      isLocked.current = locked;
+      onLockChange(locked);
+
+      if (locked) {
+        // Initialize rotation to current camera orientation to eliminate jumping
+        const euler = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ');
+        targetYaw.current = euler.y;
+        currentYaw.current = euler.y;
+        targetPitch.current = euler.x;
+        currentPitch.current = euler.x;
+        isFirstFrameAfterLock.current = true;
       }
     };
-    const onLock = () => onLockChange(true);
-    const onUnlock = () => onLockChange(false);
 
-    canvas.addEventListener('click', lockFromCanvas);
-    window.addEventListener('keydown', unlockFromEscape);
-    controls.addEventListener('lock', onLock);
-    controls.addEventListener('unlock', onUnlock);
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isLocked.current) return;
+
+      // Ignore synthetic warp deltas or anomalous spikes
+      if (isFirstFrameAfterLock.current) {
+        isFirstFrameAfterLock.current = false;
+        return;
+      }
+      if (Math.abs(e.movementX) > 120 || Math.abs(e.movementY) > 120) {
+        return;
+      }
+
+      // Smooth mouse sensitivity (0.002 rad per pixel)
+      const sensitivity = 0.0022;
+      targetYaw.current -= e.movementX * sensitivity;
+      targetPitch.current -= e.movementY * sensitivity;
+
+      // Vertical look pitch clamp (-85° to +85°)
+      const maxPitch = Math.PI / 2 - 0.08;
+      targetPitch.current = Math.max(-maxPitch, Math.min(maxPitch, targetPitch.current));
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Escape' && isLocked.current) {
+        document.exitPointerLock();
+      }
+    };
+
+    canvas.addEventListener('click', requestLock);
+    document.addEventListener('pointerlockchange', onPointerLockChange);
+    document.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('request-pointer-lock', requestLock);
+
+    // Bind any element marked with click-to-walk
+    const lockAnchor = document.getElementById('lock-anchor');
+    if (lockAnchor) {
+      lockAnchor.addEventListener('click', requestLock);
+    }
 
     return () => {
-      canvas.removeEventListener('click', lockFromCanvas);
-      window.removeEventListener('keydown', unlockFromEscape);
-      controls.removeEventListener('lock', onLock);
-      controls.removeEventListener('unlock', onUnlock);
-      if (controls.isLocked) controls.unlock();
+      canvas.removeEventListener('click', requestLock);
+      document.removeEventListener('pointerlockchange', onPointerLockChange);
+      document.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('request-pointer-lock', requestLock);
+      if (lockAnchor) {
+        lockAnchor.removeEventListener('click', requestLock);
+      }
+      if (document.pointerLockElement === canvas) {
+        document.exitPointerLock();
+      }
       onLockChange(false);
     };
-  }, [gl, onLockChange]);
+  }, [gl, camera, onLockChange, requestLock]);
 
-  // Handle floor teleport requests
+  // Handle instant elevator transitions
   useEffect(() => {
     if (targetFloor !== null) {
-      transitionTarget.current = targetFloor;
-      transitionStart.current = performance.now();
-      transitioning.current = true;
+      if (Math.abs(currentFloorY.current - targetFloor) > 0.5) {
+        transitionTarget.current = targetFloor;
+        transitionStart.current = performance.now();
+        transitioning.current = true;
+      }
     }
   }, [targetFloor]);
 
+  // Collect candidate floor meshes periodically for raycast performance
+  const refreshFloorCandidates = useCallback(() => {
+    const list: THREE.Mesh[] = [];
+    scene.traverse((obj) => {
+      if ((obj as THREE.Mesh).isMesh && (obj.visible || obj.name.includes('Floor') || obj.name.includes('Deck'))) {
+        const mesh = obj as THREE.Mesh;
+        // 1. Explicitly prioritize tagged floor decks, slabs, and walkable colliders
+        if (
+          mesh.userData?.isFloor ||
+          mesh.name === 'PolarCraneDeck' ||
+          mesh.name === 'Level33Floor' ||
+          mesh.name === 'PolarCraneDeckCollider' ||
+          mesh.name.includes('Floor') ||
+          mesh.name.includes('Deck')
+        ) {
+          list.unshift(mesh);
+        } else if (
+          mesh.receiveShadow ||
+          mesh.geometry?.type?.includes('Extrude') ||
+          mesh.geometry?.type?.includes('Plane') ||
+          mesh.geometry?.type?.includes('Ring')
+        ) {
+          // Exclude moving polar crane girders, hook blocks, and handrail components from floor detection
+          const pName = (mesh.parent?.name ?? '').toLowerCase();
+          const mName = mesh.name.toLowerCase();
+          if (!pName.includes('crane') && !mName.includes('rail') && !mName.includes('post') && !mName.includes('stiff')) {
+            list.push(mesh);
+          }
+        }
+      }
+    });
+    floorCandidates.current = list;
+  }, [scene]);
+
   useFrame((_, dt) => {
-    // Smooth vertical transition (elevator)
+    // 1. Smooth camera rotation damping (eliminates mouse stutter)
+    if (isLocked.current) {
+      const dampFactor = 26; // High responsiveness with smooth interpolation
+      currentYaw.current = THREE.MathUtils.damp(currentYaw.current, targetYaw.current, dampFactor, dt);
+      currentPitch.current = THREE.MathUtils.damp(currentPitch.current, targetPitch.current, dampFactor, dt);
+
+      camera.rotation.order = 'YXZ';
+      camera.rotation.set(currentPitch.current, currentYaw.current, 0);
+    }
+
+    // 2. Elevator transition interpolation
     if (transitioning.current && transitionTarget.current !== null) {
       const elapsed = (performance.now() - transitionStart.current) / 1000;
       const t = Math.min(elapsed / transitionDuration, 1);
       const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
       const startY = currentFloorY.current;
       const targetY = transitionTarget.current;
-      const newY = startY + (targetY - startY) * eased;
-      camera.position.y = newY + EYE_HEIGHT;
+      const newFloorY = startY + (targetY - startY) * eased;
+      const eyeH = targetY >= 34.0 ? 1.8 : EYE_HEIGHT;
+      camera.position.y = newFloorY + eyeH;
 
       if (t >= 1) {
         currentFloorY.current = targetY;
+        camera.position.y = targetY + eyeH;
         transitioning.current = false;
         transitionTarget.current = null;
         onArrived();
@@ -104,9 +239,9 @@ export default function FirstPersonController({ targetFloor, onArrived, onLockCh
       return;
     }
 
-    // WASD movement
+    // 3. WASD Movement in the horizontal plane
     const k = keys.current;
-    const speed = 4.2 * dt; // measured walking pace, in meters per second
+    const speed = 4.4 * dt; // Realistic walking pace: ~4.4 m/s
     const dir = new THREE.Vector3();
     camera.getWorldDirection(dir);
     dir.y = 0;
@@ -121,45 +256,65 @@ export default function FirstPersonController({ targetFloor, onArrived, onLockCh
 
     if (velocity.current.lengthSq() > 0) {
       velocity.current.normalize().multiplyScalar(speed);
-      const newX = camera.position.x + velocity.current.x;
-      const newZ = camera.position.z + velocity.current.z;
-      let [clampedX, clampedZ] = clampPlayerPosition(newX, newZ);
-      const level = currentFloorY.current;
-      const holeRadius = level > 25
-        ? DECK.upperHoleRadius
-        : level > 5 && level < 25
-          ? DECK.mainHoleRadius
-          : level > -10 && level < 10
-            ? CORE_CATCHER.openingRadius
-            : 0;
-      const radialDistance = Math.hypot(clampedX, clampedZ);
-      if (holeRadius && radialDistance < holeRadius + 0.45) {
-        const safeRadius = holeRadius + 0.45;
-        const angle = radialDistance > 0.001 ? Math.atan2(clampedZ, clampedX) : Math.PI / 4;
-        clampedX = Math.cos(angle) * safeRadius;
-        clampedZ = Math.sin(angle) * safeRadius;
-      }
-      camera.position.x = clampedX;
-      camera.position.z = clampedZ;
+      const [nextX, nextZ] = resolvePlayerMovement(
+        camera.position.x,
+        camera.position.z,
+        velocity.current.x,
+        velocity.current.z,
+        currentFloorY.current
+      );
+      camera.position.x = nextX;
+      camera.position.z = nextZ;
     }
 
-    // Floor collision — snap eye to floor height + EYE_HEIGHT
-    const floorSurface = getFloorHeightAt(camera.position.x, camera.position.z, currentFloorY.current + EYE_HEIGHT);
-    const targetEyeY = floorSurface + EYE_HEIGHT;
+    // 4. Raycasting Floor Detection: Support 1.8m eye level on Polar Crane Deck (+36m)
+    const now = performance.now();
+    if (now - lastCandidateRefresh.current > 2000 || floorCandidates.current.length === 0) {
+      refreshFloorCandidates();
+      lastCandidateRefresh.current = now;
+    }
 
-    // Smooth vertical follow for stairs/ramps
+    let detectedFloorY = getFloorHeightAt(camera.position.x, camera.position.z, camera.position.y);
+
+    // Cast downward ray from player position
+    const origin = new THREE.Vector3(camera.position.x, camera.position.y + 0.3, camera.position.z);
+    raycaster.current.set(origin, new THREE.Vector3(0, -1, 0));
+
+    if (floorCandidates.current.length > 0) {
+      const hits = raycaster.current.intersectObjects(floorCandidates.current, false);
+      for (const hit of hits) {
+        // Find valid floor hit below player eyes
+        if (hit.point.y <= camera.position.y + 0.1 && hit.distance > 0.05) {
+          // If within reasonable stair/floor step range of current level
+          if (Math.abs(hit.point.y - currentFloorY.current) < 2.5) {
+            detectedFloorY = hit.point.y;
+            break;
+          }
+        }
+      }
+    }
+
+    // Dynamic eye altitude: 1.8m on Polar Crane Deck (+36m level), 1.6m on other floors
+    const eyeHeight = detectedFloorY >= 34.0 ? 1.8 : EYE_HEIGHT;
+    const targetEyeY = detectedFloorY + eyeHeight;
     const dy = targetEyeY - camera.position.y;
-    if (Math.abs(dy) > 0.01) {
-      // Fast snap for small steps, smooth for larger transitions
-      if (Math.abs(dy) < 0.3) {
-        camera.position.y += dy * Math.min(dt * 10, 1);
-      } else {
-        camera.position.y += dy * Math.min(dt * 5, 1);
-      }
+
+    if (Math.abs(dy) > 0.005) {
+      // Rapid follow for stairs and steps, smooth damping for terrain
+      camera.position.y = THREE.MathUtils.damp(camera.position.y, targetEyeY, 20, dt);
+    } else {
+      camera.position.y = targetEyeY;
     }
-    camera.position.y = targetEyeY;
-    currentFloorY.current = floorSurface;
+    currentFloorY.current = camera.position.y - eyeHeight;
+
+    // 5. Ground Raycasting & Teleport Reset:
+    // If player Y drops below -12.0m, automatically reset camera to active level spawn point
+    if (camera.position.y < -12.0) {
+      camera.position.set(spawnPosition[0], spawnPosition[1], spawnPosition[2]);
+      currentFloorY.current = spawnPosition[1] - EYE_HEIGHT;
+      velocity.current.set(0, 0, 0);
+    }
   });
 
-  return <PointerLockControls ref={controlsRef as never} selector="#lock-anchor" />;
+  return null;
 }

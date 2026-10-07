@@ -1,6 +1,8 @@
 export const FLOOR_LEVELS = {
+  coreCatcher: -10.0,
   ground: -5.5,
   basement: -5.0,
+  turbineDeck: 12.0,
   main: 15.0,
   upper: 36.0,
 } as const;
@@ -76,9 +78,39 @@ export const POLAR_CRANE = {
   capacity: 320,
 } as const;
 
-export const YELLOW = '#FFD700';
+export const YELLOW = '#FFCC00';
+export const SAFETY_YELLOW = '#FFCC00';
+export const ROSATOM_LIME_GREEN = '#8DB600';
 export const CONCRETE_COLOR = '#b8b5ad';
 export const STEEL_COLOR = '#8d99ae';
 export const DARK_STEEL_COLOR = '#3a3a40';
-export const GREEN_METAL_COLOR = '#2d6a4f';
+export const GREEN_METAL_COLOR = '#8DB600';
 export const ARID_SOIL_COLOR = '#c4a87c';
+
+export const ECCS_TANKS = {
+  radius: 1.45,
+  height: 7.2,
+  capRadius: 1.45,
+  centerRadius: 16.2,
+  y: 18.6,
+} as const;
+
+export const HIGH_BAY_LIGHTS = {
+  ringRadius: 18.0,
+  y: 41.2,
+  count: 8,
+  color: '#fff4e6', // 4500K warm-white LED
+  intensity: 32,
+  distance: 45,
+} as const;
+
+export const RAIL_TRACKS = {
+  gauge: 1.52, // Standard Russian broad gauge / equipment transport dolly track
+  railWidth: 0.12,
+  railHeight: 0.08,
+  startX: -19,
+  endX: 6,
+  z: 0,
+  deckY: 15.0,
+} as const;
+

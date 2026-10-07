@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, Suspense, useCallback } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
-import { OrbitControls, Sky, Stars, Environment, AdaptiveDpr } from '@react-three/drei';
+import { OrbitControls, Sky, Stars, Environment, AdaptiveDpr, ContactShadows } from '@react-three/drei';
 import { XR, createXRStore, VRButton, TeleportTarget } from '@react-three/xr';
 import * as THREE from 'three';
 import type { OrbitControls as OCImpl } from 'three-stdlib';
@@ -9,9 +9,11 @@ import ReactorBuilding from '@/components/ReactorBuilding';
 import SteamGeneratorDeck from '@/components/SteamGeneratorDeck';
 import ServerRoom from '@/components/ServerRoom';
 import CoreCatcher from '@/components/CoreCatcher';
+import TurbineHall from '@/components/TurbineHall';
 import ExteriorScene from '@/components/ExteriorScene';
 import POIMarkers from '@/components/POIMarkers';
 import VRControllerManager from '@/components/VRControllerManager';
+import DroneFlyByController, { type DroneWaymark } from '@/components/DroneFlyByController';
 import FirstPersonController from '@/components/FirstPersonController';
 import UIOverlay from '@/components/UIOverlay';
 import { POI_LIST, FLOOR_VIEWS, type POIInfo, type ViewMode } from '@/data/poiData';
@@ -30,10 +32,14 @@ function CameraRig({ cameraPos, lookAt, mode }: { cameraPos: [number, number, nu
   const animating = useRef(false);
 
   useEffect(() => {
+    if (mode === 'drone') {
+      animating.current = false;
+      return;
+    }
     targetPos.current.set(...cameraPos);
     targetLook.current.set(...lookAt);
     animating.current = true;
-  }, [cameraPos, lookAt]);
+  }, [cameraPos, lookAt, mode]);
 
   // We use a simple lerp via requestAnimationFrame since OrbitControls handles its own updates
   useEffect(() => {
@@ -69,6 +75,7 @@ function SceneContent({ containmentOpacity, onPOISelect }: SceneContentProps) {
       <CoreCatcher />
       <SteamGeneratorDeck />
       <ServerRoom />
+      <TurbineHall />
       <ExteriorScene />
       <POIMarkers pois={POI_LIST} onSelect={onPOISelect} />
     </group>
@@ -119,12 +126,24 @@ function SceneUnavailable({ onRetry }: { onRetry: () => void }) {
 export default function App() {
   const [webglAvailable, setWebglAvailable] = useState(canCreateWebGL2);
   const [pointerLocked, setPointerLocked] = useState(false);
-  const [activeView, setActiveView] = useState('orbit-cutaway');
+  const [activeView, setActiveView] = useState('view-aerial');
   const [containmentOpacity, setContainmentOpacity] = useState(0.3);
   const [vrSupported, setVrSupported] = useState<boolean | null>(null);
   const [selectedPOI, setSelectedPOI] = useState<POIInfo | null>(null);
   const [floorTarget, setFloorTarget] = useState<number | null>(null);
   const telemetry = useTelemetry();
+
+  // Drone Fly-By state
+  const [droneSpeed, setDroneSpeed] = useState(1.0);
+  const [dronePaused, setDronePaused] = useState(false);
+  const [droneTelemetry, setDroneTelemetry] = useState<{
+    t: number;
+    altitude: number;
+    speedKmh: number;
+    headingDeg: number;
+    waymark: DroneWaymark;
+  } | null>(null);
+  const [scrubProgress, setScrubProgress] = useState<number | null>(null);
 
   const activeViewData = FLOOR_VIEWS.find((v) => v.id === activeView) ?? FLOOR_VIEWS[0];
   const controlMode: ViewMode = activeViewData.mode;
@@ -147,6 +166,9 @@ export default function App() {
     setActiveView(viewId);
     if (view.mode === 'walk') {
       setFloorTarget(view.floorY);
+    } else if (view.mode === 'drone') {
+      setDronePaused(false);
+      setScrubProgress(null);
     }
   }, []);
 
@@ -168,8 +190,8 @@ export default function App() {
 
   return (
       <div className="scene-grain w-full h-[100dvh] relative bg-[#182327] overflow-hidden">
-      {/* Hidden VRButton */}
-      <div className="absolute top-0 right-0 z-50 opacity-0 pointer-events-none">
+      {/* WebXR VR Button trigger */}
+      <div className="absolute top-0 right-0 pointer-events-none opacity-0">
         <VRButton store={xrStore} id="vr-btn" />
       </div>
 
@@ -177,36 +199,52 @@ export default function App() {
         <Canvas
           shadows
           camera={{ position: [50, 30, 60], fov: 60, near: 0.1, far: 1000 }}
-          gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.0 }}
-          dpr={[1, 2]}
+          gl={{
+            antialias: true,
+            toneMapping: THREE.ACESFilmicToneMapping,
+            toneMappingExposure: 1.08,
+            powerPreference: 'high-performance',
+          }}
+          dpr={[1, Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, 1.75)]}
         >
-        <color attach="background" args={['#87b4d4']} />
-        <fog attach="fog" args={['#c4a87c', 120, 350]} />
+        <color attach="background" args={['#8fb8d6']} />
+        <fog attach="fog" args={['#c2d7e8', 220, 580]} />
 
         <Suspense fallback={null}>
-          <Sky sunPosition={[80, 50, -30]} turbidity={5} rayleigh={1.2} mieCoefficient={0.008} mieDirectionalG={0.85} />
-          <Stars radius={400} depth={80} count={2000} factor={6} fade />
-          <Environment preset="warehouse" environmentIntensity={0.25} />
+          <Sky sunPosition={[95, 45, -45]} turbidity={2.6} rayleigh={0.8} mieCoefficient={0.005} mieDirectionalG={0.84} />
+          <Stars radius={450} depth={80} count={1200} factor={4} fade />
+          <Environment preset="warehouse" environmentIntensity={0.28} />
         </Suspense>
         <AdaptiveDpr pixelated />
 
-        {/* Realistic lighting setup */}
-        <hemisphereLight args={['#b0d0f0', '#c4a87c', 0.6]} />
+        {/* Realistic directional sunlight with soft 2048x2048 shadow mapping */}
+        <hemisphereLight args={['#b8d8f4', '#c2ab87', 0.72]} />
         <directionalLight
-          position={[80, 60, 40]}
+          position={[95, 65, 45]}
           intensity={2.8}
-          color="#fff4e0"
+          color="#fff5e6"
           castShadow
           shadow-mapSize-width={[2048]}
           shadow-mapSize-height={[2048]}
-          shadow-camera-left={[-80]}
-          shadow-camera-right={[80]}
-          shadow-camera-top={[80]}
-          shadow-camera-bottom={[-80]}
-          shadow-camera-far={[250]}
-          shadow-bias={-0.0004}
+          shadow-camera-left={[-110]}
+          shadow-camera-right={[110]}
+          shadow-camera-top={[110]}
+          shadow-camera-bottom={[-110]}
+          shadow-camera-far={[320]}
+          shadow-bias={-0.0002}
         />
-        <directionalLight position={[-40, 30, -50]} intensity={0.5} color="#88aaff" />
+        <directionalLight position={[-55, 35, -65]} intensity={0.45} color="#88aaff" />
+
+        {/* Smooth ambient occlusion contact shadows on +15m deck */}
+        <ContactShadows
+          position={[0, 15.01, 0]}
+          opacity={0.5}
+          scale={44}
+          blur={1.8}
+          far={8}
+          resolution={512}
+          color="#0c1417"
+        />
 
         <XR store={xrStore}>
           <TeleportTarget>
@@ -218,19 +256,27 @@ export default function App() {
         {/* Camera rig for orbit transitions */}
         <CameraRig
           cameraPos={activeViewData.cameraPos}
-          lookAt={[0, activeViewData.floorY, 0]}
+          lookAt={activeViewData.target ?? [0, activeViewData.floorY, 0]}
           mode={controlMode}
         />
 
         {controlMode === 'orbit' ? (
           <OrbitControls
-            target={[0, activeViewData.floorY, 0]}
+            target={activeViewData.target ?? [0, activeViewData.floorY, 0]}
             enableDamping
             dampingFactor={0.08}
-            minDistance={10}
-            maxDistance={150}
+            minDistance={8}
+            maxDistance={380}
             maxPolarAngle={Math.PI * 0.88}
             makeDefault
+          />
+        ) : controlMode === 'drone' ? (
+          <DroneFlyByController
+            active={activeView === 'view-drone'}
+            speedMultiplier={droneSpeed}
+            paused={dronePaused}
+            scrubProgress={scrubProgress}
+            onTelemetryUpdate={setDroneTelemetry}
           />
         ) : (
           <FirstPersonController
@@ -256,6 +302,14 @@ export default function App() {
         onVRClick={handleVRClick}
         vrSupported={vrSupported}
         telemetry={telemetry}
+        droneSpeed={droneSpeed}
+        onDroneSpeedChange={setDroneSpeed}
+        dronePaused={dronePaused}
+        onDroneTogglePause={() => setDronePaused((p) => !p)}
+        droneTelemetry={droneTelemetry}
+        onDroneScrub={(t) => {
+          setScrubProgress(t);
+        }}
       />
 
       {selectedPOI && (
