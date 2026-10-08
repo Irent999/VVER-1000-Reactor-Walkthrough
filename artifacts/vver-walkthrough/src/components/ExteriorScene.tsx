@@ -6,13 +6,14 @@ import {
   concreteMap, concreteNormalMap, concreteRoughnessMap,
   brushedSteelMap, brushedSteelNormalMap, brushedSteelRoughnessMap,
 } from '@/scene/pbrTextures';
+import { siteGrassLawnMaterial } from '@/scene/nppEnvironment';
 
 // ============================================================================
 // PBR MATERIALS - NOVOVORONEZH NPP UNIT 6 INDUSTRIAL PALETTE
 // ============================================================================
 
 const concretePBRMat = new THREE.MeshStandardMaterial({
-  color: '#dedbd2',
+  color: '#E3E5E8', // Свежий автоклавный светло-серый бетон НВАЭС (#E3E5E8)
   map: concreteMap,
   roughnessMap: concreteRoughnessMap,
   normalMap: concreteNormalMap,
@@ -22,13 +23,13 @@ const concretePBRMat = new THREE.MeshStandardMaterial({
 });
 
 const concreteDarkPBRMat = new THREE.MeshStandardMaterial({
-  color: '#8f9294',
+  color: '#8A8E94',
   map: concreteMap,
   roughnessMap: concreteRoughnessMap,
   normalMap: concreteNormalMap,
   normalScale: new THREE.Vector2(0.25, 0.25),
   roughness: 0.88,
-  metalness: 0.05,
+  metalness: 0.04,
 });
 
 // NVNPP Unit 6 Color Scheme: Warm beige/cream industrial wall panels
@@ -101,30 +102,40 @@ const concreteWalkwayMat = new THREE.MeshStandardMaterial({
   metalness: 0.04,
 });
 
-// Deep green manicured lawns
-const deepGreenLawnMat = new THREE.MeshStandardMaterial({
-  color: '#345e2c', // Deep green lawns
-  roughness: 0.95,
-  metalness: 0.0,
+// Внутренняя промышленная площадка АЭС: серое/гравийное покрытие (0x808080)
+const industrialGravelPlatformMat = new THREE.MeshStandardMaterial({
+  color: '#808080', // Серое гравийное покрытие промплощадки по ТЗ
+  roughness: 0.88,
+  metalness: 0.04,
 });
 
-// Arid semi-desert soil & steppe vegetation
+// Полупустынная сухая степь Джизакской области (озеро Тузкан) - 0xC2B280 (песчано-бежевый)
 const aridTerrainMat = new THREE.MeshStandardMaterial({
-  color: '#ba9f77',
-  roughness: 0.96,
+  color: 0xC2B280, // Песчано-бежевый цвет сухой глинистой степи по ТЗ
+  roughness: 0.94,
   metalness: 0.02,
   flatShading: true,
 });
 
+// Сухой серо-оливковый оттенок холмов на заднем плане (0x8B8C7A)
+const distantHillsMat = new THREE.MeshStandardMaterial({
+  color: 0x8B8C7A, // Сухой серо-оливковый / выгоревшая степь по ТЗ
+  roughness: 0.95,
+  metalness: 0.01,
+  flatShading: true,
+});
+
+// Сухая песчано-соломенная степная трава (полынь, ковыль)
 const dryGrassMat = new THREE.MeshStandardMaterial({
-  color: '#BDB76B', // Steppe dry grass
+  color: '#c2b67d', // Steppe dry grass
   roughness: 0.95,
   metalness: 0.0,
   side: THREE.DoubleSide,
 });
 
+// Степные сухостойные кустарники (полынные полукустарники)
 const greenShrubMat = new THREE.MeshStandardMaterial({
-  color: '#556B2F', // Green shrubs
+  color: 0x8B8C7A, // Сухой серо-оливковый оттенок кустарников
   roughness: 0.92,
   metalness: 0.0,
   flatShading: true,
@@ -132,35 +143,35 @@ const greenShrubMat = new THREE.MeshStandardMaterial({
 
 // Lake Tuzkan water & sand materials
 const lakeWaterMat = new THREE.MeshStandardMaterial({
-  color: '#1c5f78',
-  roughness: 0.05,
-  metalness: 0.42,
+  color: '#2b6b85', // Солоноватое степное озеро Тузкан
+  roughness: 0.06,
+  metalness: 0.38,
   transparent: true,
-  opacity: 0.93,
+  opacity: 0.92,
 });
 
 const lakeSandMat = new THREE.MeshStandardMaterial({
-  color: '#ceb991',
+  color: 0xC2B280, // Песчано-бежевый пляж
   roughness: 0.98,
   metalness: 0.01,
 });
 
 const reedGrassMat = new THREE.MeshStandardMaterial({
-  color: '#829158',
+  color: 0x8B8C7A, // Серо-оливковый тростник
   roughness: 0.9,
   metalness: 0.0,
   side: THREE.DoubleSide,
 });
 
-// Cooling Tower double-sided concrete shell & internal basin materials
+// Cooling Tower double-sided concrete shell & internal basin materials (НВАЭС)
 const coolingTowerShellMat = new THREE.MeshStandardMaterial({
-  color: '#d6d3c9',
+  color: '#E3E5E8', // Светло-серый монолитный бетон НВАЭС
   map: concreteMap,
   roughnessMap: concreteRoughnessMap,
   normalMap: concreteNormalMap,
   normalScale: new THREE.Vector2(0.24, 0.24),
-  roughness: 0.85,
-  metalness: 0.05,
+  roughness: 0.86,
+  metalness: 0.04,
   side: THREE.DoubleSide, // Double-sided so inner walls are opaque solid concrete
 });
 
@@ -215,9 +226,9 @@ const transmissionCableMat = new THREE.MeshStandardMaterial({
 });
 
 const ceramicInsulatorMat = new THREE.MeshStandardMaterial({
-  color: '#4d6575',
-  roughness: 0.25,
-  metalness: 0.6,
+  color: '#8A3324', // Терракотовый высоковольтный фарфор (ОРУ-500 кВ)
+  roughness: 0.18,
+  metalness: 0.12,
 });
 
 const fenceMeshMat = new THREE.MeshStandardMaterial({
@@ -239,6 +250,7 @@ const floodlightMat = new THREE.MeshStandardMaterial({
 function UndulatingSteppeTerrain() {
   const gY = FLOOR_LEVELS.ground;
 
+  // Основной рельеф степи вокруг станции и котловины озера Тузкан
   const terrainGeo = useMemo(() => {
     const geo = new THREE.PlaneGeometry(900, 900, 80, 80);
     const pos = geo.attributes.position;
@@ -258,18 +270,12 @@ function UndulatingSteppeTerrain() {
         const dip = Math.min(eastDist / 30, 1.0);
         pos.setZ(i, -1.8 * dip);
       } else {
-        // Rolling steppe terrain around west, north and south perimeter
+        // Rolling semi-arid steppe terrain around west, north and south perimeter
         const blend = Math.min((dist - 140) / 40, 1.0);
-        let h =
+        const h =
           (Math.sin(x * 0.02) * Math.cos(z * 0.018) * 2.2 +
             Math.sin(x * 0.045 + z * 0.035) * 1.0) *
           blend;
-
-        // Distant horizon mountain ridges rise
-        if (dist > 250) {
-          const horiz = (dist - 250) / 130;
-          h += (Math.sin(x * 0.014) * 9 + Math.cos(z * 0.012) * 10 + 9) * horiz;
-        }
 
         pos.setZ(i, h);
       }
@@ -278,15 +284,61 @@ function UndulatingSteppeTerrain() {
     return geo;
   }, []);
 
+  // Отдельная геометрия холмов на горизонте (сухой серо-оливковый 0x8B8C7A)
+  const hillsGeo = useMemo(() => {
+    const geo = new THREE.PlaneGeometry(900, 900, 70, 70);
+    const pos = geo.attributes.position;
+
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const y = pos.getY(i);
+      const z = -y;
+      const dist = Math.hypot(x, z);
+
+      if (dist <= 240) {
+        pos.setZ(i, -10); // Ниже горизонта внутри рабочей зоны
+      } else {
+        const horiz = Math.min((dist - 240) / 140, 1.0);
+        const ridge = (Math.sin(x * 0.012) * 14 + Math.cos(z * 0.014) * 16 + 18) * horiz;
+        pos.setZ(i, Math.max(0, ridge));
+      }
+    }
+    geo.computeVertexNormals();
+    return geo;
+  }, []);
+
   return (
-    <mesh
-      geometry={terrainGeo}
-      rotation={[-Math.PI / 2, 0, 0]}
-      position={[0, gY, 0]}
-      receiveShadow
-    >
-      <primitive object={aridTerrainMat} attach="material" />
-    </mesh>
+    <group>
+      {/* 1. Основная поверхность сухой песчано-степной земли Джизакской области (0xC2B280) */}
+      <mesh
+        geometry={terrainGeo}
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, gY, 0]}
+        receiveShadow
+      >
+        <primitive object={aridTerrainMat} attach="material" />
+      </mesh>
+
+      {/* 2. Промышленная площадка АЭС: серое/гравийное покрытие (0x808080) */}
+      <mesh
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[30, gY + 0.015, 5]}
+        receiveShadow
+      >
+        <planeGeometry args={[370, 310]} />
+        <primitive object={industrialGravelPlatformMat} attach="material" />
+      </mesh>
+
+      {/* 3. Холмы на заднем плане: сухой серо-оливковый / выгоревшая степь (0x8B8C7A) */}
+      <mesh
+        geometry={hillsGeo}
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, gY, 0]}
+        receiveShadow
+      >
+        <primitive object={distantHillsMat} attach="material" />
+      </mesh>
+    </group>
   );
 }
 
@@ -448,7 +500,13 @@ function LakeTuzkanShoreline() {
 // 4. SOLID HYPERBOLOID COOLING TOWER & INTERNAL WATER BASIN (NVNPP REFERENCE)
 // ============================================================================
 
-function CoolingTower({ position }: { position: [number, number, number] }) {
+interface CoolingTowerProps {
+  position: [number, number, number];
+  name?: string;
+  scale?: [number, number, number] | number;
+}
+
+function CoolingTower({ position, name = 'CoolingTower', scale = 1 }: CoolingTowerProps) {
   const height = 94;
   const segments = 36;
 
@@ -467,7 +525,7 @@ function CoolingTower({ position }: { position: [number, number, number] }) {
   }, [height]);
 
   return (
-    <group position={position}>
+    <group position={position} name={name} scale={scale}>
       {/* 1. Double-Sided Solid Hyperboloid Concrete Shell */}
       <mesh castShadow receiveShadow>
         <latheGeometry args={[lathePoints, segments]} />
@@ -1056,92 +1114,200 @@ function RoadwaysAndLandscaping() {
         <primitive object={concreteWalkwayMat} attach="material" />
       </mesh>
 
-      {/* 5. Deep Green Manicured Lawns along roadways and building plazas */}
+      {/* 5. Внутренние благоустроенные зоны промышленной площадки: гравийное покрытие (0x808080) */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-25, gY + 0.03, 62]} receiveShadow>
         <planeGeometry args={[44, 26]} />
-        <primitive object={deepGreenLawnMat} attach="material" />
+        <primitive object={industrialGravelPlatformMat} attach="material" />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[45, gY + 0.03, 62]} receiveShadow>
         <planeGeometry args={[60, 26]} />
-        <primitive object={deepGreenLawnMat} attach="material" />
+        <primitive object={industrialGravelPlatformMat} attach="material" />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[40, gY + 0.03, -68]} receiveShadow>
         <planeGeometry args={[110, 28]} />
-        <primitive object={deepGreenLawnMat} attach="material" />
+        <primitive object={industrialGravelPlatformMat} attach="material" />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, gY + 0.03, 115]} receiveShadow>
         <planeGeometry args={[95, 24]} />
-        <primitive object={deepGreenLawnMat} attach="material" />
+        <primitive object={industrialGravelPlatformMat} attach="material" />
       </mesh>
     </group>
   );
 }
 
 // ============================================================================
-// 11. SITE PERIMETER SECURITY FENCING & FLOODLIGHT POSTS
+// 11. SITE PERIMETER SECURITY FENCING & FLOODLIGHT POSTS (HIGH-PERFORMANCE INSTANCEDMESH)
 // ============================================================================
 
 function SiteFencingAndLighting() {
   const gY = FLOOR_LEVELS.ground;
 
-  const floodlightPositions = useMemo(
+  const floodlightPositions: Array<[number, number, number]> = useMemo(
     () => [
-      [-64, gY, 68] as [number, number, number],
-      [0, gY, 68] as [number, number, number],
-      [64, gY, 68] as [number, number, number],
-      [-64, gY, -70] as [number, number, number],
-      [0, gY, -70] as [number, number, number],
-      [64, gY, -70] as [number, number, number],
-      [145, gY, 0] as [number, number, number],
-      [-66, gY, 0] as [number, number, number],
+      [-64, gY, 68],
+      [0, gY, 68],
+      [64, gY, 68],
+      [-64, gY, -70],
+      [0, gY, -70],
+      [64, gY, -70],
+      [145, gY, 0],
+      [-66, gY, 0],
     ],
     [gY]
   );
 
-  return (
-    <group>
-      {/* Perimeter Security Fences */}
-      {[
-        { pos: [40, gY, 78] as [number, number, number], rot: 0, len: 196 },
-        { pos: [40, gY, -82] as [number, number, number], rot: 0, len: 196 },
-        { pos: [142, gY, -2] as [number, number, number], rot: Math.PI / 2, len: 160 },
-        { pos: [-64, gY, -2] as [number, number, number], rot: Math.PI / 2, len: 160 },
-      ].map((f, i) => (
-        <group key={`fence-${i}`} position={f.pos} rotation={[0, f.rot, 0]}>
-          <mesh position={[0, 0.15, 0]}>
-            <boxGeometry args={[f.len, 0.3, 0.4]} />
-            <primitive object={concreteCurbMat} attach="material" />
-          </mesh>
-          <mesh position={[0, 1.4, 0]}>
-            <boxGeometry args={[f.len, 2.2, 0.02]} />
-            <primitive object={fenceMeshMat} attach="material" />
-          </mesh>
-        </group>
-      ))}
+  const fences = useMemo(
+    () => [
+      { pos: [40, gY, 78] as [number, number, number], rot: 0, len: 196 },
+      { pos: [40, gY, -82] as [number, number, number], rot: 0, len: 196 },
+      { pos: [142, gY, -2] as [number, number, number], rot: Math.PI / 2, len: 160 },
+      { pos: [-64, gY, -2] as [number, number, number], rot: Math.PI / 2, len: 160 },
+    ],
+    [gY]
+  );
 
-      {/* Industrial Floodlight Posts along perimeter */}
-      {floodlightPositions.map((pos, i) => (
-        <group key={`pole-${i}`} position={pos}>
-          <mesh position={[0, 0.25, 0]}>
-            <cylinderGeometry args={[0.5, 0.6, 0.5, 8]} />
-            <primitive object={concreteDarkPBRMat} attach="material" />
-          </mesh>
-          <mesh position={[0, 6, 0]}>
-            <cylinderGeometry args={[0.1, 0.18, 12, 8]} />
-            <primitive object={steelTrussMat} attach="material" />
-          </mesh>
-          <mesh position={[0, 12, 0]}>
-            <boxGeometry args={[1.8, 0.12, 0.12]} />
-            <primitive object={steelTrussMat} attach="material" />
-          </mesh>
-          {[-0.7, 0.7].map((lx) => (
-            <mesh key={`head-${lx}`} position={[lx, 12.1, 0.2]} rotation={[Math.PI / 4, 0, 0]}>
-              <boxGeometry args={[0.5, 0.35, 0.25]} />
-              <primitive object={floodlightMat} attach="material" />
-            </mesh>
-          ))}
-        </group>
-      ))}
+  // Instanced Meshes for Fences (Curbs, Mesh Panels, Steel Posts)
+  const { curbsMesh, panelsMesh, postsMesh } = useMemo(() => {
+    const curbGeom = new THREE.BoxGeometry(1, 0.3, 0.4);
+    const panelGeom = new THREE.BoxGeometry(1, 2.2, 0.02);
+    const postGeom = new THREE.CylinderGeometry(0.06, 0.06, 2.4, 8);
+
+    const cMesh = new THREE.InstancedMesh(curbGeom, concreteCurbMat, fences.length);
+    const pMesh = new THREE.InstancedMesh(panelGeom, fenceMeshMat, fences.length);
+    cMesh.receiveShadow = true;
+    cMesh.frustumCulled = true;
+    pMesh.castShadow = true;
+    pMesh.receiveShadow = true;
+    pMesh.frustumCulled = true;
+
+    // Posts placed every 8 meters along all perimeter segments
+    const postMatrices: THREE.Matrix4[] = [];
+    const dummy = new THREE.Object3D();
+
+    fences.forEach((f, idx) => {
+      // Concrete Curb Foundation
+      dummy.position.set(f.pos[0], f.pos[1] + 0.15, f.pos[2]);
+      dummy.rotation.set(0, f.rot, 0);
+      dummy.scale.set(f.len, 1, 1);
+      dummy.updateMatrix();
+      cMesh.setMatrixAt(idx, dummy.matrix);
+
+      // Wire Mesh Protective Panel
+      dummy.position.set(f.pos[0], f.pos[1] + 1.4, f.pos[2]);
+      dummy.rotation.set(0, f.rot, 0);
+      dummy.scale.set(f.len, 1, 1);
+      dummy.updateMatrix();
+      pMesh.setMatrixAt(idx, dummy.matrix);
+
+      // Periodic vertical steel posts
+      const numPosts = Math.floor(f.len / 8);
+      const halfLen = f.len / 2;
+      for (let pi = 0; pi <= numPosts; pi++) {
+        const offset = -halfLen + (pi / numPosts) * f.len;
+        dummy.position.set(
+          f.pos[0] + (f.rot === 0 ? offset : 0),
+          f.pos[1] + 1.2,
+          f.pos[2] + (f.rot === 0 ? 0 : offset)
+        );
+        dummy.rotation.set(0, 0, 0);
+        dummy.scale.set(1, 1, 1);
+        dummy.updateMatrix();
+        postMatrices.push(dummy.matrix.clone());
+      }
+    });
+
+    cMesh.instanceMatrix.needsUpdate = true;
+    pMesh.instanceMatrix.needsUpdate = true;
+
+    const ptMesh = new THREE.InstancedMesh(postGeom, steelTrussMat, postMatrices.length);
+    ptMesh.castShadow = true;
+    ptMesh.frustumCulled = true;
+    postMatrices.forEach((mat, idx) => {
+      ptMesh.setMatrixAt(idx, mat);
+    });
+    ptMesh.instanceMatrix.needsUpdate = true;
+
+    return { curbsMesh: cMesh, panelsMesh: pMesh, postsMesh: ptMesh };
+  }, [fences]);
+
+  // Instanced Meshes for High-Mast Perimeter Floodlights
+  const { lightBasesMesh, lightMastsMesh, lightArmsMesh, lightHeadsMesh } = useMemo(() => {
+    const count = floodlightPositions.length;
+    const baseGeom = new THREE.CylinderGeometry(0.5, 0.6, 0.5, 8);
+    const mastGeom = new THREE.CylinderGeometry(0.1, 0.18, 12, 8);
+    const armGeom = new THREE.BoxGeometry(1.8, 0.12, 0.12);
+    const headGeom = new THREE.BoxGeometry(0.5, 0.35, 0.25);
+
+    const bMesh = new THREE.InstancedMesh(baseGeom, concreteDarkPBRMat, count);
+    const mMesh = new THREE.InstancedMesh(mastGeom, steelTrussMat, count);
+    const aMesh = new THREE.InstancedMesh(armGeom, steelTrussMat, count);
+    const hMesh = new THREE.InstancedMesh(headGeom, floodlightMat, count * 2);
+
+    bMesh.frustumCulled = true;
+    mMesh.frustumCulled = true;
+    aMesh.frustumCulled = true;
+    hMesh.frustumCulled = true;
+
+    const dummy = new THREE.Object3D();
+    let headIdx = 0;
+
+    floodlightPositions.forEach((pos, idx) => {
+      // Concrete Plinth
+      dummy.position.set(pos[0], pos[1] + 0.25, pos[2]);
+      dummy.rotation.set(0, 0, 0);
+      dummy.scale.set(1, 1, 1);
+      dummy.updateMatrix();
+      bMesh.setMatrixAt(idx, dummy.matrix);
+
+      // Steel Mast
+      dummy.position.set(pos[0], pos[1] + 6, pos[2]);
+      dummy.rotation.set(0, 0, 0);
+      dummy.scale.set(1, 1, 1);
+      dummy.updateMatrix();
+      mMesh.setMatrixAt(idx, dummy.matrix);
+
+      // Top Crossarm
+      dummy.position.set(pos[0], pos[1] + 12, pos[2]);
+      dummy.rotation.set(0, 0, 0);
+      dummy.scale.set(1, 1, 1);
+      dummy.updateMatrix();
+      aMesh.setMatrixAt(idx, dummy.matrix);
+
+      // Twin floodlight luminaires
+      for (const lx of [-0.7, 0.7]) {
+        dummy.position.set(pos[0] + lx, pos[1] + 12.1, pos[2] + 0.2);
+        dummy.rotation.set(Math.PI / 4, 0, 0);
+        dummy.scale.set(1, 1, 1);
+        dummy.updateMatrix();
+        hMesh.setMatrixAt(headIdx++, dummy.matrix);
+      }
+    });
+
+    bMesh.instanceMatrix.needsUpdate = true;
+    mMesh.instanceMatrix.needsUpdate = true;
+    aMesh.instanceMatrix.needsUpdate = true;
+    hMesh.instanceMatrix.needsUpdate = true;
+
+    return {
+      lightBasesMesh: bMesh,
+      lightMastsMesh: mMesh,
+      lightArmsMesh: aMesh,
+      lightHeadsMesh: hMesh,
+    };
+  }, [floodlightPositions]);
+
+  return (
+    <group name="InstancedSiteFencingAndLighting">
+      {/* 1. Instanced Fences (Curb, Wire Mesh, Posts) */}
+      <primitive object={curbsMesh} />
+      <primitive object={panelsMesh} />
+      <primitive object={postsMesh} />
+
+      {/* 2. Instanced High-Mast Floodlights */}
+      <primitive object={lightBasesMesh} />
+      <primitive object={lightMastsMesh} />
+      <primitive object={lightArmsMesh} />
+      <primitive object={lightHeadsMesh} />
     </group>
   );
 }
@@ -1152,6 +1318,14 @@ function SiteFencingAndLighting() {
 
 export default function ExteriorScene() {
   const gY = FLOOR_LEVELS.ground;
+
+  // Exactly 2 cooling towers placed symmetrically opposite each of the two VVER containments:
+  // - CoolingTower_1 opposite Unit 1 containment (Z ≈ 0)
+  // - CoolingTower_2 opposite Unit 2 containment (Z ≈ 70)
+  const coolingTowerPositions = [
+    { name: 'CoolingTower_1', x: -115, y: gY, z: 0, scale: 1 },
+    { name: 'CoolingTower_2', x: -115, y: gY, z: 70, scale: 1 },
+  ];
 
   return (
     <group>
@@ -1164,8 +1338,17 @@ export default function ExteriorScene() {
       {/* 3. Site Security Fencing & Perimeter Industrial Lighting */}
       <SiteFencingAndLighting />
 
-      {/* 4. Solid Hyperboloid Cooling Tower (Градирня) with Internal Basin & Columns */}
-      <CoolingTower position={[-125, gY, -115]} />
+      {/* 4. Exactly 2 Cooling Towers (Ровно 2 градирни, симметрично напротив энергоблоков) */}
+      <group name="coolingTowersGroup">
+        {coolingTowerPositions.map((cfg) => (
+          <CoolingTower
+            key={cfg.name}
+            name={cfg.name}
+            position={[cfg.x, cfg.y, cfg.z]}
+            scale={cfg.scale}
+          />
+        ))}
+      </group>
 
       {/* 6. Ventilation Chimneys (Венттрубы) - Red/white striped with ring platforms */}
       <VentilationChimneys position={[-22, gY, -28]} />

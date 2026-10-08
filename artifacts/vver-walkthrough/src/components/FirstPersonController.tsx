@@ -1,7 +1,8 @@
 import { useRef, useEffect, useCallback } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { CORE_CATCHER, DECK, EYE_HEIGHT } from '@/scene/constants';
+import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js';
+import { EYE_HEIGHT } from '@/scene/constants';
 import { getFloorHeightAt, resolvePlayerMovement } from '@/scene/floorDetection';
 
 interface FirstPersonControllerProps {

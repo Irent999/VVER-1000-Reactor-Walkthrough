@@ -124,10 +124,10 @@ function createConcreteMaps() {
       const nCoarse = (smoothNoise(x, y, 99, 32) - 0.5) * 12;
       const surfaceVariation = nFine + nMid + nCoarse;
 
-      // Base concrete tones (Novovoronezh / Rosatom light sand-grey industrial concrete)
-      const baseR = 196;
-      const baseG = 193;
-      const baseB = 186;
+      // Base concrete tones (Novovoronezh NPP / НВАЭС fresh light-grey concrete #E3E5E8 / #D0D4D9)
+      const baseR = 227; // #E3
+      const baseG = 229; // #E5
+      const baseB = 232; // #E8
 
       const panelSeed = Math.floor(x / panelW) + Math.floor(y / panelH) * 5;
       const panelTint = (pseudoRandom(panelSeed, panelSeed, 13) - 0.5) * 8;

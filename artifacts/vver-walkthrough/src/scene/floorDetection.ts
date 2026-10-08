@@ -70,6 +70,28 @@ export function getFloorHeightAt(x: number, z: number, currentY: number): number
     }
   }
 
+  // 6. RITM-200N SMR Complex (Reactor building, BSHU room, and SMR turbine hall)
+  if (x >= 108.0 && x <= 178.0 && z >= 58.0 && z <= 102.0) {
+    // SMR Reactor Building & BSHU (X: 110..146, Z: 61..99)
+    if (x <= 146.0) {
+      if (currentY >= 5.5) {
+        return 7.20; // Верхняя площадка обслуживания и перегрузки (+7.20м)
+      }
+      if (currentY >= 2.0) {
+        return 3.60; // Помещение БЩУ малой АЭС (+3.60м)
+      }
+      if (currentY >= -2.0) {
+        return 0.50; // Нижняя площадка ГЦЭН и бака-барботера (+0.50м)
+      }
+      return FLOOR_LEVELS.ground; // Подошва шахты реактора (-5.5м)
+    }
+    // SMR Turbine Hall (X: 146..176, Z: 61..99)
+    if (currentY >= -2.0) {
+      return 0.50; // Отметка обслуживания турбоагрегата АСММ
+    }
+    return FLOOR_LEVELS.ground;
+  }
+
   // Basement foundation is a continuous walkable slab beneath containment.
   if (r <= CONTAINMENT.innerRadius - 1 && currentY < 10) {
     return FLOOR_LEVELS.basement;
@@ -81,8 +103,15 @@ export function getFloorHeightAt(x: number, z: number, currentY: number): number
 
 /** Walkable XZ bounds for clamping the player */
 export function clampPlayerPosition(x: number, z: number): [number, number] {
-  // If player is in the Turbine Hall (strictly outside containment dome)
-  if (x > 25.0) {
+  // If player is in the RITM-200N SMR Complex
+  if (x >= 108.0 && z >= 56.0) {
+    const clampedX = Math.max(110.0, Math.min(174.0, x));
+    const clampedZ = Math.max(60.0, Math.min(99.0, z));
+    return [clampedX, clampedZ];
+  }
+
+  // If player is in the VVER-1000 Turbine Hall (strictly outside containment dome)
+  if (x > 25.0 && z < 20.0) {
     const clampedX = Math.max(27.5, Math.min(126.0, x));
     const clampedZ = Math.max(-28.5, Math.min(4.5, z));
     return [clampedX, clampedZ];
@@ -102,6 +131,10 @@ export function clampPlayerPosition(x: number, z: number): [number, number] {
  * at the current elevation, preventing falls into open voids, pits, or through walls.
  */
 export function isPositionSafe(x: number, z: number, floorY: number): boolean {
+  // 1. RITM-200N SMR Complex (Reactor building, BSHU, Turbine Hall)
+  if (x >= 110.0 && x <= 176.0 && z >= 59.0 && z <= 100.0) {
+    return true; // Walkways in SMR complex are safe
+  }
   // 1. Turbine Hall Operating Deck (+12m) check (strictly outside containment dome)
   if (floorY >= 10.5 && floorY <= 14.0 && x >= 26.0) {
     // Outer perimeter walls of Turbine Hall

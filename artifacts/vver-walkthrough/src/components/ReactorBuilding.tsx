@@ -2,7 +2,7 @@ import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import {
-  CONTAINMENT, DECK, POLAR_CRANE, SAFETY_YELLOW,
+  CONTAINMENT, CONTAINMENT_GEOMETRY, DECK, POLAR_CRANE, SAFETY_YELLOW,
   DARK_STEEL_COLOR, FLOOR_LEVELS, HIGH_BAY_LIGHTS, RAIL_TRACKS,
 } from '@/scene/constants';
 import {
@@ -12,30 +12,30 @@ import {
   brushedSteelMap, brushedSteelNormalMap, brushedSteelRoughnessMap,
 } from '@/scene/pbrTextures';
 
-// 1. Concrete PBR: Seamless concrete with industrial paneling lines & roughness 0.85
+// 1. Concrete PBR: Нововоронежская АЭС - свежий светло-серый бетонированный оттенок (#E3E5E8), матовая поверхность (roughness 0.86)
 const interiorConcreteMat = new THREE.MeshStandardMaterial({
-  color: '#f4f2eb',
+  color: '#E3E5E8',
   map: concreteMap,
   normalMap: concreteNormalMap,
   roughnessMap: concreteRoughnessMap,
   normalScale: new THREE.Vector2(0.35, 0.35),
-  roughness: 0.85, // Realistic 0.85 roughness as requested
-  metalness: 0.02,
+  roughness: 0.86,
+  metalness: 0.03,
   side: THREE.BackSide,
 });
 
 const exteriorConcreteMat = new THREE.MeshStandardMaterial({
-  color: '#e8e5dc',
+  color: '#E3E5E8',
   map: concreteMap,
   normalMap: concreteNormalMap,
   roughnessMap: concreteRoughnessMap,
   normalScale: new THREE.Vector2(0.3, 0.3),
-  roughness: 0.85,
-  metalness: 0.02,
+  roughness: 0.86,
+  metalness: 0.03,
 });
 
 const structuralConcreteDark = new THREE.MeshStandardMaterial({
-  color: '#8e8e86',
+  color: '#8A8E94',
   map: concreteMap,
   normalMap: concreteNormalMap,
   roughnessMap: concreteRoughnessMap,
@@ -771,13 +771,17 @@ function ContainmentStructure({ opacity }: { opacity: number }) {
     }
   });
 
-  const R = CONTAINMENT.outerRadius;
-  const innerR = CONTAINMENT.innerRadius;
-  const wallH = CONTAINMENT.wallTopY - CONTAINMENT.baseY;
-  const wallCenterY = (CONTAINMENT.baseY + CONTAINMENT.wallTopY) / 2;
+  const R = CONTAINMENT_GEOMETRY.outerRadius;
+  const innerR = CONTAINMENT_GEOMETRY.innerRadius;
+  const wallH = CONTAINMENT_GEOMETRY.wallHeight;
+  const wallCenterY = CONTAINMENT_GEOMETRY.wallCenterY;
+  const domeCenterY = CONTAINMENT_GEOMETRY.domeCenterY;
+  const fRadius = CONTAINMENT_GEOMETRY.foundationRadius;
+  const fThick = CONTAINMENT_GEOMETRY.foundationThickness;
+  const fCenterY = CONTAINMENT_GEOMETRY.foundationCenterY;
 
   return (
-    <group>
+    <group name="VVERUnit1_ContainmentStructure">
       {/* 1. Interior Containment Cylinder Wall (Seamless concrete PBR, roughness 0.85) */}
       <mesh
         material={interiorConcreteMat}
@@ -790,7 +794,7 @@ function ContainmentStructure({ opacity }: { opacity: number }) {
       {/* 2. Interior Upper Dome Surface (Seamless concrete PBR, roughness 0.85) */}
       <mesh
         material={interiorConcreteMat}
-        position={[0, CONTAINMENT.wallTopY, 0]}
+        position={[0, domeCenterY, 0]}
         receiveShadow
       >
         <sphereGeometry args={[innerR, 64, 32, 0, Math.PI * 2, 0, Math.PI / 2]} />
@@ -800,13 +804,13 @@ function ContainmentStructure({ opacity }: { opacity: number }) {
       <mesh material={outerMatRef} position={[0, wallCenterY, 0]}>
         <cylinderGeometry args={[R, R, wallH, 64, 1, true]} />
       </mesh>
-      <mesh material={outerMatRef} position={[0, CONTAINMENT.wallTopY, 0]}>
+      <mesh material={outerMatRef} position={[0, domeCenterY, 0]}>
         <sphereGeometry args={[R, 64, 32, 0, Math.PI * 2, 0, Math.PI / 2]} />
       </mesh>
 
-      {/* Solid Foundation Ring Base Slab */}
-      <mesh position={[0, CONTAINMENT.baseY - 0.25, 0]} receiveShadow castShadow>
-        <cylinderGeometry args={[R + 1.2, R + 1.2, 0.5, 64]} />
+      {/* Solid Foundation Ring Base Slab (Единая фундаментная плита, отметка Y = -5.25м, толщина 0.5м) */}
+      <mesh position={[0, fCenterY, 0]} receiveShadow castShadow>
+        <cylinderGeometry args={[fRadius, fRadius, fThick, 64]} />
         <primitive object={exteriorConcreteMat} attach="material" />
       </mesh>
 
@@ -1164,9 +1168,23 @@ function SubterraneanCoreCatcherStair() {
   );
 }
 
-export default function ReactorBuilding({ containmentOpacity }: { containmentOpacity: number }) {
+export interface ReactorBuildingProps {
+  containmentOpacity: number;
+  position?: [number, number, number];
+  scale?: [number, number, number] | number;
+}
+
+export default function ReactorBuilding({
+  containmentOpacity,
+  position = [0, 0, 0],
+  scale = [1, 1, 1],
+}: ReactorBuildingProps) {
   return (
-    <group>
+    <group
+      name="VVERUnit1_ReactorBuilding"
+      position={position}
+      scale={typeof scale === 'number' ? [scale, scale, scale] : scale}
+    >
       {/* Containment Inner Wall, Dome, and Cutaway Shell */}
       <ContainmentStructure opacity={containmentOpacity} />
 

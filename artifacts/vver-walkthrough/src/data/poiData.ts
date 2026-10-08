@@ -1,4 +1,19 @@
-export type POIId = 'rpv' | 'coreCatcher' | 'steamGenerator' | 'eccsTanks' | 'polarCrane' | 'serverRoom' | 'reactorPit' | 'turboGenerator';
+export type POIId =
+  | 'rpv'
+  | 'coreCatcher'
+  | 'steamGenerator'
+  | 'eccsTanks'
+  | 'polarCrane'
+  | 'serverRoom'
+  | 'reactorPit'
+  | 'turboGenerator'
+  | 'ritmCore'
+  | 'ritmSG'
+  | 'ritmCRD'
+  | 'ritmPump'
+  | 'ritmTurbine'
+  | 'ritmBubbler'
+  | 'ritmMCR';
 
 export interface POIInfo {
   id: POIId;
@@ -183,6 +198,149 @@ export const POI_LIST: POIInfo[] = [
     descriptionRu:
       'Турбоагрегат К-1000-60/1500 преобразует энергию пара второго контура в 1000 МВт электроэнергии при 1500 об/мин. Свежий пар 6.0 МПа поступает в цилиндр высокого давления (ЦВД), осушается и перегревается в 4 сепараторах-пароперегревателях (СПП-1000), после чего поступает в 3 двухпоточных цилиндра низкого давления (ЦНД). Генератор ТВВ-1000 вырабатывает напряжение 24 кВ.',
   },
+  {
+    id: 'ritmCore',
+    position: [128, 2.3, 80],
+    titleEn: 'RITM-200N Core (Активная зона)',
+    titleRu: 'Активная зона РИТМ-200Н',
+    categoryEn: 'SMR · Integral Core',
+    categoryRu: 'АСММ · Активная зона реактора',
+    color: '#00d2ff',
+    specs: [
+      { labelEn: 'Thermal Output', labelRu: 'Тепловая мощность', value: '190 MWt' },
+      { labelEn: 'Electrical Power', labelRu: 'Электрическая мощность', value: '55 MWe (до 60 MWe)' },
+      { labelEn: 'Fuel Assemblies', labelRu: 'Число кассет ТВС', value: '69 шт. (шестигранные)' },
+      { labelEn: 'Active Core Height', labelRu: 'Высота активной зоны', value: '1.65 m' },
+      { labelEn: 'Fuel Enrichment', labelRu: 'Обогащение по ²³⁵U', value: '< 20% (LEU)' },
+      { labelEn: 'Refueling Cycle', labelRu: 'Топливная кампания', value: '7–10 лет без перегрузки' },
+    ],
+    descriptionEn:
+      'The RITM-200N reactor core contains 69 hexagonal fuel assemblies with high uranium content, providing continuous operation for up to 10 years without refueling. Located in the lower plenum of the single integral pressure vessel, natural and forced circulation keep fuel temperatures well within safe limits.',
+    descriptionRu:
+      'Активная зона реактора РИТМ-200Н состоит из 69 шестигранных тепловыделяющих сборок (ТВС). Компактная геометрия и увеличенное замедление обеспечивают длительную кампанию до 10 лет без перегрузки топлива. Зона размещена в нижней части единого интегрального корпуса реактора.',
+  },
+  {
+    id: 'ritmSG',
+    position: [128, 5.1, 80],
+    titleEn: 'Integral Steam Generator (ПГ)',
+    titleRu: 'Встроенный парогенератор (ПГ)',
+    categoryEn: 'SMR · Integral Steam Gen',
+    categoryRu: 'АСММ · Интегральный парогенератор',
+    color: '#64dfdf',
+    specs: [
+      { labelEn: 'Design Concept', labelRu: 'Компоновка', value: 'Integral Annular Cassettes' },
+      { labelEn: 'Cassette Count', labelRu: 'Число кассет ПГ', value: '12 змеевиковых кассет' },
+      { labelEn: 'Steam Pressure', labelRu: 'Давление свежего пара', value: '3.82 MPa' },
+      { labelEn: 'Steam Temperature', labelRu: 'Температура пара', value: '310 °C (перегретый)' },
+      { labelEn: 'Steam Production', labelRu: 'Паропроизводительность', value: '310 t/h' },
+      { labelEn: 'Tube Material', labelRu: 'Материал трубок', value: 'Titanium / Stainless Alloy' },
+    ],
+    descriptionEn:
+      'Unlike massive external steam generators of large NPPs, RITM-200N features 12 integral cassette modules arranged annularly around the central riser inside the reactor pressure vessel. This eliminates large primary piping and rules out large-break Loss of Coolant Accidents (LOCA).',
+    descriptionRu:
+      'В отличие от внешних парогенераторов ВВЭР-1000, в РИТМ-200Н 12 кассетных парогенераторов встроены прямо в кольцевое пространство внутри корпуса реактора вокруг центральной шахты. Это исключает протяженные трубопроводы 1-го контура и предотвращает аварии с разрывом петель.',
+  },
+  {
+    id: 'ritmCRD',
+    position: [128, 11.5, 80],
+    titleEn: 'Control Rod Drive Mechanisms (СУЗ)',
+    titleRu: 'Приводы СУЗ (Крышка реактора)',
+    categoryEn: 'SMR · Reactivity Control',
+    categoryRu: 'АСММ · Приводы защиты и регулирования',
+    color: '#ffd166',
+    specs: [
+      { labelEn: 'Drive Count', labelRu: 'Число приводов СУЗ', value: '19 герметичных механизмов' },
+      { labelEn: 'Drive Type', labelRu: 'Тип привода', value: 'Linear Stepping Motor (ШЭМ)' },
+      { labelEn: 'Trip Scram Time', labelRu: 'Время сброса АЗ', value: '< 2.5 с (гравитационный)' },
+      { labelEn: 'Design Standard', labelRu: 'Исполнение', value: 'Sealed Pressure Housings' },
+      { labelEn: 'Seismic Category', labelRu: 'Сейсмостойкость', value: 'Category I (SSE 8-9 points)' },
+    ],
+    descriptionEn:
+      'The 19 Control Rod Drive Mechanisms (СУЗ) are mounted directly atop the reactor vessel closure head. Employing linear stepping magnetic drives, they regulate reactor power and insert emergency shutdown rods by gravity within 2.5 seconds upon any trip signal.',
+    descriptionRu:
+      '19 герметичных приводов СУЗ установлены на съемной полусферической крышке реактора. Шаговые электромагнитные механизмы точно регулируют мощность реактора, а при обесточивании мгновенно сбрасывают поглощающие стержни в активную зону под действием силы тяжести менее чем за 2.5 секунды.',
+  },
+  {
+    id: 'ritmPump',
+    position: [125.5, 3.5, 82.5],
+    titleEn: 'Canned Motor Coolant Pumps (ГЦЭН)',
+    titleRu: 'Компактные электронасосы (ГЦЭН)',
+    categoryEn: 'SMR · Primary Circulation',
+    categoryRu: 'АСММ · Главные циркуляционные насосы',
+    color: '#06d6a0',
+    specs: [
+      { labelEn: 'Pump Units', labelRu: 'Число насосов', value: '4 герметичных ГЦЭН' },
+      { labelEn: 'Mounting Style', labelRu: 'Тип монтажа', value: 'Direct on RPV Horizontal Nozzles' },
+      { labelEn: 'Flow Rate per Pump', labelRu: 'Подача каждого насоса', value: '1400 m³/h' },
+      { labelEn: 'Shaft Seal Type', labelRu: 'Уплотнение вала', value: 'Seal-less Canned Motor (Бессальниковый)' },
+      { labelEn: 'Cooling Circuit', labelRu: 'Охлаждение двигателя', value: 'Water jacket (Замкнутый контур)' },
+    ],
+    descriptionEn:
+      'Four compact canned-motor main coolant pumps are flanged directly onto horizontal nozzles machined into the reactor vessel forging. The completely seal-less design eliminates any possibility of coolant leakage along the pump shaft, maximizing SMR safety.',
+    descriptionRu:
+      'Четыре бессальниковых герметичных электронасоса (ГЦЭН) смонтированы непосредственно на горизонтальных патрубках корпуса реактора РИТМ-200Н. Отсутствие внешних уплотнений вала полностью исключает утечку радиоактивного теплоносителя наружу.',
+  },
+  {
+    id: 'ritmTurbine',
+    position: [160, -0.5, 80],
+    titleEn: 'SMR Turbo-Generator (55-60 MWe)',
+    titleRu: 'Турбоагрегат АСММ (55-60 МВт)',
+    categoryEn: 'SMR · Power Generation',
+    categoryRu: 'АСММ · Машинный зал',
+    color: '#118ab2',
+    specs: [
+      { labelEn: 'Electric Output', labelRu: 'Электрическая мощность', value: '55 MWe net (до 60 MWe)' },
+      { labelEn: 'Shaft Speed', labelRu: 'Частота вращения', value: '3000 rpm' },
+      { labelEn: 'Turbine Type', labelRu: 'Тип турбины', value: 'Condensing with Process Extractions' },
+      { labelEn: 'Inlet Steam Pressure', labelRu: 'Давление на входе', value: '3.8 MPa' },
+      { labelEn: 'Generator Type', labelRu: 'Генератор', value: 'Air/Water Cooled Synchronous' },
+      { labelEn: 'Condenser Unit', labelRu: 'Конденсатор', value: 'Under-slung Surface Condenser' },
+    ],
+    descriptionEn:
+      'The compact turbine hall adjacent to the SMR reactor module houses the steam turbine and synchronous generator producing 55 MWe. Superheated steam is delivered from the integral steam generators, expanding through high and low-pressure stages into the surface condenser.',
+    descriptionRu:
+      'Компактный машинный зал АСММ содержит паровую турбину и синхронный генератор единичной мощностью 55–60 МВт. Перегретый пар из встроенных парогенераторов реактора РИТМ-200Н поступает по защищенному паропроводу, вырабатывая электроэнергию при 3000 об/мин.',
+  },
+  {
+    id: 'ritmBubbler',
+    position: [117.5, 2.0, 76],
+    titleEn: 'Bubbler Tank & Passive ECCS (САОЗ)',
+    titleRu: 'Бак-барботер и САОЗ/СПОР',
+    categoryEn: 'SMR · Passive Safety',
+    categoryRu: 'АСММ · Пассивная безопасность',
+    color: '#ef476f',
+    specs: [
+      { labelEn: 'Safety Logic', labelRu: 'Принцип работы', value: 'Fully Passive (No AC Power Required)' },
+      { labelEn: 'Autonomy Period', labelRu: 'Автономность без действий персонала', value: '72 часа' },
+      { labelEn: 'ECCS Storage', labelRu: 'Гидроемкости САОЗ', value: '2 баллона с раствором бора' },
+      { labelEn: 'Bubbler Function', labelRu: 'Функция бака-барботера', value: 'Steam Condensation & Pressure Relief' },
+      { labelEn: 'Decay Heat Removal', labelRu: 'Отвод остаточного тепла', value: 'Passive Emergency Air/Water Heat Exchangers' },
+    ],
+    descriptionEn:
+      'The bubbler tank and passive safety injection systems (САОЗ/СПОР) provide complete emergency shutdown and cooling autonomy for up to 72 hours without electrical power or operator intervention, condensing relief steam and flooding the vessel passively.',
+    descriptionRu:
+      'Бак-барботер, гидроаккумуляторы САОЗ и теплообменники системы пассивного отвода тепла (СПОР) обеспечивают 72 часа полной автономности безопасности без внешнего энергоснабжения и вмешательства оператора при любых проектных авариях.',
+  },
+  {
+    id: 'ritmMCR',
+    position: [128, 0.5, 69],
+    titleEn: 'SMR Main Control Room (БЩУ)',
+    titleRu: 'Пульт управления (БЩУ малой АЭС)',
+    categoryEn: 'SMR · Automation & Control',
+    categoryRu: 'АСММ · Цифровой блочный щит',
+    color: '#48cae4',
+    specs: [
+      { labelEn: 'Architecture', labelRu: 'Архитектура СУ ТБ', value: 'Fully Digital Integrated DCS' },
+      { labelEn: 'Display Wall', labelRu: 'Видеостена', value: 'Panoramic Reactor Mimic Display' },
+      { labelEn: 'Crew Size', labelRu: 'Оперативный персонал', value: '2 оператора в смене' },
+      { labelEn: 'Automation Level', labelRu: 'Уровень автоматизации', value: 'Full digital closed-loop control' },
+      { labelEn: 'Emergency Panel', labelRu: 'Резервный пульт', value: 'Hardwired Independent Safety Panel' },
+    ],
+    descriptionEn:
+      'The SMR Main Control Room (БЩУ) features high-density ergonomic digital operator consoles, a panoramic status mimic wall displaying real-time flux and thermal parameters, and redundant digital automation requiring only two licensed operators per shift.',
+    descriptionRu:
+      'Блочный щит управления (БЩУ) малой АЭС оснащен эргономичными цифровыми пультами, панорамной видеостеной мнемосхем РИТМ-200Н с отображением физических параметров в реальном времени. Высокий уровень автоматизации позволяет управлять станцией силами всего 2 операторов.',
+  },
 ];
 
 export type ViewMode = 'orbit' | 'walk' | 'drone';
@@ -198,6 +356,14 @@ export type FloorTarget = {
 
 export const FLOOR_VIEWS: FloorTarget[] = [
   {
+    id: 'view-master-plan',
+    label: '🗺️ Генплан: Общий вид всей АЭС / Full Master Plan Site View',
+    floorY: 20,
+    cameraPos: [90, 160, 220],
+    target: [45, 15, 10],
+    mode: 'orbit',
+  },
+  {
     id: 'view-drone',
     label: '🛸 Дрон-облёт АЭС / Cinematic Drone Fly-By',
     floorY: 35,
@@ -206,27 +372,99 @@ export const FLOOR_VIEWS: FloorTarget[] = [
     mode: 'drone',
   },
   {
-    id: 'view-aerial',
-    label: '🛰️ Общий вид АЭС с высоты / Aerial Bird\'s-Eye View',
+    id: 'view-unit1',
+    label: '⚛️ Энергоблок ВВЭР-1000 №1 / VVER-1000 Unit 1',
     floorY: 15,
-    cameraPos: [145, 115, 165],
-    target: [0, 18, -25],
+    cameraPos: [65, 45, -75],
+    target: [25, 20, -10],
     mode: 'orbit',
   },
   {
-    id: 'view-construction',
-    label: '🏗️ Площадка строительства / Construction Deck Level',
-    floorY: 0,
-    cameraPos: [0, 3.2, 74],
-    target: [0, 24, 0],
+    id: 'view-unit2',
+    label: '⚛️ Энергоблок ВВЭР-1000 №2 / VVER-1000 Unit 2',
+    floorY: 15,
+    cameraPos: [65, 45, 135],
+    target: [25, 20, 60],
     mode: 'orbit',
   },
   {
-    id: 'view-cooling-tower',
-    label: '🌀 Основание Градирни / Cooling Tower Base View',
-    floorY: 0,
-    cameraPos: [-125, 4.2, -78],
-    target: [-125, 62, -115],
+    id: 'view-smr',
+    label: '🔋 Комплекс МАЭС РИТМ-200Н: Общий вид / RITM-200N SMR Overview',
+    floorY: 10,
+    cameraPos: [179, 48, 130],
+    target: [142, 16, 80],
+    mode: 'orbit',
+  },
+  {
+    id: 'view-smr-cutaway',
+    label: '🔬 РИТМ-200Н: Разрез реакторного блока / SMR Cutaway View',
+    floorY: 6,
+    cameraPos: [128, 18, 117],
+    target: [128, 8, 80],
+    mode: 'orbit',
+  },
+  {
+    id: 'view-smr-core',
+    label: '⚛️ РИТМ-200Н: Активная зона, ПГ и ГЦЭН / Core & Steam Gen',
+    floorY: 3,
+    cameraPos: [128, 6.5, 94],
+    target: [128, 4.5, 80],
+    mode: 'orbit',
+  },
+  {
+    id: 'view-smr-crdm',
+    label: '🕹️ РИТМ-200Н: Приводы СУЗ и крышка реактора / CRDM',
+    floorY: 12,
+    cameraPos: [128, 15.5, 91],
+    target: [128, 11.5, 80],
+    mode: 'orbit',
+  },
+  {
+    id: 'view-smr-turbine',
+    label: '⚡ РИТМ-200Н: Машинный зал и турбоагрегат / SMR Turbine Hall',
+    floorY: 3,
+    cameraPos: [160, 7.5, 99],
+    target: [160, 1.5, 80],
+    mode: 'orbit',
+  },
+  {
+    id: 'walk-smr-mcr',
+    label: '🖥️ РИТМ-200Н: Пульт управления (БЩУ) / SMR Control Room',
+    floorY: 1.5,
+    cameraPos: [128, 1.8 + 1.6, 64],
+    target: [128, 2.0, 69],
+    mode: 'walk',
+  },
+  {
+    id: 'view-switchyard',
+    label: '⚡ ОРУ-500 кВ и ЛЭП / Outdoor Switchyard & Grid',
+    floorY: 8,
+    cameraPos: [195, 38, -45],
+    target: [172, 12, 10],
+    mode: 'orbit',
+  },
+  {
+    id: 'view-cooling-tower-1',
+    label: '🌀 Градирня №1 / Cooling Tower 1',
+    floorY: 25,
+    cameraPos: [-185, 70, -45],
+    target: [-115, 35, 0],
+    mode: 'orbit',
+  },
+  {
+    id: 'view-cooling-tower-2',
+    label: '🌀 Градирня №2 / Cooling Tower 2',
+    floorY: 25,
+    cameraPos: [-185, 70, 115],
+    target: [-115, 35, 70],
+    mode: 'orbit',
+  },
+  {
+    id: 'view-abk',
+    label: '🏢 Административный комплекс (АБК) / Admin Complex',
+    floorY: 5,
+    cameraPos: [0, 24, 185],
+    target: [0, 10, 138],
     mode: 'orbit',
   },
   {

@@ -19,6 +19,38 @@ export const CONTAINMENT = {
   totalHeight: 60.0,
 } as const;
 
+/**
+ * Единые геометрические параметры и отметки высот для обоих контайнментов ВВЭР-1000
+ * (Энергоблок №1 и Энергоблок №2):
+ * - Единый нулевой уровень фундамента: baseY = -5.0м
+ * - Фундаментная плита: отметка низа -5.5м (уровень планировки ground), отметка верха -5.0м, толщина 0.5м
+ * - Высота цилиндрической части оболочки: wallHeight = 37.5м (от -5.0м до +32.5м)
+ * - Центр полусферического купола: +32.5м, радиус 23.2м, верхняя точка купола (зенит) = +55.7м
+ * - Полная высота сооружения от подошвы плиты: 61.2м
+ * - Масштаб (scale) обоих энергоблоков: строго [1, 1, 1]
+ */
+export const CONTAINMENT_GEOMETRY = {
+  outerRadius: 23.2,
+  innerRadius: 22.0,
+  wallThickness: 1.2,
+  foundationRadius: 23.2 + 1.2, // 24.4m
+  foundationThickness: 0.5,
+  foundationBaseY: FLOOR_LEVELS.ground, // -5.5m
+  foundationTopY: CONTAINMENT.baseY,     // -5.0m
+  foundationCenterY: (CONTAINMENT.baseY + FLOOR_LEVELS.ground) / 2, // -5.25m
+  wallBaseY: CONTAINMENT.baseY,          // -5.0m
+  wallTopY: CONTAINMENT.wallTopY,        // +32.5m
+  wallHeight: CONTAINMENT.wallTopY - CONTAINMENT.baseY, // 37.5m
+  wallCenterY: (CONTAINMENT.baseY + CONTAINMENT.wallTopY) / 2, // +13.75m
+  domeCenterY: CONTAINMENT.wallTopY,     // +32.5m
+  domeRadius: 23.2,
+  domeApexY: CONTAINMENT.wallTopY + 23.2, // +55.7m
+  totalHeightFromGround: (CONTAINMENT.wallTopY + 23.2) - FLOOR_LEVELS.ground, // 61.2m
+  buttressWidth: 0.9,
+  buttressDepth: 0.7,
+  buttressCount: 12,
+} as const;
+
 export const CORE_CATCHER = {
   bottomY: -10.0,
   topY: -6.0,
@@ -81,8 +113,9 @@ export const POLAR_CRANE = {
 export const YELLOW = '#FFCC00';
 export const SAFETY_YELLOW = '#FFCC00';
 export const ROSATOM_LIME_GREEN = '#8DB600';
-export const CONCRETE_COLOR = '#b8b5ad';
-export const STEEL_COLOR = '#8d99ae';
+export const CONCRETE_COLOR = '#E3E5E8'; // Свежий автоклавный светло-серый бетон НВАЭС
+export const CONCRETE_WEATHERED = '#D0D4D9'; // Швы, фаски и цокольные плиты
+export const STEEL_COLOR = '#B0B7BD'; // Нержавеющая сталь оборудования 1-го контура
 export const DARK_STEEL_COLOR = '#3a3a40';
 export const GREEN_METAL_COLOR = '#8DB600';
 export const ARID_SOIL_COLOR = '#c4a87c';

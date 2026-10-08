@@ -11,6 +11,12 @@ import ServerRoom from '@/components/ServerRoom';
 import CoreCatcher from '@/components/CoreCatcher';
 import TurbineHall from '@/components/TurbineHall';
 import ExteriorScene from '@/components/ExteriorScene';
+import {
+  VVERUnit2,
+  InterUnitOverheadPipeBridge,
+  RITM200NComplex,
+  CylindricalWaterStorageTanks,
+} from '@/components/MasterSiteAssets';
 import POIMarkers from '@/components/POIMarkers';
 import VRControllerManager from '@/components/VRControllerManager';
 import DroneFlyByController, { type DroneWaymark } from '@/components/DroneFlyByController';
@@ -18,11 +24,38 @@ import FirstPersonController from '@/components/FirstPersonController';
 import UIOverlay from '@/components/UIOverlay';
 import { POI_LIST, FLOOR_VIEWS, type POIInfo, type ViewMode } from '@/data/poiData';
 import { useTelemetry } from '@/hooks/useTelemetry';
+import {
+  configureNPPRenderer,
+  applySceneOptimizations,
+  fixBuildingOverlap,
+} from '@/scene/nppOptimizationModule';
 
 const xrStore = createXRStore({
   controller: { teleportPointer: true, rayPointer: true },
   offerSession: true,
 });
+
+/** Автоматический оптимизатор сцены: включает Frustum Culling, предрасчет BoundingBox/Sphere, настраивает WebXR */
+function ScenePerformanceOptimizer() {
+  const { scene, gl } = useThree();
+
+  useEffect(() => {
+    configureNPPRenderer(gl, {
+      maxPixelRatio: 1.5,
+      enableSoftShadows: true,
+    });
+    applySceneOptimizations(scene, {
+      disableSmallShadowCasters: true,
+    });
+    // Автоматическая проверка пересечений, разнесение зданий и устранение Z-fighting
+    fixBuildingOverlap(scene, {
+      requiredClearance: 8.0,
+      removeDuplicateRoofs: true,
+    });
+  }, [scene, gl]);
+
+  return null;
+}
 
 /** Smoothly moves the camera to a target position and lookAt target */
 function CameraRig({ cameraPos, lookAt, mode }: { cameraPos: [number, number, number]; lookAt: [number, number, number]; mode: ViewMode }) {
@@ -71,11 +104,28 @@ interface SceneContentProps {
 function SceneContent({ containmentOpacity, onPOISelect }: SceneContentProps) {
   return (
     <group>
-      <ReactorBuilding containmentOpacity={containmentOpacity} />
-      <CoreCatcher />
-      <SteamGeneratorDeck />
-      <ServerRoom />
-      <TurbineHall />
+      {/* Unit 1 Full Interactive Interior & Exterior (Строго position.y = 0, scale = [1, 1, 1]) */}
+      <group name="VVERUnit1_MasterGroup" position={[0, 0, 0]} scale={[1, 1, 1]}>
+        <ReactorBuilding
+          containmentOpacity={containmentOpacity}
+          position={[0, 0, 0]}
+          scale={[1, 1, 1]}
+        />
+        <CoreCatcher />
+        <SteamGeneratorDeck />
+        <ServerRoom />
+        <TurbineHall />
+      </group>
+
+      {/* Full Combined NPP Site Master Plan Infrastructure */}
+      {/* Unit 2: Строго на одной горизонтальной оси (position.y = 0), масштаб [1, 1, 1], смещение ΔZ = +70 */}
+      <VVERUnit2 position={[0, 0, 70]} scale={[1, 1, 1]} />
+      <InterUnitOverheadPipeBridge />
+      {/* Комплекс МАЭС РИТМ-200Н: четкий технологический проход/разрыв от стен машзала (X=142, Z=80) */}
+      <RITM200NComplex position={[142, 0, 80]} />
+      <CylindricalWaterStorageTanks position={[64, 0, 86]} />
+
+      {/* Exterior Site, Cooling Towers (x2), Switchyard, ABK, Roads & Steppe Landscape */}
       <ExteriorScene />
       <POIMarkers pois={POI_LIST} onSelect={onPOISelect} />
     </group>
@@ -200,38 +250,39 @@ export default function App() {
           shadows
           camera={{ position: [50, 30, 60], fov: 60, near: 0.1, far: 1000 }}
           gl={{
-            antialias: true,
+            antialias: false, // Отключение тяжелого MSAA сглаживания для встроенной графики по ТЗ
             toneMapping: THREE.ACESFilmicToneMapping,
             toneMappingExposure: 1.08,
             powerPreference: 'high-performance',
           }}
-          dpr={[1, Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, 1.75)]}
+          dpr={[1, Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, 1.5)]}
         >
-        <color attach="background" args={['#8fb8d6']} />
-        <fog attach="fog" args={['#c2d7e8', 220, 580]} />
+        <ScenePerformanceOptimizer />
+        <color attach="background" args={['#9CB0C3']} />
+        <fogExp2 attach="fog" args={['#9CB0C3', 0.0022]} />
 
         <Suspense fallback={null}>
-          <Sky sunPosition={[95, 45, -45]} turbidity={2.6} rayleigh={0.8} mieCoefficient={0.005} mieDirectionalG={0.84} />
+          <Sky sunPosition={[80, 113, 80]} turbidity={2.8} rayleigh={1.15} mieCoefficient={0.005} mieDirectionalG={0.84} />
           <Stars radius={450} depth={80} count={1200} factor={4} fade />
           <Environment preset="warehouse" environmentIntensity={0.28} />
         </Suspense>
         <AdaptiveDpr pixelated />
 
-        {/* Realistic directional sunlight with soft 2048x2048 shadow mapping */}
-        <hemisphereLight args={['#b8d8f4', '#c2ab87', 0.72]} />
+        {/* Realistic natural lighting: Sky/Ground HemisphereLight + 45° Directional Sunlight */}
+        <hemisphereLight args={['#9CB0C3', '#8B7E66', 0.82]} />
         <directionalLight
-          position={[95, 65, 45]}
-          intensity={2.8}
-          color="#fff5e6"
+          position={[80, 113, 80]}
+          intensity={2.6}
+          color="#fffaf0"
           castShadow
           shadow-mapSize-width={[2048]}
           shadow-mapSize-height={[2048]}
-          shadow-camera-left={[-110]}
-          shadow-camera-right={[110]}
-          shadow-camera-top={[110]}
-          shadow-camera-bottom={[-110]}
-          shadow-camera-far={[320]}
-          shadow-bias={-0.0002}
+          shadow-camera-left={[-150]}
+          shadow-camera-right={[150]}
+          shadow-camera-top={[150]}
+          shadow-camera-bottom={[-150]}
+          shadow-camera-far={[380]}
+          shadow-bias={-0.00015}
         />
         <directionalLight position={[-55, 35, -65]} intensity={0.45} color="#88aaff" />
 
