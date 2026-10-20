@@ -1073,7 +1073,7 @@ export interface RITM200NFullComplexProps {
  *   - Машинный зал: X от +4 до +32 (центр X = +18)
  *   - Венттруба: X = -32.0, Z = 0 (примыкает к тыльной стене реакторного блока)
  */
-export default function RITM200NFullComplex({ position = [142, 0, 80] }: RITM200NFullComplexProps) {
+export default function RITM200NFullComplex({ position = [168, 0, 80] }: RITM200NFullComplexProps) {
   const gY = FLOOR_LEVELS.ground;
 
   return (

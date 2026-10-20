@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  Activity, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Cpu, Crosshair, Eye, Footprints, Gauge,
-  Info, Layers, Monitor, Radio, Thermometer, X, Zap, Droplets, Menu, Play, Pause, Compass, Navigation, Video,
+  Activity, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Cpu, Crosshair, Eye, EyeOff, Footprints, Gauge,
+  Info, Layers, Minus, Monitor, Radio, Thermometer, X, Zap, Droplets, Menu, Play, Pause, Compass, Navigation, Video,
 } from 'lucide-react';
 import { FLOOR_VIEWS, POI_LIST, type POIInfo, type ViewMode } from '@/data/poiData';
-import type { TelemetrySnapshot } from '@/hooks/useTelemetry';
+import { useTelemetry, type TelemetrySnapshot } from '@/hooks/useTelemetry';
 import type { DroneWaymark } from '@/components/DroneFlyByController';
 
 interface UIOverlayProps {
@@ -17,7 +17,7 @@ interface UIOverlayProps {
   controlMode: ViewMode;
   onVRClick: () => void;
   vrSupported: boolean | null;
-  telemetry: TelemetrySnapshot;
+  telemetry?: TelemetrySnapshot;
   // Drone Fly-by props:
   droneSpeed?: number;
   onDroneSpeedChange?: (speed: number) => void;
@@ -155,7 +155,7 @@ export default function UIOverlay({
   controlMode,
   onVRClick,
   vrSupported,
-  telemetry,
+  telemetry: propTelemetry,
   droneSpeed = 1.0,
   onDroneSpeedChange,
   dronePaused = false,
@@ -163,10 +163,16 @@ export default function UIOverlay({
   droneTelemetry,
   onDroneScrub,
 }: UIOverlayProps) {
+  const fallbackTelemetry = useTelemetry();
+  const telemetry = propTelemetry ?? fallbackTelemetry;
   // Left HUD panel collapsible state
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  // Right drawer panel for live telemetry & equipment list
-  const [rightPanelOpen, setRightPanelOpen] = useState(false);
+  // Right drawer panel for live telemetry & equipment list (starts open, collapsible via button or compact pill)
+  const [rightPanelOpen, setRightPanelOpen] = useState(true);
+  // Global 2D UI visibility toggle (hotkey 'H')
+  const [allUIHidden, setAllUIHidden] = useState(false);
+  // WebXR VR active session detection for auto-hiding 2D UI
+  const [isVRPresenting, setIsVRPresenting] = useState(false);
   const [vrModal, setVrModal] = useState<{
     open: boolean;
     title: string;
@@ -177,6 +183,36 @@ export default function UIOverlay({
     message: '',
   });
   const [selectedPOI, setSelectedPOI] = useState<POIInfo | null>(null);
+
+  // 1. Горячая клавиша 'H' (Hide UI) для мгновенного скрытия/показа всех 2D-оверлеев
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Игнорируем нажатия при вводе в текстовые поля
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+      if (e.code === 'KeyH' || e.key.toLowerCase() === 'h' || e.key.toLowerCase() === 'р') {
+        e.preventDefault();
+        setAllUIHidden((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // 2. Автоматическое скрытие 2D UI при старте VR-сессии (WebXR Session) и восстановление при выходе
+  useEffect(() => {
+    const handleXRStart = () => setIsVRPresenting(true);
+    const handleXREnd = () => setIsVRPresenting(false);
+
+    window.addEventListener('webxr-session-start', handleXRStart);
+    window.addEventListener('webxr-session-end', handleXREnd);
+
+    return () => {
+      window.removeEventListener('webxr-session-start', handleXRStart);
+      window.removeEventListener('webxr-session-end', handleXREnd);
+    };
+  }, []);
 
   const active = FLOOR_VIEWS.find((item) => item.id === activeView) ?? FLOOR_VIEWS[0];
   const fmt = (value: number, digits = 1) => value.toFixed(digits);
@@ -242,6 +278,32 @@ export default function UIOverlay({
     }
   };
 
+  // 3. Полное скрытие 2D UI при входе в VR-сессию WebXR (display: none / opacity: 0)
+  if (isVRPresenting) {
+    return <div style={{ display: 'none' }} aria-hidden="true" />;
+  }
+
+  // 4. Режим скрытого интерфейса по горячей клавише 'H'
+  if (allUIHidden) {
+    return (
+      <div
+        style={{ position: 'fixed', bottom: '24px', left: '20px', zIndex: 100000 }}
+        className="pointer-events-auto panel-enter"
+      >
+        <button
+          data-testid="button-unhide-ui"
+          onClick={() => setAllUIHidden(false)}
+          title="Показать весь интерфейс (Горячая клавиша: H)"
+          aria-label="Показать UI"
+          className="flex items-center gap-2 rounded-full border border-[#f5c26f]/70 bg-[#101b1e]/95 px-4 py-2.5 text-xs font-bold text-[#f5c26f] shadow-[0_8px_32px_rgba(0,0,0,0.85),0_0_20px_rgba(245,194,111,0.25)] backdrop-blur-2xl transition hover:scale-105 hover:bg-[#1a2b30] cursor-pointer"
+        >
+          <Eye size={15} />
+          <span>Показать UI [H]</span>
+        </button>
+      </div>
+    );
+  }
+
   return (
     <>
       {/* 1. Small Floating Circular Button on Top-Left Edge: [ ☰ ] / [ ◀ ] */}
@@ -295,6 +357,18 @@ export default function UIOverlay({
         >
           <span className="text-base leading-none">🥽</span>
           <span>Войти в VR / Enter VR Mode</span>
+        </button>
+
+        {/* Hide All UI Toggle Button (HotKey H) */}
+        <button
+          data-testid="button-hide-all-ui"
+          onClick={() => setAllUIHidden(true)}
+          title="Скрыть все элементы интерфейса (Горячая клавиша: H)"
+          aria-label="Скрыть интерфейс"
+          className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-[#142024]/95 px-3 py-2 text-xs font-semibold text-[#a9bbae] shadow-lg backdrop-blur-xl transition hover:scale-105 hover:bg-[#1e3036] hover:text-[#f5c26f] cursor-pointer"
+        >
+          <EyeOff size={14} />
+          <span className="hidden sm:inline text-[10px] font-mono">Скрыть [H]</span>
         </button>
 
         {/* Right Telemetry Drawer Toggle Button */}
@@ -530,12 +604,44 @@ export default function UIOverlay({
           <section className="border-b border-[#c9d1c6]/10 px-4 py-3">
             <div className="mb-2 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Monitor size={13} className="text-[#62d1a2]" />
+                <Monitor size={14} className="text-[#62d1a2]" />
                 <p className="text-[10px] font-bold uppercase tracking-[.13em] text-[#a9b6af]">
                   Параметры энергоблока
                 </p>
               </div>
-              <span className="mono text-[9px] text-[#71d1a6]">LIVE / 0.8 s</span>
+              <div className="flex items-center gap-1.5">
+                <span className="mono text-[9px] text-[#71d1a6] mr-1 hidden sm:inline">LIVE / 0.8 s</span>
+                {/* Кнопка сворачивания окна в плашку [ — ] */}
+                <button
+                  data-testid="button-collapse-telemetry"
+                  onClick={() => setRightPanelOpen(false)}
+                  title="Свернуть окно в компактную плашку [ — ] (Горячая клавиша: H)"
+                  aria-label="Свернуть окно в компактную плашку"
+                  className="flex h-6 w-6 items-center justify-center rounded-md bg-white/5 text-[#a3b6ae] hover:bg-white/15 hover:text-[#f5c26f] transition cursor-pointer"
+                >
+                  <Minus size={13} strokeWidth={2.5} />
+                </button>
+                {/* Кнопка скрыть [ 👁 ] */}
+                <button
+                  data-testid="button-hide-telemetry"
+                  onClick={() => setRightPanelOpen(false)}
+                  title="Скрыть окно параметров [ 👁 ]"
+                  aria-label="Скрыть окно параметров"
+                  className="flex h-6 w-6 items-center justify-center rounded-md bg-white/5 text-[#a3b6ae] hover:bg-white/15 hover:text-[#62d1a2] transition cursor-pointer"
+                >
+                  <EyeOff size={13} />
+                </button>
+                {/* Кнопка закрыть [ X ] */}
+                <button
+                  data-testid="button-close-telemetry"
+                  onClick={() => setRightPanelOpen(false)}
+                  title="Закрыть окно телеметрии [ X ]"
+                  aria-label="Закрыть окно"
+                  className="flex h-6 w-6 items-center justify-center rounded-md bg-white/5 text-[#a3b6ae] hover:bg-red-500/20 hover:text-red-400 transition cursor-pointer"
+                >
+                  <X size={13} />
+                </button>
+              </div>
             </div>
             <TelemetryReadout
               testId="status-neutron-flux"
@@ -657,6 +763,42 @@ export default function UIOverlay({
           </footer>
         </div>
       </aside>
+
+      {/* 7. Компактная плашка / иконка в правом нижнем углу экрана при свернутом окне */}
+      {!rightPanelOpen && !allUIHidden && !isVRPresenting && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '20px',
+            zIndex: 9990,
+          }}
+          className="pointer-events-auto panel-enter"
+        >
+          <button
+            data-testid="button-expand-telemetry-pill"
+            onClick={() => setRightPanelOpen(true)}
+            title="Развернуть окно параметров энергоблока ВВЭР-1000 и узлов POI"
+            aria-label="Телеметрия ВВЭР-1000 — развернуть"
+            className="group flex items-center gap-2.5 rounded-full border border-[#62d1a2]/60 bg-[#0c1a17]/95 px-4 py-2.5 text-xs font-bold text-[#e1eee7] shadow-[0_10px_35px_rgba(0,0,0,0.7),0_0_20px_rgba(98,209,162,0.25)] backdrop-blur-2xl transition-all duration-200 hover:scale-105 hover:border-[#62d1a2] hover:bg-[#142e26] hover:shadow-[0_0_28px_rgba(98,209,162,0.45)] cursor-pointer"
+          >
+            <StatusDot active={telemetry.safetyMode === 'NORMAL'} />
+            <div className="flex items-center gap-1.5">
+              <span className="mono font-bold tracking-tight text-[#62d1a2]">
+                Телеметрия ВВЭР-1000
+              </span>
+              <span className="mono text-[10px] text-[#9bb3ab] hidden sm:inline">
+                {telemetry.gridPower.toFixed(0)} МВт
+              </span>
+            </div>
+            <span
+              className="mono flex h-5 w-5 items-center justify-center rounded-full bg-white/10 text-[9px] text-[#86e2b6] group-hover:bg-[#62d1a2]/25 group-hover:text-white transition"
+            >
+              ▼
+            </span>
+          </button>
+        </div>
+      )}
 
       {/* 4. Cinematic Drone Tour Overhead Telemetry Display */}
       {controlMode === 'drone' && (

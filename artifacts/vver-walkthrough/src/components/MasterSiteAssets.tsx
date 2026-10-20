@@ -190,6 +190,18 @@ export function VVERUnit2({
             </mesh>
           ))}
         </group>
+
+        {/* Left Auxiliary Building Unit 2 (Обстройка РО энергоблока №2) */}
+        <group position={[-33.5, gY, 0]}>
+          <mesh position={[0, 1.75, 0]} castShadow receiveShadow>
+            <boxGeometry args={[22, 3.5, 32]} />
+            <primitive object={baseRedBrownSkirtMat} attach="material" />
+          </mesh>
+          <mesh position={[0, 3.5 + 27.5 / 2, 0]} castShadow receiveShadow>
+            <boxGeometry args={[21.8, 27.5, 31.8]} />
+            <primitive object={exteriorConcreteMat} attach="material" />
+          </mesh>
+        </group>
       </group>
 
       {/* Transition Pipe Bridge between Unit 2 Containment & Unit 2 Turbine Hall */}
@@ -208,7 +220,7 @@ export function VVERUnit2({
       </group>
 
       {/* Turbine Hall Building Unit 2 (Parallel to Unit 1, X = 77m, Z = -12m relative to Unit 2 center) */}
-      <group position={[77.0, gY, -12.0]}>
+      <group position={[77.0, gY, -12.0]} name="VVERUnit2_TurbineHall">
         {/* Lower Red-Brown Skirt */}
         <mesh position={[0, 2.25, 0]} castShadow receiveShadow>
           <boxGeometry args={[100, 4.5, 36]} />
@@ -321,7 +333,7 @@ export function InterUnitOverheadPipeBridge() {
 // Интерактивная 3D-модель малой атомной станции с детальным разрезом оборудования
 // ============================================================================
 
-export function RITM200NComplex({ position = [142, 0, 80] }: { position?: [number, number, number] }) {
+export function RITM200NComplex({ position = [168, 0, 80] }: { position?: [number, number, number] }) {
   return <RITM200NFullComplex position={position} />;
 }
 

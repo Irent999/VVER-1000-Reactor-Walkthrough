@@ -30,54 +30,81 @@ function POIMarker({ poi, onSelect }: POIMarkerProps) {
     onSelect(poi);
   };
 
+  const handleHtmlClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onSelect(poi);
+  };
+
+  const isSpecialMCR = poi.id === 'vverMCR' || poi.id === 'ritmMCR';
+
   return (
     <group position={poi.position}>
+      {/* 3D Сфера / Иконка маркера */}
       <mesh
         onClick={handleClick}
         onPointerOver={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = 'pointer'; }}
         onPointerOut={() => { setHovered(false); document.body.style.cursor = 'default'; }}
       >
-        <sphereGeometry args={[0.5, 16, 16]} />
+        <sphereGeometry args={[isSpecialMCR ? 0.75 : 0.5, 20, 20]} />
         <meshStandardMaterial
           color={poi.color}
           emissive={poi.color}
-          emissiveIntensity={hovered ? 1.5 : 0.8}
+          emissiveIntensity={hovered ? 2.5 : isSpecialMCR ? 1.8 : 1.0}
+          roughness={0.2}
+          metalness={0.3}
           transparent
-          opacity={0.9}
+          opacity={0.95}
         />
       </mesh>
       <mesh ref={coreRef}>
-        <sphereGeometry args={[0.3, 12, 12]} />
+        <sphereGeometry args={[isSpecialMCR ? 0.45 : 0.3, 14, 14]} />
         <meshBasicMaterial color={poi.color} />
       </mesh>
-      {/* Pulsing ring */}
+
+      {/* Пульсирующее гало-кольцо */}
       <mesh ref={ringRef} rotation={[Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.7, 0.9, 32]} />
-        <meshBasicMaterial color={poi.color} transparent opacity={0.5} side={THREE.DoubleSide} />
+        <ringGeometry args={[isSpecialMCR ? 1.0 : 0.7, isSpecialMCR ? 1.3 : 0.9, 32]} />
+        <meshBasicMaterial color={poi.color} transparent opacity={0.65} side={THREE.DoubleSide} />
       </mesh>
-      {/* Vertical beam to indicate position */}
+
+      {/* Вертикальный световой маяк отметки */}
       <mesh position={[0, -2, 0]}>
-        <cylinderGeometry args={[0.03, 0.03, 4, 6]} />
-        <meshBasicMaterial color={poi.color} transparent opacity={0.3} />
+        <cylinderGeometry args={[0.04, 0.04, 4, 8]} />
+        <meshBasicMaterial color={poi.color} transparent opacity={0.45} />
       </mesh>
-      {hovered && (
-        <Html distanceFactor={12} position={[0, 1.2, 0]} center>
-          <div style={{
+
+      {/* Интерактивная плашка с подписью, видимая с высоты облёта */}
+      <Html
+        distanceFactor={isSpecialMCR ? 34 : 26}
+        position={[0, isSpecialMCR ? 1.5 : 1.2, 0]}
+        center
+      >
+        <div
+          onClick={handleHtmlClick}
+          style={{
             background: 'rgba(10, 20, 35, 0.92)',
-            border: `1px solid ${poi.color}`,
+            border: `1.5px solid ${poi.color}`,
             borderRadius: '8px',
-            padding: '6px 12px',
+            padding: isSpecialMCR ? '5px 12px' : '4px 9px',
             color: '#fff',
-            fontSize: '13px',
-            fontFamily: 'system-ui, sans-serif',
+            fontSize: isSpecialMCR ? '13px' : '11px',
+            fontWeight: 700,
+            fontFamily: 'system-ui, -apple-system, sans-serif',
             whiteSpace: 'nowrap',
-            pointerEvents: 'none',
-            boxShadow: `0 0 12px ${poi.color}55`,
-          }}>
-            <strong style={{ color: poi.color }}>{poi.titleEn}</strong>
-          </div>
-        </Html>
-      )}
+            cursor: 'pointer',
+            boxShadow: `0 0 16px ${poi.color}77`,
+            transform: hovered ? 'scale(1.15)' : 'scale(1.0)',
+            transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            userSelect: 'none',
+          }}
+        >
+          <span style={{ color: poi.color, fontSize: '12px' }}>●</span>
+          <span>{poi.titleRu}</span>
+        </div>
+      </Html>
     </group>
   );
 }

@@ -83,6 +83,7 @@ export default function DroneFlyByController({
   const lookTarget = useRef(new THREE.Vector3());
   const smoothedTarget = useRef(new THREE.Vector3());
   const isInitialized = useRef(false);
+  const lastTelemetryTime = useRef(0);
 
   // Closed cinematic camera flight path around Containment Building & Turbine Hall
   const { cameraPath, targetPath } = useMemo(() => {
@@ -154,8 +155,10 @@ export default function DroneFlyByController({
     smoothedTarget.current.lerp(tgt, 0.08);
     camera.lookAt(smoothedTarget.current);
 
-    // Compute heading angle and telemetry
-    if (onTelemetryUpdate) {
+    // Compute heading angle and telemetry with throttling (~8 Hz) to eliminate 60 FPS React re-renders
+    const now = performance.now();
+    if (onTelemetryUpdate && (now - lastTelemetryTime.current > 120 || paused)) {
+      lastTelemetryTime.current = now;
       const tangent = cameraPath.getTangentAt(t);
       const heading = (Math.atan2(tangent.x, tangent.z) * 180) / Math.PI;
       const normalizedHeading = (heading + 360) % 360;

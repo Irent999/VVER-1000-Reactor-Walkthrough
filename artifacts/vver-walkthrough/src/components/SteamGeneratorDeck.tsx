@@ -1,6 +1,7 @@
 import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { reactorStateManager } from '@/scene/reactorStateManager';
 import {
   RPV, STEAM_GEN, MCP, DECK, DARK_STEEL_COLOR, ROSATOM_LIME_GREEN, SAFETY_YELLOW, ECCS_TANKS,
 } from '@/scene/constants';
@@ -67,8 +68,18 @@ function CherenkovGlow() {
   const matRef = useRef<THREE.MeshBasicMaterial>(null);
   useFrame((state) => {
     if (matRef.current) {
+      const v = reactorStateManager.vverState;
       const t = state.clock.elapsedTime;
-      matRef.current.opacity = 0.5 + Math.sin(t * 2.2) * 0.15;
+      const normP = v.powerPercent / 100;
+      if (v.scramActive || normP < 0.05) {
+        // Затухающее остаточное тепловыделение после сброса АЗ-5
+        matRef.current.color.set('#441111');
+        matRef.current.opacity = 0.2;
+      } else {
+        // Яркое васильковое Черенковское свечение
+        matRef.current.color.set('#00b4ff');
+        matRef.current.opacity = (0.4 + Math.sin(t * 2.5) * 0.15) * (0.3 + normP * 0.7);
+      }
     }
   });
   return (
@@ -82,9 +93,35 @@ function CherenkovGlow() {
 /** Reactor Pressure Vessel (12m high, 4.5m diameter) */
 function ReactorVessel() {
   const studRotRef = useRef<THREE.Group>(null);
-  useFrame((_, dt) => { if (studRotRef.current) studRotRef.current.rotation.y += dt * 0.015; });
+  const crdGroupRef = useRef<THREE.Group>(null);
+
+  useFrame((_, dt) => {
+    if (studRotRef.current) studRotRef.current.rotation.y += dt * 0.015;
+    if (crdGroupRef.current) {
+      const v = reactorStateManager.vverState;
+      // Вертикальное перемещение 61 группы приводов СУЗ над активной зоной
+      const targetY = RPV.flangeY + 2.2 + (v.crdmPositionPercent / 100) * 0.85;
+      crdGroupRef.current.position.y = THREE.MathUtils.lerp(crdGroupRef.current.position.y, targetY, dt * 6.0);
+    }
+  });
 
   const r = RPV.radius;
+
+  // 61 группа ШУОК СУЗ (Шаговые электромагнитные приводы в гексагональном порядке 1 + 6 + 12 + 18 + 24 = 61)
+  const crdPositions = useMemo(() => {
+    const coords: [number, number][] = [[0, 0]];
+    const rings = [6, 12, 18, 24];
+    const ringRadii = [0.45, 0.85, 1.25, 1.65];
+    rings.forEach((count, rIdx) => {
+      const radius = ringRadii[rIdx];
+      for (let i = 0; i < count; i++) {
+        const a = (i / count) * Math.PI * 2 + (rIdx % 2 ? Math.PI / count : 0);
+        coords.push([Math.cos(a) * radius, Math.sin(a) * radius]);
+      }
+    });
+    return coords.slice(0, 61);
+  }, []);
+
   return (
     <group>
       {/* RPV cylindrical body — 12m tall, 4.5m diameter, sitting on the main deck */}
@@ -119,17 +156,17 @@ function ReactorVessel() {
           );
         })}
       </group>
-      {/* Control rod drive mechanism nozzles on top head */}
-      {Array.from({ length: 12 }).map((_, i) => {
-        const a = (i / 12) * Math.PI * 2;
-        const rad = 0.8 + (i % 2) * 0.6;
-        return (
-          <mesh key={`crd-${i}`} position={[Math.cos(a) * rad, RPV.flangeY + 2.2, Math.sin(a) * rad]} castShadow>
-            <cylinderGeometry args={[0.07, 0.07, 2.4, 8]} />
-            <primitive object={darkSteelMat} attach="material" />
+
+      {/* 61 группа приводов СУЗ ШУОК с динамическим вертикальным перемещением */}
+      <group ref={crdGroupRef} position={[0, RPV.flangeY + 2.2, 0]}>
+        {crdPositions.map(([cx, cz], i) => (
+          <mesh key={`crd-shuok-${i}`} position={[cx, 0, cz]} castShadow>
+            <cylinderGeometry args={[0.045, 0.045, 2.2, 8]} />
+            <primitive object={i === 0 ? safetyYellowMat : darkSteelMat} attach="material" />
           </mesh>
-        );
-      })}
+        ))}
+      </group>
+
       {/* Central inspection aperture with Cherenkov glow */}
       <mesh position={[0, RPV.headTopY, 0]}>
         <cylinderGeometry args={[0.8, 0.8, 0.4, 16]} />
@@ -233,8 +270,17 @@ function SteamGenerator({ index }: { index: number }) {
  * 4 high-pressure vertical tanks situated in compartments on the main deck,
  * finished in distinct Rosatom safety lime-green (#8DB600) with metallic reflections (0.3) and roughness (0.3).
  */
+// Калиброванные радиальные углы размещения 4 гидроемкостей САОЗ
+// с гарантированным технологическим зазором > 1.0м от лестничных маршей и перегородок
+const ECCS_SAFE_ANGLES = [
+  -Math.PI * 0.18, // Емкость САОЗ №1: вынесена к наружной стене контайнмента южнее шахты лестницы №1
+  Math.PI * 0.68,  // Емкость САОЗ №2: вынесена к стене западнее шахты лестницы №2
+  Math.PI * 1.08,  // Емкость САОЗ №3: западный технологический отсек
+  Math.PI * 1.58,  // Емкость САОЗ №4: южный технологический отсек
+];
+
 function ECCSTank({ index }: { index: number }) {
-  const angle = (index / 4) * Math.PI * 2; // Offset by 45° from steam generators
+  const angle = ECCS_SAFE_ANGLES[index % 4];
   const tx = Math.cos(angle) * ECCS_TANKS.centerRadius;
   const tz = Math.sin(angle) * ECCS_TANKS.centerRadius;
   const rad = ECCS_TANKS.radius;
@@ -329,7 +375,13 @@ function MainCoolantPump({ index }: { index: number }) {
   const pz = Math.sin(angle) * MCP.centerRadius;
 
   const rotRef = useRef<THREE.Mesh>(null);
-  useFrame((_, dt) => { if (rotRef.current) rotRef.current.rotation.y += dt * 1.8; });
+  useFrame((_, dt) => {
+    const v = reactorStateManager.vverState;
+    const rpm = v.pumpRPM[index];
+    if (rotRef.current && rpm > 10) {
+      rotRef.current.rotation.y += dt * (rpm / 1500) * 3.5;
+    }
+  });
 
   return (
     <group position={[px, MCP.centerY, pz]} rotation={[0, -angle, 0]}>
@@ -402,8 +454,16 @@ function LoopPipe({ index }: { index: number }) {
   const flowMatRef = useRef<THREE.MeshBasicMaterial>(null);
   useFrame((state) => {
     if (flowMatRef.current) {
-      const t = (state.clock.elapsedTime * 0.4 + index * 0.25) % 1;
-      flowMatRef.current.opacity = 0.35 + Math.sin(t * Math.PI * 2) * 0.2;
+      const v = reactorStateManager.vverState;
+      const rpm = v.pumpRPM[index];
+      const isRunning = v.pumps[index] && rpm > 50;
+      if (isRunning) {
+        const speed = (rpm / 1500) * 1.6;
+        const t = (state.clock.elapsedTime * speed + index * 0.25) % 1;
+        flowMatRef.current.opacity = 0.35 + Math.sin(t * Math.PI * 2) * 0.25;
+      } else {
+        flowMatRef.current.opacity = 0.08;
+      }
     }
   });
 

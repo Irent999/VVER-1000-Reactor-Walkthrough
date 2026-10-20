@@ -10,6 +10,7 @@ interface FirstPersonControllerProps {
   onArrived: () => void;
   onLockChange: (locked: boolean) => void;
   spawnPosition: [number, number, number];
+  lookAtTarget?: [number, number, number];
 }
 
 export default function FirstPersonController({
@@ -17,6 +18,7 @@ export default function FirstPersonController({
   onArrived,
   onLockChange,
   spawnPosition,
+  lookAtTarget,
 }: FirstPersonControllerProps) {
   const { camera, gl, scene } = useThree();
 
@@ -40,26 +42,41 @@ export default function FirstPersonController({
 
   // Reusable raycaster for floor detection
   const raycaster = useRef(new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, -1, 0), 0.05, 12));
+  // Reusable raycaster for horizontal obstacle & equipment detection
+  const obstacleRaycaster = useRef(new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(), 0.05, 0.7));
   const floorCandidates = useRef<THREE.Mesh[]>([]);
   const lastCandidateRefresh = useRef(0);
 
   // Sync camera spawn position & initialize target orientation
-  const spawnKey = `${spawnPosition[0]}:${spawnPosition[1]}:${spawnPosition[2]}`;
+  const targetKey = lookAtTarget ? `${lookAtTarget[0]}:${lookAtTarget[1]}:${lookAtTarget[2]}` : '';
+  const spawnKey = `${spawnPosition[0]}:${spawnPosition[1]}:${spawnPosition[2]}:${targetKey}`;
   useEffect(() => {
     camera.position.set(spawnPosition[0], spawnPosition[1], spawnPosition[2]);
     const eyeHeight = spawnPosition[1] >= 34.0 ? 1.8 : EYE_HEIGHT;
     currentFloorY.current = spawnPosition[1] - eyeHeight;
     velocity.current.set(0, 0, 0);
 
-    // Initial look direction towards center
-    const lookAngle = Math.atan2(-spawnPosition[0], -spawnPosition[2]);
+    // Initial look direction: towards lookAtTarget if provided, otherwise towards scene center
+    let lookAngle = 0;
+    let pitchAngle = -0.05;
+    if (lookAtTarget) {
+      const dx = lookAtTarget[0] - spawnPosition[0];
+      const dz = lookAtTarget[2] - spawnPosition[2];
+      const dy = lookAtTarget[1] - spawnPosition[1];
+      lookAngle = Math.atan2(-dx, -dz);
+      const horizontalDist = Math.hypot(dx, dz);
+      pitchAngle = Math.atan2(dy, horizontalDist);
+    } else {
+      lookAngle = Math.atan2(-spawnPosition[0], -spawnPosition[2]);
+    }
+
     targetYaw.current = lookAngle;
     currentYaw.current = lookAngle;
-    targetPitch.current = -0.05;
-    currentPitch.current = -0.05;
+    targetPitch.current = pitchAngle;
+    currentPitch.current = pitchAngle;
 
     camera.rotation.order = 'YXZ';
-    camera.rotation.set(-0.05, lookAngle, 0);
+    camera.rotation.set(pitchAngle, lookAngle, 0);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [camera, spawnKey]);
 
@@ -257,15 +274,30 @@ export default function FirstPersonController({
 
     if (velocity.current.lengthSq() > 0) {
       velocity.current.normalize().multiplyScalar(speed);
-      const [nextX, nextZ] = resolvePlayerMovement(
-        camera.position.x,
-        camera.position.z,
-        velocity.current.x,
-        velocity.current.z,
-        currentFloorY.current
-      );
-      camera.position.x = nextX;
-      camera.position.z = nextZ;
+
+      // Проверка препятствий по горизонтали с помощью Raycasting
+      const moveDir = velocity.current.clone().normalize();
+      const waistOrigin = new THREE.Vector3(camera.position.x, currentFloorY.current + 0.9, camera.position.z);
+      obstacleRaycaster.current.set(waistOrigin, moveDir);
+      let hitSolidObstacle = false;
+      if (floorCandidates.current.length > 0) {
+        const hits = obstacleRaycaster.current.intersectObjects(floorCandidates.current, false);
+        if (hits.length > 0 && hits[0].distance < 0.40) {
+          hitSolidObstacle = true;
+        }
+      }
+
+      if (!hitSolidObstacle) {
+        const [nextX, nextZ] = resolvePlayerMovement(
+          camera.position.x,
+          camera.position.z,
+          velocity.current.x,
+          velocity.current.z,
+          currentFloorY.current
+        );
+        camera.position.x = nextX;
+        camera.position.z = nextZ;
+      }
     }
 
     // 4. Raycasting Floor Detection: Support 1.8m eye level on Polar Crane Deck (+36m)

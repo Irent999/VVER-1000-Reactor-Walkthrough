@@ -347,11 +347,91 @@ function createBrushedSteelMaps() {
   };
 }
 
+// --------------------------------------------------------------------------------
+// 5. Seamless Steppe Terrain PBR: Organic sandy-clay soil, dry grass & micro-gravel
+// (Zero grid panel joints, zero seams, 100% continuous multi-frequency procedural noise)
+// --------------------------------------------------------------------------------
+function createSteppeTerrainMaps() {
+  const colorData = new Uint8Array(SIZE * SIZE * 4);
+  const roughnessData = new Uint8Array(SIZE * SIZE * 4);
+  const heights = new Float32Array(SIZE * SIZE);
+
+  for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+      const idx = y * SIZE + x;
+
+      // Continuous multi-octave noise without any tile/panel boundaries
+      const fineGrain = (pseudoRandom(x, y, 41) - 0.5) * 16;
+      const microPebble = (smoothNoise(x, y, 67, 4) - 0.5) * 18;
+      const loamPatch = (smoothNoise(x, y, 103, 14) - 0.5) * 24;
+      const soilVariation = (smoothNoise(x, y, 189, 48) - 0.5) * 28;
+
+      const totalNoise = fineGrain * 0.4 + microPebble * 0.7 + loamPatch + soilVariation;
+
+      // Base steppe loess / sandy loam soil palette (#C2A878, #B89C68, #A39063)
+      const baseR = 194; // warm sandy clay
+      const baseG = 168; // earthen ochre
+      const baseB = 120; // steppe grass / dust tint
+
+      const r = THREE.MathUtils.clamp(Math.round(baseR + totalNoise * 0.95), 110, 245);
+      const g = THREE.MathUtils.clamp(Math.round(baseG + totalNoise * 0.85), 95, 230);
+      const b = THREE.MathUtils.clamp(Math.round(baseB + totalNoise * 0.65), 70, 205);
+
+      const cIdx = idx * 4;
+      colorData[cIdx] = r;
+      colorData[cIdx + 1] = g;
+      colorData[cIdx + 2] = b;
+      colorData[cIdx + 3] = 255;
+
+      // High diffuse roughness: chalky dry steppe earth (0.90 to 0.98)
+      const roughVal = THREE.MathUtils.clamp(Math.round(230 + (fineGrain - microPebble * 0.5) * 0.8), 210, 255);
+      roughnessData[cIdx] = roughVal;
+      roughnessData[cIdx + 1] = roughVal;
+      roughnessData[cIdx + 2] = roughVal;
+      roughnessData[cIdx + 3] = 255;
+
+      // Natural micro-relief height
+      const h = 128 + totalNoise * 0.8;
+      heights[idx] = h / 255.0;
+    }
+  }
+
+  const normalData = buildNormalMap(heights, 1.8);
+
+  return {
+    map: makeTexture(colorData, SIZE, true, 24, 24),
+    roughnessMap: makeTexture(roughnessData, SIZE, false, 24, 24),
+    normalMap: makeTexture(normalData, SIZE, false, 24, 24),
+  };
+}
+
+// --------------------------------------------------------------------------------
+// 6. Water Surface Ripple Normal Map for Lake / Cooling Reservoir
+// --------------------------------------------------------------------------------
+function createWaterMaps() {
+  const heights = new Float32Array(SIZE * SIZE);
+  for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+      const idx = y * SIZE + x;
+      const w1 = Math.sin(x * 0.12 + y * 0.08) * 0.5 + 0.5;
+      const w2 = Math.cos(x * 0.09 - y * 0.14) * 0.5 + 0.5;
+      const w3 = smoothNoise(x, y, 221, 16);
+      heights[idx] = (w1 * 0.4 + w2 * 0.4 + w3 * 0.2);
+    }
+  }
+  const normalData = buildNormalMap(heights, 3.5);
+  return {
+    normalMap: makeTexture(normalData, SIZE, false, 12, 12),
+  };
+}
+
 // Generate singleton PBR map instances
 const concreteMaps = createConcreteMaps();
 const floorTileMaps = createFloorTileMaps();
 const diamondPlateMaps = createDiamondPlateMaps();
 const brushedSteelMaps = createBrushedSteelMaps();
+const steppeTerrainMaps = createSteppeTerrainMaps();
+const waterMaps = createWaterMaps();
 
 export const concreteMap = concreteMaps.map;
 export const concreteRoughnessMap = concreteMaps.roughnessMap;
@@ -368,3 +448,10 @@ export const diamondPlateNormalMap = diamondPlateMaps.normalMap;
 export const brushedSteelMap = brushedSteelMaps.map;
 export const brushedSteelRoughnessMap = brushedSteelMaps.roughnessMap;
 export const brushedSteelNormalMap = brushedSteelMaps.normalMap;
+
+export const steppeTerrainMap = steppeTerrainMaps.map;
+export const steppeRoughnessMap = steppeTerrainMaps.roughnessMap;
+export const steppeNormalMap = steppeTerrainMaps.normalMap;
+
+export const waterNormalMap = waterMaps.normalMap;
+

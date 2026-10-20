@@ -44,11 +44,47 @@ function VRTeleportRing({ position, visible }: { position: [number, number, numb
   );
 }
 
-function LocomotionRig() {
+export interface VRControllerManagerProps {
+  viewTarget?: [number, number, number];
+  floorY?: number;
+  activeViewId?: string;
+}
+
+function LocomotionRig({ viewTarget, floorY, activeViewId }: VRControllerManagerProps) {
   const playerRef = useRef<THREE.Group>(null);
   const { session } = useXR();
-  const [teleportPos] = useState<[number, number, number]>([0, FLOOR_LEVELS.main, 10]);
+  const [teleportPos, setTeleportPos] = useState<[number, number, number]>([-32.0, 13.20, 1.8]);
   const [showRing, setShowRing] = useState(false);
+
+  // Динамический перенос VR Dolly при смене ракурса в UI без сбивания трекинга головы
+  const lastTargetKey = useRef<string>('');
+  useEffect(() => {
+    if (viewTarget && playerRef.current) {
+      const key = `${viewTarget[0]}:${viewTarget[1]}:${viewTarget[2]}:${floorY ?? ''}`;
+      if (key !== lastTargetKey.current) {
+        lastTargetKey.current = key;
+        const targetY = floorY !== undefined ? floorY : (viewTarget[1] <= 2 ? 0.5 : viewTarget[1]);
+        playerRef.current.position.set(viewTarget[0], targetY, viewTarget[2]);
+        playerRef.current.updateMatrixWorld(true);
+        setTeleportPos([viewTarget[0], targetY, viewTarget[2]]);
+      }
+    }
+  }, [viewTarget, floorY]);
+
+  // Слушатель старта сессии WebXR: мгновенно переносит игрока внутрь БЩУ ВВЭР-1000
+  useEffect(() => {
+    const handleXRStart = (e: Event) => {
+      const customEvent = e as CustomEvent<{ spawn?: [number, number, number] }>;
+      const spawn = customEvent.detail?.spawn || [-32.0, 13.20, 1.8];
+      if (playerRef.current) {
+        playerRef.current.position.set(spawn[0], spawn[1], spawn[2]);
+        playerRef.current.updateMatrixWorld(true);
+        setTeleportPos([spawn[0], spawn[1], spawn[2]]);
+      }
+    };
+    window.addEventListener('webxr-session-start', handleXRStart);
+    return () => window.removeEventListener('webxr-session-start', handleXRStart);
+  }, []);
 
   // 1. Controller Thumbstick locomotion:
   // - Smooth horizontal translation (3.5 m/s)
@@ -83,11 +119,11 @@ function LocomotionRig() {
 
     // Safety boundary: prevent infinite falling below -12.0m in VR
     if (p.y < -12.0) {
-      p.set(0, FLOOR_LEVELS.main, 10);
+      p.set(-32.0, 13.20, 1.8);
       return;
     }
 
-    // Check collision safety
+    // Check collision safety against containment wall and technological equipment
     if (!isPositionSafe(p.x, p.z, targetY)) {
       const r = Math.hypot(p.x, p.z);
       // Guard central opening on upper deck (+36m)
@@ -109,22 +145,33 @@ function LocomotionRig() {
   useEffect(() => {
     if (session) {
       setShowRing(true);
+      if (playerRef.current) {
+        const isWalk = activeViewId && activeViewId.startsWith('walk');
+        const defaultSpawn: [number, number, number] = [-32.0, 13.20, 1.8];
+        const spawnX = isWalk && viewTarget ? viewTarget[0] : defaultSpawn[0];
+        const spawnY = isWalk && floorY !== undefined ? floorY : defaultSpawn[1];
+        const spawnZ = isWalk && viewTarget ? viewTarget[2] : defaultSpawn[2];
+
+        playerRef.current.position.set(spawnX, spawnY, spawnZ);
+        playerRef.current.updateMatrixWorld(true);
+        setTeleportPos([spawnX, spawnY, spawnZ]);
+      }
     } else {
       setShowRing(false);
     }
-  }, [session]);
+  }, [session, viewTarget, floorY, activeViewId]);
 
   return (
     <>
       <XROrigin
         ref={playerRef as RefObject<THREE.Group>}
-        position={[0, FLOOR_LEVELS.main, 10]}
+        position={[-32.0, 13.20, 1.8]}
       />
       <VRTeleportRing position={teleportPos} visible={showRing} />
     </>
   );
 }
 
-export default function VRControllerManager() {
-  return <LocomotionRig />;
+export default function VRControllerManager(props: VRControllerManagerProps) {
+  return <LocomotionRig {...props} />;
 }

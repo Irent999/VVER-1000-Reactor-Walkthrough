@@ -1,9 +1,10 @@
 import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import VVER1000MainControlRoom from './VVER1000MainControlRoom';
 import {
   CONTAINMENT, CONTAINMENT_GEOMETRY, DECK, POLAR_CRANE, SAFETY_YELLOW,
-  DARK_STEEL_COLOR, FLOOR_LEVELS, HIGH_BAY_LIGHTS, RAIL_TRACKS,
+  DARK_STEEL_COLOR, FLOOR_LEVELS, HIGH_BAY_LIGHTS, RAIL_TRACKS, STAIRS,
 } from '@/scene/constants';
 import {
   concreteMap, concreteNormalMap, concreteRoughnessMap,
@@ -650,10 +651,10 @@ function DeckPlates() {
         <primitive object={diamondPlateMat} attach="material" side={THREE.DoubleSide} />
       </mesh>
 
-      {/* Perimeter Yellow Safety Railing at +15m */}
+      {/* Perimeter Yellow Safety Railing at +15m with calibrated 1.0m+ technological gap */}
       {Array.from({ length: 48 }).map((_, i) => {
         const a = (i / 48) * Math.PI * 2;
-        const pr = DECK.outerRadius - 1.8;
+        const pr = 17.2; // Сокращенный радиус для свободного технологического прохода перед САОЗ
         return (
           <mesh key={`p-rail-${i}`} position={[Math.cos(a) * pr, DECK.mainY + 0.6, Math.sin(a) * pr]} castShadow>
             <cylinderGeometry args={[0.03, 0.03, 1.2, 6]} />
@@ -662,7 +663,7 @@ function DeckPlates() {
         );
       })}
       <mesh position={[0, DECK.mainY + 1.2, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[DECK.outerRadius - 1.8, 0.03, 6, 48]} />
+        <torusGeometry args={[17.2, 0.03, 6, 48]} />
         <primitive object={safetyYellowMat} attach="material" />
       </mesh>
 
@@ -808,6 +809,12 @@ function ContainmentStructure({ opacity }: { opacity: number }) {
         <sphereGeometry args={[R, 64, 32, 0, Math.PI * 2, 0, Math.PI / 2]} />
       </mesh>
 
+      {/* 4. Rosatom Lime-Green Decorative Dome Cornice Ring (в точности как на физическом макете) */}
+      <mesh position={[0, domeCenterY, 0]} castShadow receiveShadow>
+        <torusGeometry args={[R + 0.25, 0.55, 12, 64]} />
+        <meshStandardMaterial color="#6FB836" roughness={0.35} metalness={0.15} />
+      </mesh>
+
       {/* Solid Foundation Ring Base Slab (Единая фундаментная плита, отметка Y = -5.25м, толщина 0.5м) */}
       <mesh position={[0, fCenterY, 0]} receiveShadow castShadow>
         <cylinderGeometry args={[fRadius, fRadius, fThick, 64]} />
@@ -839,8 +846,8 @@ function ContainmentStructure({ opacity }: { opacity: number }) {
 function Stairwell1() {
   const steps = 30;
   const { xMin, xMax, zMin, zMax, yStart, yEnd } = {
-    xMin: 17, xMax: 21, zMin: -8, zMax: 8,
-    yStart: FLOOR_LEVELS.basement, yEnd: DECK.mainY,
+    xMin: STAIRS.s1.xMin, xMax: STAIRS.s1.xMax, zMin: STAIRS.s1.zMin, zMax: STAIRS.s1.zMax,
+    yStart: STAIRS.s1.yStart, yEnd: STAIRS.s1.yEnd,
   };
   const stepDepth = (zMax - zMin) / steps;
   const stepHeight = (yEnd - yStart) / steps;
@@ -967,8 +974,8 @@ function Stairwell1() {
 function Stairwell2() {
   const steps = 32;
   const { xMin, xMax, zMin, zMax, yStart, yEnd } = {
-    xMin: -8, xMax: 8, zMin: 17, zMax: 21,
-    yStart: DECK.mainY, yEnd: DECK.upperY,
+    xMin: STAIRS.s2.xMin, xMax: STAIRS.s2.xMax, zMin: STAIRS.s2.zMin, zMax: STAIRS.s2.zMax,
+    yStart: STAIRS.s2.yStart, yEnd: STAIRS.s2.yEnd,
   };
   const stepDepth = (xMax - xMin) / steps;
   const stepHeight = (yEnd - yStart) / steps;
@@ -1172,18 +1179,24 @@ export interface ReactorBuildingProps {
   containmentOpacity: number;
   position?: [number, number, number];
   scale?: [number, number, number] | number;
+  children?: React.ReactNode;
 }
 
 export default function ReactorBuilding({
   containmentOpacity,
   position = [0, 0, 0],
   scale = [1, 1, 1],
+  children,
 }: ReactorBuildingProps) {
+  const containmentGroupRef = useRef<THREE.Group>(null);
+
   return (
     <group
-      name="VVERUnit1_ReactorBuilding"
+      ref={containmentGroupRef}
+      name="containmentGroup"
       position={position}
       scale={typeof scale === 'number' ? [scale, scale, scale] : scale}
+      userData={{ isContainmentGroup: true, groupName: 'VVERUnit1_ContainmentGroup' }}
     >
       {/* Containment Inner Wall, Dome, and Cutaway Shell */}
       <ContainmentStructure opacity={containmentOpacity} />
@@ -1204,6 +1217,8 @@ export default function ReactorBuilding({
 
       {/* Invisible physical collision walls enclosing floor boundaries & handrails */}
       <InvisibleCollisionWalls />
+
+      {children}
     </group>
   );
 }

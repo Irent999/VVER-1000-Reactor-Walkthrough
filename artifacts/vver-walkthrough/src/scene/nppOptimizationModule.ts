@@ -205,33 +205,34 @@ export function getNVAESMaterials(): NVAESMaterialSet {
 export interface NPPRendererOptimizationOptions {
   antialias?: boolean;                // false (отключение MSAA для встроенной графики)
   powerPreference?: WebGLPowerPreference; // 'high-performance'
-  maxPixelRatio?: number;             // не выше Math.min(window.devicePixelRatio, 1.5)
+  maxPixelRatio?: number;             // не выше Math.min(window.devicePixelRatio, 2.0)
   enableSoftShadows?: boolean;
-  shadowMapSize?: number;             // 1024 / 2048
+  shadowMapSize?: number;             // 1024
 }
 
 /**
  * Применяет конфигурацию рендерера для минимизации задержек и экономии VRAM/RAM:
  * - renderer.powerPreference = "high-performance"
- * - pixelRatio ограничен значением 1.5 (на Retina/4K дисплеях не тратит ресурсы впустую)
- * - Настройка теней PCFSoftShadowMap с низким оверхедом
+ * - pixelRatio ограничен Math.min(window.devicePixelRatio, 2)
+ * - Оптимизированный размер карт теней 1024x1024 с PCFSoftShadowMap
  */
 export function configureNPPRenderer(
   renderer: THREE.WebGLRenderer,
   options: NPPRendererOptimizationOptions = {}
 ): void {
   const {
-    maxPixelRatio = 1.5,
+    maxPixelRatio = 2.0,
     enableSoftShadows = true,
-    shadowMapSize = 2048,
+    shadowMapSize = 1024,
   } = options;
 
-  // Ограничение PixelRatio до 1.5 (на Retina экранах экономит до 50% заполнения пикселей)
+  // Ограничение PixelRatio до Math.min(window.devicePixelRatio, 2)
   const currentDpr = typeof window !== 'undefined' ? window.devicePixelRatio : 1;
   const clampedDpr = Math.min(currentDpr, maxPixelRatio);
   renderer.setPixelRatio(clampedDpr);
 
-  // Цветопередача и тоновое отображение
+  // Цветопередача, очистка буфера и тоновое отображение (защита от черного экрана)
+  renderer.setClearColor(new THREE.Color(0x9cb0c3), 1.0);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.08;
 
@@ -244,8 +245,9 @@ export function configureNPPRenderer(
     renderer.shadowMap.enabled = false;
   }
 
-  // WebXR события: динамическая подстройка DPR для 72/90 FPS в очках виртуальной реальности
+  // WebXR готовность и события: динамическая подстройка DPR для 72/90 FPS в очках виртуальной реальности
   if (renderer.xr) {
+    renderer.xr.enabled = true;
     renderer.xr.addEventListener('sessionstart', () => {
       // Для стабильного 90 FPS на автономных шлемах фиксируем pixelRatio = 1.0 или 1.2
       renderer.setPixelRatio(Math.min(currentDpr, 1.25));
@@ -314,10 +316,21 @@ export function applySceneOptimizations(
           obj.geometry.computeBoundingBox();
         }
 
-        // 3. Отключение теней для микродеталей (болты, провода, мелкие кронштейны)
+        // 3. Отключение теней для мелких и вспомогательных объектов (повышение FPS)
         if (disableSmallShadowCasters && obj.castShadow && obj.geometry.boundingSphere) {
           const radius = obj.geometry.boundingSphere.radius * Math.max(obj.scale.x, obj.scale.y, obj.scale.z);
-          if (radius < 0.4) {
+          const name = (obj.name || obj.parent?.name || '').toLowerCase();
+          const isDecorative =
+            name.includes('fence') ||
+            name.includes('curb') ||
+            name.includes('rail') ||
+            name.includes('post') ||
+            name.includes('ladder') ||
+            name.includes('reed') ||
+            name.includes('shrub') ||
+            name.includes('light') ||
+            name.includes('marker');
+          if (radius < 0.9 || isDecorative) {
             obj.castShadow = false;
             stats.shadowCastersCulled++;
           }
@@ -636,57 +649,87 @@ export function setupOptimizedNPPAtmosphere(
 // ============================================================================
 
 export interface FixBuildingOverlapOptions {
-  requiredClearance?: number; // Минимальный технологический зазор в метрах (по умолчанию 6.0 м)
+  requiredClearance?: number; // Минимальный технологический зазор в метрах (по умолчанию 8.0 м, 5-10 м по ТЗ)
   removeDuplicateRoofs?: boolean; // Удаление дублирующихся перекрытий синей крыши (Z-fighting)
+  preferXAxis?: boolean; // Приоритет разнесения по оси X (восточное крыло площадки)
 }
 
 /**
- * Алгоритм автоматического расчета габаритов (Bounding Box), принудительного разнесения
+ * Алгоритм автоматического расчета точных границ (Bounding Box), принудительного разнесения
  * зданий и устранения Z-fighting на синей кровле комплекса РИТМ-200Н.
  * 
- * @param scene Сцена Three.js, содержащая объекты
- * @param options Параметры зазора и дедупликации
- * @returns Отчет о произведенных сдвигах и удаленных дубликатах
+ * Выполняет:
+ * 1. Вычисление точных границ THREE.Box3().setFromObject() для белого здания и ritm200Group.
+ * 2. Принудительный сдвиг по оси X/Z:
+ *    Если ritm200Group пересекается с белым зданием, жестко задает сдвиг:
+ *    ritm200Group.position.x += Math.max(15.0, offset + clearance) с гарантированным
+ *    технологическим зазором в 5-10 метров.
+ *    Вызывает ritm200Group.updateMatrixWorld(true) после сдвига.
+ * 3. Устранение внутреннего дублирования крыш (Z-fighting):
+ *    Обходит дочерние меши ritm200Group.traverse(child => ...) и удаляет лишние
+ *    продублированные меши кровли, создающие наложение двух синих плоскостей друг на друга.
+ * 
+ * @param sceneOrRitm Сцена Three.js или непосредственно группа ritm200Group
+ * @param whiteBuildingParamOrOptions Белое здание (Object3D) или опции
+ * @param optionsParam Дополнительные параметры зазора и дедупликации
+ * @returns Отчет о произведенных сдвигах, детекции коллизий и удаленных дубликатах
  */
 export function fixBuildingOverlap(
-  scene: THREE.Scene,
-  options: FixBuildingOverlapOptions = {}
+  sceneOrRitm: THREE.Scene | THREE.Object3D,
+  whiteBuildingParamOrOptions?: THREE.Object3D | FixBuildingOverlapOptions,
+  optionsParam?: FixBuildingOverlapOptions
 ): {
   overlapDetected: boolean;
   shiftApplied: { x: number; z: number };
   duplicatesRemoved: number;
+  ritmBox?: THREE.Box3;
+  whiteBox?: THREE.Box3;
 } {
-  const clearance = options.requiredClearance ?? 6.0;
-  const shouldDeduplicate = options.removeDuplicateRoofs ?? true;
-
-  // 1. Поиск здания РИТМ-200Н в иерархии сцены
   let ritm200Group: THREE.Object3D | null = null;
-  scene.traverse((obj) => {
-    if (
-      !ritm200Group &&
-      (obj.name === 'RITM200N_SMR_FullComplex' ||
-       obj.name === 'RITM200N_Complex' ||
-       obj.name.toLowerCase().includes('ritm200'))
-    ) {
-      ritm200Group = obj;
-    }
-  });
+  let whiteBuildings: THREE.Object3D[] = [];
+  let options: FixBuildingOverlapOptions = {};
 
-  // 2. Поиск смежного белого/капитального здания (Машинный зал Блока 2 или Блока 1)
-  const whiteBuildings: THREE.Object3D[] = [];
-  scene.traverse((obj) => {
-    if (
-      obj !== ritm200Group &&
-      !ritm200Group?.children.includes(obj) &&
-      (obj.name === 'VVERUnit2_Group' ||
-       obj.name.toLowerCase().includes('turbine') ||
-       obj.name.toLowerCase().includes('whitebuilding') ||
-       obj.name === 'VVERUnit1_MasterGroup')
-    ) {
-      whiteBuildings.push(obj);
-    }
-  });
+  if (whiteBuildingParamOrOptions && 'isObject3D' in whiteBuildingParamOrOptions) {
+    // Вызов сигнатуры (ritm200Group, whiteBuilding, options)
+    ritm200Group = sceneOrRitm;
+    whiteBuildings = [whiteBuildingParamOrOptions as THREE.Object3D];
+    options = optionsParam || {};
+  } else {
+    // Вызов сигнатуры (scene, options)
+    const scene = sceneOrRitm;
+    options = (whiteBuildingParamOrOptions as FixBuildingOverlapOptions) || {};
 
+    // 1. Поиск здания РИТМ-200Н в иерархии сцены
+    scene.traverse((obj) => {
+      if (
+        !ritm200Group &&
+        (obj.name === 'RITM200N_SMR_FullComplex' ||
+         obj.name === 'RITM200N_Complex' ||
+         obj.name.toLowerCase().includes('ritm200'))
+      ) {
+        ritm200Group = obj;
+      }
+    });
+
+    // 2. Поиск смежного белого/капитального здания (Машинный зал Блока 2, Блока 1 или VVERUnit2_Group)
+    scene.traverse((obj) => {
+      if (
+        obj !== ritm200Group &&
+        !ritm200Group?.children.includes(obj) &&
+        (obj.name === 'VVERUnit2_TurbineHall' ||
+         obj.name === 'WhiteTurbineBuilding' ||
+         obj.name === 'VVERUnit2_Group' ||
+         (obj.name.toLowerCase().includes('turbine') && !obj.name.toLowerCase().includes('smr') && !obj.name.toLowerCase().includes('ritm')) ||
+         obj.name.toLowerCase().includes('whitebuilding') ||
+         obj.name === 'VVERUnit1_MasterGroup')
+      ) {
+        whiteBuildings.push(obj);
+      }
+    });
+  }
+
+  const clearance = options.requiredClearance ?? 8.0; // Технологический зазор 8 метров (в диапазоне 5-10м)
+  const shouldDeduplicate = options.removeDuplicateRoofs ?? true;
   let duplicatesRemoved = 0;
 
   // 3. Устранение внутреннего дублирования крыш (Z-fighting)
@@ -697,9 +740,9 @@ export function fixBuildingOverlap(
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh;
         const mat = mesh.material as THREE.MeshStandardMaterial;
-        // Проверяем синие меши кровли (#1F4E79 или аналогичные)
+        // Проверяем синие меши кровли (#1F4E79 или кобальтово-синий оттенок)
         const isBlueRoof =
-          (mat && 'color' in mat && (mat.color.getHex() === 0x1F4E79 || (mat.color.b > 0.4 && mat.color.r < 0.2))) ||
+          (mat && 'color' in mat && (mat.color.getHex() === 0x1F4E79 || (mat.color.b > 0.4 && mat.color.r < 0.25))) ||
           mesh.name.toLowerCase().includes('roof');
 
         if (isBlueRoof && mesh.position.y > 10.0) {
@@ -720,12 +763,12 @@ export function fixBuildingOverlap(
         r1.getWorldPosition(wPos1);
         r2.getWorldPosition(wPos2);
 
-        // Если меши находятся почти на одной высоте и в одной точке (дельта < 0.25м)
+        // Если меши находятся практически на одной высоте и перекрывают друг друга
         if (
-          Math.abs(wPos1.y - wPos2.y) < 0.25 &&
-          wPos1.distanceTo(wPos2) < 2.0
+          Math.abs(wPos1.y - wPos2.y) < 0.35 &&
+          wPos1.distanceTo(wPos2) < 3.0
         ) {
-          // Удаляем дубликат из родительской группы
+          // Удаляем дубликат из родительской группы и освобождаем память геометрии
           r2.parent.remove(r2);
           if (r2.geometry) r2.geometry.dispose();
           duplicatesRemoved++;
@@ -736,41 +779,50 @@ export function fixBuildingOverlap(
 
   const shiftApplied = { x: 0, z: 0 };
   let overlapDetected = false;
+  let finalRitmBox: THREE.Box3 | undefined;
+  let finalWhiteBox: THREE.Box3 | undefined;
 
-  // 4. Расчет Bounding Box и принудительный сдвиг
+  // 4. Получение точных границ (Bounding Box) и принудительный сдвиг по оси X и Z
   if (ritm200Group && whiteBuildings.length > 0) {
-    // Принудительно обновляем мировые матрицы
-    scene.updateMatrixWorld(true);
+    // Принудительно обновляем мировые матрицы для точного вычисления Box3
+    if ('updateMatrixWorld' in sceneOrRitm) {
+      sceneOrRitm.updateMatrixWorld(true);
+    }
+    ritm200Group.updateMatrixWorld(true);
 
     const ritmBox = new THREE.Box3().setFromObject(ritm200Group);
 
-    for (const whiteBld of whiteBuildings) {
-      const whiteBox = new THREE.Box3().setFromObject(whiteBld);
+    // Предпочитаем наиболее близкое смежное белое здание (Машзал энергоблока №2)
+    const primaryWhiteBld =
+      whiteBuildings.find((b) => b.name === 'VVERUnit2_TurbineHall' || b.name === 'WhiteTurbineBuilding') ||
+      whiteBuildings[0];
 
-      // Проверка пересечения габаритов
+    const whiteBox = new THREE.Box3().setFromObject(primaryWhiteBld);
+    finalRitmBox = ritmBox;
+    finalWhiteBox = whiteBox;
+
+    // Проверка пересечения габаритов
+    if (ritmBox.intersectsBox(whiteBox)) {
+      overlapDetected = true;
+
+      // Вычисляем необходимый сдвиг по оси X для образования чистого зазора 5-10 метров
+      const overlapDepthX = whiteBox.max.x - ritmBox.min.x;
+      const requiredShiftX = Math.max(15.0, overlapDepthX + clearance);
+
+      // Принудительный сдвиг ritm200Group по оси X
+      ritm200Group.position.x += requiredShiftX;
+      shiftApplied.x += requiredShiftX;
+
+      // Принудительное обновление мировой матрицы трансформации
+      ritm200Group.updateMatrixWorld(true);
+      ritmBox.setFromObject(ritm200Group);
+
+      // Контрольная проверка по оси Z: если после сдвига по X осталась интерференция
       if (ritmBox.intersectsBox(whiteBox)) {
-        overlapDetected = true;
-
-        // Вычисляем глубину перекрытия по осям X и Z
-        const overlapX = Math.min(ritmBox.max.x, whiteBox.max.x) - Math.max(ritmBox.min.x, whiteBox.min.x);
-        const overlapZ = Math.min(ritmBox.max.z, whiteBox.max.z) - Math.max(ritmBox.min.z, whiteBox.min.z);
-
-        // Сдвигаем по оси наименьшего или наиболее логичного перемещения с запасом технологического зазора
-        if (overlapZ <= overlapX) {
-          // Сдвиг по Z: если РИТМ южнее белого здания, сдвигаем дальше на юг (+Z)
-          const sign = ritmBox.getCenter(new THREE.Vector3()).z >= whiteBox.getCenter(new THREE.Vector3()).z ? 1 : -1;
-          const shiftZ = (overlapZ + clearance) * sign;
-          ritm200Group.position.z += shiftZ;
-          shiftApplied.z += shiftZ;
-        } else {
-          // Сдвиг по X: если РИТМ восточнее, сдвигаем дальше на восток (+X)
-          const sign = ritmBox.getCenter(new THREE.Vector3()).x >= whiteBox.getCenter(new THREE.Vector3()).x ? 1 : -1;
-          const shiftX = (overlapX + clearance) * sign;
-          ritm200Group.position.x += shiftX;
-          shiftApplied.x += shiftX;
-        }
-
-        // Обновляем мировую матрицу группы и пересчитываем Bounding Box
+        const overlapDepthZ = whiteBox.max.z - ritmBox.min.z;
+        const requiredShiftZ = Math.max(15.0, overlapDepthZ + clearance);
+        ritm200Group.position.z += requiredShiftZ;
+        shiftApplied.z += requiredShiftZ;
         ritm200Group.updateMatrixWorld(true);
         ritmBox.setFromObject(ritm200Group);
       }
@@ -781,5 +833,7 @@ export function fixBuildingOverlap(
     overlapDetected,
     shiftApplied,
     duplicatesRemoved,
+    ritmBox: finalRitmBox,
+    whiteBox: finalWhiteBox,
   };
 }

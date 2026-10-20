@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, Suspense, useCallback } from 'react';
-import { Canvas, useThree } from '@react-three/fiber';
+import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { OrbitControls, Sky, Stars, Environment, AdaptiveDpr, ContactShadows } from '@react-three/drei';
 import { XR, createXRStore, VRButton, TeleportTarget } from '@react-three/xr';
 import * as THREE from 'three';
@@ -10,6 +10,7 @@ import SteamGeneratorDeck from '@/components/SteamGeneratorDeck';
 import ServerRoom from '@/components/ServerRoom';
 import CoreCatcher from '@/components/CoreCatcher';
 import TurbineHall from '@/components/TurbineHall';
+import DeaeratorBuilding from '@/components/DeaeratorBuilding';
 import ExteriorScene from '@/components/ExteriorScene';
 import {
   VVERUnit2,
@@ -22,21 +23,29 @@ import VRControllerManager from '@/components/VRControllerManager';
 import DroneFlyByController, { type DroneWaymark } from '@/components/DroneFlyByController';
 import FirstPersonController from '@/components/FirstPersonController';
 import UIOverlay from '@/components/UIOverlay';
+import VVER1000AuxiliaryBuilding from '@/components/VVER1000AuxiliaryBuilding';
+import VVER1000MainControlRoom from '@/components/VVER1000MainControlRoom';
+import WebXRSceneManager from '@/scene/webxrManager';
 import { POI_LIST, FLOOR_VIEWS, type POIInfo, type ViewMode } from '@/data/poiData';
-import { useTelemetry } from '@/hooks/useTelemetry';
 import {
   configureNPPRenderer,
   applySceneOptimizations,
   fixBuildingOverlap,
 } from '@/scene/nppOptimizationModule';
+import { syncRITMViewpoints } from '@/scene/dynamicViewpointManager';
+import { validateAndAdjustCameraLineOfSight, auditAndCleanAllFloorViews } from '@/scene/cameraLineOfSightModule';
 
 const xrStore = createXRStore({
   controller: { teleportPointer: true, rayPointer: true },
   offerSession: true,
 });
 
-/** Автоматический оптимизатор сцены: включает Frustum Culling, предрасчет BoundingBox/Sphere, настраивает WebXR */
-function ScenePerformanceOptimizer() {
+interface ScenePerformanceOptimizerProps {
+  onSyncRITM?: (pois: POIInfo[], views: typeof FLOOR_VIEWS) => void;
+}
+
+/** Автоматический оптимизатор сцены: включает Frustum Culling, предрасчет BoundingBox/Sphere, устраняет наложения и динамически связывает точки обзора */
+function ScenePerformanceOptimizer({ onSyncRITM }: ScenePerformanceOptimizerProps) {
   const { scene, gl } = useThree();
 
   useEffect(() => {
@@ -52,56 +61,156 @@ function ScenePerformanceOptimizer() {
       requiredClearance: 8.0,
       removeDuplicateRoofs: true,
     });
-  }, [scene, gl]);
+
+    // Динамический сдвиг ракурсов (Viewpoints / POI) вслед за моделью РИТМ-200Н
+    const ritmGroup = scene.getObjectByName('RITM200N_SMR_FullComplex') ||
+      scene.getObjectByName('RITM200N_Complex');
+    if (ritmGroup && onSyncRITM) {
+      const { updatedPOIs, updatedViews } = syncRITMViewpoints(ritmGroup, POI_LIST, FLOOR_VIEWS);
+      const cleanedViews = auditAndCleanAllFloorViews(updatedViews, scene);
+      onSyncRITM(updatedPOIs, cleanedViews);
+    }
+  }, [scene, gl, onSyncRITM]);
 
   return null;
 }
 
-/** Smoothly moves the camera to a target position and lookAt target */
-function CameraRig({ cameraPos, lookAt, mode }: { cameraPos: [number, number, number]; lookAt: [number, number, number]; mode: ViewMode }) {
-  const { camera } = useThree();
+/**
+ * Высокопроизводительный контроллер камеры:
+ * 1. Интеграция в анимационный цикл useFrame (исключает лаги от ре-рендеров React)
+ * 2. Плавное сглаживание движений OrbitControls (enableDamping = true, dampingFactor = 0.05)
+ * 3. Бесшовные кинематографические перелеты между ракурсами с контролем препятствий
+ */
+interface SmoothCameraControllerProps {
+  cameraPos: [number, number, number];
+  lookAt: [number, number, number];
+  mode: ViewMode;
+  viewId?: string;
+  onTransitionEnd?: () => void;
+}
+
+function SmoothCameraController({
+  cameraPos,
+  lookAt,
+  mode,
+  viewId,
+  onTransitionEnd,
+}: SmoothCameraControllerProps) {
+  const { camera, scene } = useThree();
+  const controlsRef = useRef<OCImpl | null>(null);
+
+  // Параметры перехода хранятся в refs и обрабатываются строго в цикле useFrame
+  const isTransitioning = useRef(false);
+  const transitionStart = useRef(0);
+  const transitionDuration = 1.35; // секунды
+
+  const startPos = useRef(new THREE.Vector3());
   const targetPos = useRef(new THREE.Vector3(...cameraPos));
+  const startTarget = useRef(new THREE.Vector3());
   const targetLook = useRef(new THREE.Vector3(...lookAt));
-  const animating = useRef(false);
+  const currentLook = useRef(new THREE.Vector3(...lookAt));
+
+  const prevKey = useRef('');
+  const currentKey = `${viewId}:${cameraPos.join(',')}:${lookAt.join(',')}:${mode}`;
 
   useEffect(() => {
+    if (prevKey.current === currentKey) return;
+    prevKey.current = currentKey;
+
     if (mode === 'drone') {
-      animating.current = false;
+      isTransitioning.current = false;
       return;
     }
-    targetPos.current.set(...cameraPos);
-    targetLook.current.set(...lookAt);
-    animating.current = true;
-  }, [cameraPos, lookAt, mode]);
 
-  // We use a simple lerp via requestAnimationFrame since OrbitControls handles its own updates
-  useEffect(() => {
-    if (mode !== 'orbit') return;
-    let raf = 0;
-    const animate = () => {
-      if (animating.current) {
-        camera.position.lerp(targetPos.current, 0.06);
-        if (camera.position.distanceTo(targetPos.current) < 0.5) {
-          animating.current = false;
-          camera.position.copy(targetPos.current);
-        }
-        camera.lookAt(targetLook.current);
+    // Проверка прямой видимости THREE.Raycaster и автоматическая коррекция спавна
+    const los = validateAndAdjustCameraLineOfSight(
+      cameraPos,
+      lookAt,
+      scene,
+      { minObstacleDistance: 1.5 },
+      viewId
+    );
+
+    startPos.current.copy(camera.position);
+    targetPos.current.set(...los.adjustedPosition);
+
+    if (controlsRef.current) {
+      startTarget.current.copy(controlsRef.current.target);
+    } else {
+      const dir = new THREE.Vector3();
+      camera.getWorldDirection(dir);
+      startTarget.current.copy(camera.position).add(dir.multiplyScalar(20));
+    }
+
+    targetLook.current.set(...los.adjustedTarget);
+    transitionStart.current = performance.now();
+    isTransitioning.current = true;
+
+    // Временно отключаем ручное вращение OrbitControls во время плавного перелета камеры
+    if (controlsRef.current) {
+      controlsRef.current.enabled = false;
+    }
+  }, [camera, cameraPos, lookAt, mode, scene, viewId, currentKey]);
+
+  useFrame(() => {
+    if (mode === 'drone') return;
+
+    if (isTransitioning.current) {
+      const elapsed = (performance.now() - transitionStart.current) / 1000;
+      const progress = Math.min(1.0, elapsed / transitionDuration);
+      // Плавная кубическая кривая smoothstep: t * t * (3 - 2 * t)
+      const t = progress * progress * (3 - 2 * progress);
+
+      camera.position.lerpVectors(startPos.current, targetPos.current, t);
+      currentLook.current.lerpVectors(startTarget.current, targetLook.current, t);
+
+      if (controlsRef.current) {
+        controlsRef.current.target.copy(currentLook.current);
       }
-      raf = requestAnimationFrame(animate);
-    };
-    raf = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(raf);
-  }, [camera, mode]);
+      camera.lookAt(currentLook.current);
 
-  return null;
+      if (progress >= 1.0) {
+        isTransitioning.current = false;
+        camera.position.copy(targetPos.current);
+        camera.lookAt(targetLook.current);
+        if (controlsRef.current) {
+          controlsRef.current.target.copy(targetLook.current);
+          controlsRef.current.enabled = mode === 'orbit';
+          controlsRef.current.update();
+        }
+        onTransitionEnd?.();
+      }
+      return;
+    }
+
+    // В обычном режиме орбиты - непрерывное плавное сглаживание в цикле анимации useFrame
+    if (mode === 'orbit' && controlsRef.current && controlsRef.current.enabled) {
+      controlsRef.current.update();
+    }
+  });
+
+  if (mode !== 'orbit') return null;
+
+  return (
+    <OrbitControls
+      ref={controlsRef}
+      enableDamping={true}
+      dampingFactor={0.05}
+      minDistance={6}
+      maxDistance={420}
+      maxPolarAngle={Math.PI * 0.88}
+      makeDefault
+    />
+  );
 }
 
 interface SceneContentProps {
   containmentOpacity: number;
   onPOISelect: (poi: POIInfo) => void;
+  pois?: POIInfo[];
 }
 
-function SceneContent({ containmentOpacity, onPOISelect }: SceneContentProps) {
+function SceneContent({ containmentOpacity, onPOISelect, pois = POI_LIST }: SceneContentProps) {
   return (
     <group>
       {/* Unit 1 Full Interactive Interior & Exterior (Строго position.y = 0, scale = [1, 1, 1]) */}
@@ -114,20 +223,25 @@ function SceneContent({ containmentOpacity, onPOISelect }: SceneContentProps) {
         <CoreCatcher />
         <SteamGeneratorDeck />
         <ServerRoom />
+        <DeaeratorBuilding />
         <TurbineHall />
+        {/* Левый вспомогательный корпус (обстройка РО / пульт управления) с БЩУ на отметке +13.20м */}
+        <VVER1000AuxiliaryBuilding>
+          <VVER1000MainControlRoom position={[-32.0, 13.20, 0.0]} />
+        </VVER1000AuxiliaryBuilding>
       </group>
 
       {/* Full Combined NPP Site Master Plan Infrastructure */}
       {/* Unit 2: Строго на одной горизонтальной оси (position.y = 0), масштаб [1, 1, 1], смещение ΔZ = +70 */}
       <VVERUnit2 position={[0, 0, 70]} scale={[1, 1, 1]} />
       <InterUnitOverheadPipeBridge />
-      {/* Комплекс МАЭС РИТМ-200Н: четкий технологический проход/разрыв от стен машзала (X=142, Z=80) */}
-      <RITM200NComplex position={[142, 0, 80]} />
+      {/* Комплекс МАЭС РИТМ-200Н: четкий технологический проход/разрыв от стен машзала (X=168, Z=80) */}
+      <RITM200NComplex position={[168, 0, 80]} />
       <CylindricalWaterStorageTanks position={[64, 0, 86]} />
 
       {/* Exterior Site, Cooling Towers (x2), Switchyard, ABK, Roads & Steppe Landscape */}
       <ExteriorScene />
-      <POIMarkers pois={POI_LIST} onSelect={onPOISelect} />
+      <POIMarkers pois={pois} onSelect={onPOISelect} />
     </group>
   );
 }
@@ -181,7 +295,11 @@ export default function App() {
   const [vrSupported, setVrSupported] = useState<boolean | null>(null);
   const [selectedPOI, setSelectedPOI] = useState<POIInfo | null>(null);
   const [floorTarget, setFloorTarget] = useState<number | null>(null);
-  const telemetry = useTelemetry();
+  const [isVRPresenting, setIsVRPresenting] = useState(false);
+
+  // Динамические POI и Viewpoints (синхронизируются с глобальной матрицей РИТМ-200Н)
+  const [dynamicPOIs, setDynamicPOIs] = useState<POIInfo[]>(POI_LIST);
+  const [dynamicViews, setDynamicViews] = useState(FLOOR_VIEWS);
 
   // Drone Fly-By state
   const [droneSpeed, setDroneSpeed] = useState(1.0);
@@ -195,8 +313,13 @@ export default function App() {
   } | null>(null);
   const [scrubProgress, setScrubProgress] = useState<number | null>(null);
 
-  const activeViewData = FLOOR_VIEWS.find((v) => v.id === activeView) ?? FLOOR_VIEWS[0];
+  const activeViewData = dynamicViews.find((v) => v.id === activeView) ?? dynamicViews[0];
   const controlMode: ViewMode = activeViewData.mode;
+
+  const handleSyncRITM = useCallback((pois: POIInfo[], views: typeof FLOOR_VIEWS) => {
+    setDynamicPOIs([...pois]);
+    setDynamicViews([...views]);
+  }, []);
 
   useEffect(() => {
     const check = async () => {
@@ -210,8 +333,19 @@ export default function App() {
     check();
   }, []);
 
+  useEffect(() => {
+    const onStart = () => setIsVRPresenting(true);
+    const onEnd = () => setIsVRPresenting(false);
+    window.addEventListener('webxr-session-start', onStart);
+    window.addEventListener('webxr-session-end', onEnd);
+    return () => {
+      window.removeEventListener('webxr-session-start', onStart);
+      window.removeEventListener('webxr-session-end', onEnd);
+    };
+  }, []);
+
   const handleViewChange = useCallback((viewId: string) => {
-    const view = FLOOR_VIEWS.find((v) => v.id === viewId);
+    const view = dynamicViews.find((v) => v.id === viewId) ?? FLOOR_VIEWS.find((v) => v.id === viewId);
     if (!view) return;
     setActiveView(viewId);
     if (view.mode === 'walk') {
@@ -220,7 +354,7 @@ export default function App() {
       setDronePaused(false);
       setScrubProgress(null);
     }
-  }, []);
+  }, [dynamicViews]);
 
   const handlePOISelect = useCallback((poi: POIInfo) => {
     setSelectedPOI(poi);
@@ -250,38 +384,63 @@ export default function App() {
           shadows
           camera={{ position: [50, 30, 60], fov: 60, near: 0.1, far: 1000 }}
           gl={{
-            antialias: false, // Отключение тяжелого MSAA сглаживания для встроенной графики по ТЗ
+            antialias: true,
+            alpha: false,
             toneMapping: THREE.ACESFilmicToneMapping,
             toneMappingExposure: 1.08,
             powerPreference: 'high-performance',
           }}
-          dpr={[1, Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, 1.5)]}
+          dpr={[1, Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, 2)]}
+          onCreated={({ gl, scene, camera }) => {
+            const bgColor = new THREE.Color('#d4c5a9');
+            scene.background = bgColor;
+            gl.setClearColor(bgColor, 1.0);
+            gl.setPixelRatio(Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, 2));
+            camera.near = 0.1;
+            camera.far = 1000;
+            camera.updateProjectionMatrix();
+          }}
         >
-        <ScenePerformanceOptimizer />
-        <color attach="background" args={['#9CB0C3']} />
-        <fogExp2 attach="fog" args={['#9CB0C3', 0.0022]} />
+        <WebXRSceneManager
+          activeSpawnPos={activeViewData.cameraPos}
+          floorY={activeViewData.floorY}
+          activeViewId={activeViewData.id}
+        />
+        <ScenePerformanceOptimizer onSyncRITM={handleSyncRITM} />
+        {/* Реалистичный природный фон и легкий естественный степной туман по ТЗ */}
+        <color attach="background" args={['#d4c5a9']} />
+        <fogExp2 attach="fog" args={['#d4c5a9', 0.001]} />
+
+        {/* Глобальное базовое освещение для предотвращения темноты/черного экрана в VR */}
+        <ambientLight intensity={1.4} color="#fffcf5" />
 
         <Suspense fallback={null}>
-          <Sky sunPosition={[80, 113, 80]} turbidity={2.8} rayleigh={1.15} mieCoefficient={0.005} mieDirectionalG={0.84} />
+          <Sky
+            sunPosition={[95, 110, 85]}
+            turbidity={2.4}
+            rayleigh={0.95}
+            mieCoefficient={0.004}
+            mieDirectionalG={0.82}
+          />
           <Stars radius={450} depth={80} count={1200} factor={4} fade />
-          <Environment preset="warehouse" environmentIntensity={0.28} />
+          <Environment preset="warehouse" environmentIntensity={0.25} />
         </Suspense>
         <AdaptiveDpr pixelated />
 
-        {/* Realistic natural lighting: Sky/Ground HemisphereLight + 45° Directional Sunlight */}
-        <hemisphereLight args={['#9CB0C3', '#8B7E66', 0.82]} />
+        {/* Теплое солнечное дневное освещение степи */}
+        <hemisphereLight args={['#f5ebd8', '#998363', 0.88]} />
         <directionalLight
-          position={[80, 113, 80]}
-          intensity={2.6}
-          color="#fffaf0"
+          position={[95, 110, 85]}
+          intensity={2.8}
+          color="#fff3dc"
           castShadow
-          shadow-mapSize-width={[2048]}
-          shadow-mapSize-height={[2048]}
-          shadow-camera-left={[-150]}
-          shadow-camera-right={[150]}
-          shadow-camera-top={[150]}
-          shadow-camera-bottom={[-150]}
-          shadow-camera-far={[380]}
+          shadow-mapSize-width={1024}
+          shadow-mapSize-height={1024}
+          shadow-camera-left={-130}
+          shadow-camera-right={130}
+          shadow-camera-top={130}
+          shadow-camera-bottom={-130}
+          shadow-camera-far={320}
           shadow-bias={-0.00015}
         />
         <directionalLight position={[-55, 35, -65]} intensity={0.45} color="#88aaff" />
@@ -299,29 +458,28 @@ export default function App() {
 
         <XR store={xrStore}>
           <TeleportTarget>
-            <SceneContent containmentOpacity={containmentOpacity} onPOISelect={handlePOISelect} />
+            <SceneContent
+              containmentOpacity={containmentOpacity}
+              onPOISelect={handlePOISelect}
+              pois={dynamicPOIs}
+            />
           </TeleportTarget>
-          <VRControllerManager />
+          <VRControllerManager
+            viewTarget={activeViewData.target ?? activeViewData.cameraPos}
+            floorY={activeViewData.floorY}
+            activeViewId={activeViewData.id}
+          />
         </XR>
 
-        {/* Camera rig for orbit transitions */}
-        <CameraRig
+        {/* Unified camera controller with damping = 0.05 & useFrame animation loop */}
+        <SmoothCameraController
           cameraPos={activeViewData.cameraPos}
           lookAt={activeViewData.target ?? [0, activeViewData.floorY, 0]}
           mode={controlMode}
+          viewId={activeViewData.id}
         />
 
-        {controlMode === 'orbit' ? (
-          <OrbitControls
-            target={activeViewData.target ?? [0, activeViewData.floorY, 0]}
-            enableDamping
-            dampingFactor={0.08}
-            minDistance={8}
-            maxDistance={380}
-            maxPolarAngle={Math.PI * 0.88}
-            makeDefault
-          />
-        ) : controlMode === 'drone' ? (
+        {controlMode === 'drone' ? (
           <DroneFlyByController
             active={activeView === 'view-drone'}
             speedMultiplier={droneSpeed}
@@ -329,14 +487,15 @@ export default function App() {
             scrubProgress={scrubProgress}
             onTelemetryUpdate={setDroneTelemetry}
           />
-        ) : (
+        ) : controlMode === 'walk' ? (
           <FirstPersonController
             targetFloor={floorTarget}
             onArrived={handleFloorArrived}
             onLockChange={handlePointerLockChange}
             spawnPosition={activeViewData.cameraPos}
+            lookAtTarget={activeViewData.target}
           />
-        )}
+        ) : null}
         </Canvas>
       ) : (
         <SceneUnavailable onRetry={() => setWebglAvailable(canCreateWebGL2())} />
@@ -352,7 +511,6 @@ export default function App() {
         controlMode={controlMode}
         onVRClick={handleVRClick}
         vrSupported={vrSupported}
-        telemetry={telemetry}
         droneSpeed={droneSpeed}
         onDroneSpeedChange={setDroneSpeed}
         dronePaused={dronePaused}
@@ -363,7 +521,7 @@ export default function App() {
         }}
       />
 
-      {selectedPOI && (
+      {selectedPOI && !isVRPresenting && (
         <div className="fixed inset-0 z-50" onClick={() => setSelectedPOI(null)}>
           <POIModal poi={selectedPOI} onClose={() => setSelectedPOI(null)} />
         </div>

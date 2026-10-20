@@ -71,9 +71,9 @@ export function getFloorHeightAt(x: number, z: number, currentY: number): number
   }
 
   // 6. RITM-200N SMR Complex (Reactor building, BSHU room, and SMR turbine hall)
-  if (x >= 108.0 && x <= 178.0 && z >= 58.0 && z <= 102.0) {
-    // SMR Reactor Building & BSHU (X: 110..146, Z: 61..99)
-    if (x <= 146.0) {
+  if (x >= 134.0 && x <= 204.0 && z >= 58.0 && z <= 102.0) {
+    // SMR Reactor Building & BSHU (X: 136..172, Z: 61..99)
+    if (x <= 172.0) {
       if (currentY >= 5.5) {
         return 7.20; // Верхняя площадка обслуживания и перегрузки (+7.20м)
       }
@@ -85,11 +85,24 @@ export function getFloorHeightAt(x: number, z: number, currentY: number): number
       }
       return FLOOR_LEVELS.ground; // Подошва шахты реактора (-5.5м)
     }
-    // SMR Turbine Hall (X: 146..176, Z: 61..99)
+    // SMR Turbine Hall (X: 172..202, Z: 61..99)
     if (currentY >= -2.0) {
       return 0.50; // Отметка обслуживания турбоагрегата АСММ
     }
     return FLOOR_LEVELS.ground;
+  }
+
+  // 7. VVER-1000 Auxiliary Building (Левый вспомогательный корпус / Обстройка РО) (+13.20м)
+  if (x >= -45.0 && x <= -22.0 && z >= -16.5 && z <= 16.5) {
+    if (currentY >= 9.5 && currentY <= 18.5) {
+      return 13.20; // Отметка пола БЩУ-1 в левом корпусе
+    }
+    if (currentY >= 3.5 && currentY < 9.5) {
+      return 6.60; // Технологический этаж КИПиА
+    }
+    if (currentY >= -2.0 && currentY < 3.5) {
+      return 0.00; // Цокольный / кабельный этаж
+    }
   }
 
   // Basement foundation is a continuous walkable slab beneath containment.
@@ -104,9 +117,22 @@ export function getFloorHeightAt(x: number, z: number, currentY: number): number
 /** Walkable XZ bounds for clamping the player */
 export function clampPlayerPosition(x: number, z: number): [number, number] {
   // If player is in the RITM-200N SMR Complex
-  if (x >= 108.0 && z >= 56.0) {
-    const clampedX = Math.max(110.0, Math.min(174.0, x));
+  if (x >= 134.0 && z >= 56.0) {
+    const clampedX = Math.max(136.0, Math.min(200.0, x));
     const clampedZ = Math.max(60.0, Math.min(99.0, z));
+    return [clampedX, clampedZ];
+  }
+
+  // If player is in VVER-1000 Auxiliary Building (Левый вспомогательный корпус / БЩУ-1) (+13.20m)
+  if (x >= -45.0 && x <= -22.0 && z >= -16.5 && z <= 16.5) {
+    // Операторский зал БЩУ (стены: X [-39.0, -25.0], Z [-4.6, 4.6])
+    if (x >= -40.0 && x <= -24.0 && z >= -5.5 && z <= 5.5) {
+      const clampedX = Math.max(-38.5, Math.min(-25.5, x));
+      const clampedZ = Math.max(-4.2, Math.min(4.2, z));
+      return [clampedX, clampedZ];
+    }
+    const clampedX = Math.max(-43.5, Math.min(-23.0, x));
+    const clampedZ = Math.max(-15.0, Math.min(15.0, z));
     return [clampedX, clampedZ];
   }
 
@@ -132,8 +158,27 @@ export function clampPlayerPosition(x: number, z: number): [number, number] {
  */
 export function isPositionSafe(x: number, z: number, floorY: number): boolean {
   // 1. RITM-200N SMR Complex (Reactor building, BSHU, Turbine Hall)
-  if (x >= 110.0 && x <= 176.0 && z >= 59.0 && z <= 100.0) {
+  if (x >= 134.0 && x <= 202.0 && z >= 59.0 && z <= 100.0) {
     return true; // Walkways in SMR complex are safe
+  }
+  // 2. VVER-1000 Auxiliary Building (Левый корпус / БЩУ-1 на отметке +13.20м)
+  if (x >= -45.0 && x <= -22.0 && z >= -16.5 && z <= 16.5 && floorY >= 10.5 && floorY <= 15.5) {
+    // Внутренние границы операторского зала БЩУ
+    if (x >= -39.5 && x <= -24.5 && z >= -5.0 && z <= 5.0) {
+      if (x < -38.5 || x > -25.5 || z < -4.2 || z > 4.2) {
+        return false; // Столкновение со стенами БЩУ
+      }
+      // Консоли операторов (X в пределах [-37.0, -27.0], Z в пределах [-2.2, -0.8])
+      if (x >= -37.0 && x <= -27.0 && z >= -2.2 && z <= -0.8) {
+        return false; // Столкновение с центральной консолью БЩУ
+      }
+      return true;
+    }
+    // Коридоры и холлы левого вспомогательного корпуса
+    if (x < -43.5 || x > -22.8 || z < -15.0 || z > 15.0) {
+      return false; // Столкновение с наружными фасадами
+    }
+    return true;
   }
   // 1. Turbine Hall Operating Deck (+12m) check (strictly outside containment dome)
   if (floorY >= 10.5 && floorY <= 14.0 && x >= 26.0) {
@@ -154,7 +199,7 @@ export function isPositionSafe(x: number, z: number, floorY: number): boolean {
   }
 
   const r = Math.sqrt(x * x + z * z);
-  const maxOuterR = CONTAINMENT.innerRadius - 0.3; // 19.7m
+  const maxOuterR = CONTAINMENT.innerRadius - 0.4; // 21.6m
 
   // 2. Inside containment: Never allow passing through outer containment wall
   if (r > maxOuterR) return false;
@@ -188,10 +233,32 @@ export function isPositionSafe(x: number, z: number, floorY: number): boolean {
     return r >= innerBarrierR && r <= outerBarrierR;
   }
 
-  // Main Deck (+15m): circular deck with central reactor pit guardrail
+  // Main Deck (+15m): circular deck with central reactor pit guardrail & equipment
   if (floorY > 5 && floorY <= 25) {
-    // Central reactor pit yellow railing barrier (r >= 5.5m)
-    return r >= 5.5 && r <= maxOuterR;
+    // Central reactor pit yellow railing barrier (r >= 5.6m)
+    if (r < 5.6 || r > maxOuterR) return false;
+
+    // Коллизии 4-х парогенераторов ПГВ-1000 (R ≈ 11.5m по 4 квадрантам)
+    for (let i = 0; i < 4; i++) {
+      const angle = (i / 4) * Math.PI * 2 + Math.PI / 4;
+      const cx = Math.cos(angle) * 11.5;
+      const cz = Math.sin(angle) * 11.5;
+      if (Math.hypot(x - cx, z - cz) < 2.2) {
+        return false; // Корпус парогенератора ПГВ-1000
+      }
+    }
+
+    // Коллизии гидроемкостей САОЗ (ECCS tanks)
+    for (let i = 0; i < 4; i++) {
+      const angle = (i / 4) * Math.PI * 2;
+      const tx = Math.cos(angle) * 18.8;
+      const tz = Math.sin(angle) * 18.8;
+      if (Math.hypot(x - tx, z - tz) < 1.6) {
+        return false; // Бак САОЗ
+      }
+    }
+
+    return true;
   }
 
   // Basement DCS / Server Room (-5m): annular space around core catcher vault

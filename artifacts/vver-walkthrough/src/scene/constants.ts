@@ -98,10 +98,10 @@ export const DECK = {
 } as const;
 
 export const STAIRS = {
-  // Stairwell 1: basement (-5) to main deck (+15), along Z at x≈19
-  s1: { xMin: 17, xMax: 21, zMin: -8, zMax: 8, yStart: -5.0, yEnd: 15.0 },
-  // Stairwell 2: main deck (+15) to upper (+36), along X at z≈19
-  s2: { xMin: -8, xMax: 8, zMin: 17, zMax: 21, yStart: 15.0, yEnd: 36.0 },
+  // Stairwell 1: basement (-5) to main deck (+15), along Z at x≈16.5 (radial clearance from outer wall = 2.31m)
+  s1: { xMin: 14.8, xMax: 18.2, zMin: -7.5, zMax: 7.5, yStart: -5.0, yEnd: 15.0 },
+  // Stairwell 2: main deck (+15) to upper (+36), along X at z≈16.5 (radial clearance from outer wall = 2.31m)
+  s2: { xMin: -7.5, xMax: 7.5, zMin: 14.8, zMax: 18.2, yStart: 15.0, yEnd: 36.0 },
 } as const;
 
 export const POLAR_CRANE = {
@@ -121,10 +121,10 @@ export const GREEN_METAL_COLOR = '#8DB600';
 export const ARID_SOIL_COLOR = '#c4a87c';
 
 export const ECCS_TANKS = {
-  radius: 1.45,
-  height: 7.2,
-  capRadius: 1.45,
-  centerRadius: 16.2,
+  radius: 1.35,
+  height: 6.8,
+  capRadius: 1.35,
+  centerRadius: 18.8, // Сдвиг гидроемкостей САОЗ ближе к стенам гермообъема (18.8м при внутреннем радиусе 22.0м)
   y: 18.6,
 } as const;
 

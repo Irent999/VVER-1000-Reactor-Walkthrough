@@ -7,6 +7,11 @@ export type POIId =
   | 'serverRoom'
   | 'reactorPit'
   | 'turboGenerator'
+  | 'vverMCR'
+  | 'deaerator'
+  | 'coolingTowers'
+  | 'switchyard'
+  | 'specialBuilding'
   | 'ritmCore'
   | 'ritmSG'
   | 'ritmCRD'
@@ -199,8 +204,113 @@ export const POI_LIST: POIInfo[] = [
       'Турбоагрегат К-1000-60/1500 преобразует энергию пара второго контура в 1000 МВт электроэнергии при 1500 об/мин. Свежий пар 6.0 МПа поступает в цилиндр высокого давления (ЦВД), осушается и перегревается в 4 сепараторах-пароперегревателях (СПП-1000), после чего поступает в 3 двухпоточных цилиндра низкого давления (ЦНД). Генератор ТВВ-1000 вырабатывает напряжение 24 кВ.',
   },
   {
+    id: 'vverMCR',
+    position: [-32.0, 19.0, 0.0],
+    titleEn: 'VVER-1000 Main Control Room (БЩУ-1)',
+    titleRu: 'БЩУ ВВЭР-1000',
+    categoryEn: 'Auxiliary Building · Control Center (+13.20m)',
+    categoryRu: 'Левый вспомогательный корпус РО · Отметка +13.20м',
+    color: '#00e5ff',
+    specs: [
+      { labelEn: 'Reactor Unit', labelRu: 'Энергоблок', value: 'ВВЭР-1000 / В-320' },
+      { labelEn: 'Location', labelRu: 'Размещение', value: 'Левый вспомогательный корпус (обстройка РО)' },
+      { labelEn: 'Elevation', labelRu: 'Отметка размещения', value: '+13.20 m (Операторский этаж)' },
+      { labelEn: 'Operator Stations', labelRu: 'Рабочие места', value: 'ВИУР, ВИУТ, НСБ' },
+      { labelEn: 'Primary Coolant Loops', labelRu: 'Контуры циркуляции', value: '4 петли (ГЦЭН-195М, ПГВ-1000)' },
+      { labelEn: 'Reactivity Control', labelRu: 'Система СУЗ', value: '61 группа ШУОК + АЗ-5' },
+      { labelEn: 'Safety Displays', labelRu: 'Системы визуализации', value: 'Мнемощит АСУ ТП, табло сигнализации' },
+    ],
+    descriptionEn:
+      'The Main Control Room (БЩУ-1) is the central nerve center for Unit 1 VVER-1000, located inside the left auxiliary reactor building (control annex) at elevation +13.20m, directly adjoining the cylindrical containment. Operators monitor and control 4 primary reactor loops, turbine generator K-1000-60/1500, reactor safety systems (AZ-5, ECCS/САОЗ), and automated digital instrumentation in real time.',
+    descriptionRu:
+      'Блочный щит управления (БЩУ-1) энергоблока ВВЭР-1000 расположен внутри левого вспомогательного реакторного корпуса (обстройки РО / пульта управления) на отметке +13.20м, примыкающего к цилиндрической части контейнмента. Обеспечивает круглосуточное оперативное управление 4 петлями первого контура, ГЦЭН, приводами СУЗ, турбогенератором К-1000-60/1500 и системами безопасности (АЗ-5, САОЗ).',
+  },
+  {
+    id: 'deaerator',
+    position: [28.5, 28.0, -12.0],
+    titleEn: 'Deaerator Compartment (Деаэраторная этажерка)',
+    titleRu: 'Деаэраторная этажерка ВВЭР-1000',
+    categoryEn: 'Main Power Block · Intermediate Annex',
+    categoryRu: 'Главный корпус · Сопрягающий объем РО и МЗ',
+    color: '#e2a34f',
+    specs: [
+      { labelEn: 'Building Type', labelRu: 'Тип сооружения', value: 'Деаэраторная этажерка (ДЭ)' },
+      { labelEn: 'Equipment Type', labelRu: 'Оборудование', value: '2х Деаэратора ДП-1000 (185 м³)' },
+      { labelEn: 'Operating Pressure', labelRu: 'Рабочее давление', value: '1.2 MPa' },
+      { labelEn: 'Feedwater Temp', labelRu: 'Температура питательной воды', value: '164–188 °C' },
+      { labelEn: 'Main Steam Lines', labelRu: 'Паропроводы острого пара', value: '4x Ду 600 (6.0 MPa)' },
+      { labelEn: 'Hermetic Penetrations', labelRu: 'Гермопроходки', value: 'Сейсмостойкие узлы РО' },
+    ],
+    descriptionEn:
+      'The multi-story Deaerator Building directly connects the cylindrical reactor containment to the longitudinal turbine hall. On the upper elevation (+27m), two massive horizontal deaerator vessels (DP-1000) remove dissolved oxygen and non-condensable gases from secondary circuit feedwater, while 4 main steam lines (DN 600) deliver 6.0 MPa steam into the machine hall.',
+    descriptionRu:
+      'Деаэраторная этажерка представляет собой многоэтажный объем главного корпуса, непосредственно сопрягающий контейнмент реакторного отделения с протяженным машинным залом. На верхнем ярусе (+27м) размещены 2 массивных деаэратора ДП-1000 (по 185 м³) с колонками деаэрации, а сквозь здание проходят 4 главных паропровода острого пара Ду 600.',
+  },
+  {
+    id: 'coolingTowers',
+    position: [-147.5, 45.0, 15.0],
+    titleEn: 'Cooling Towers Cluster (Кластер градирен)',
+    titleRu: 'Кластер градирен (4 башни)',
+    categoryEn: 'Circulating Water Cooling Infrastructure',
+    categoryRu: 'Комплекс оборотного техводоснабжения',
+    color: '#3498db',
+    specs: [
+      { labelEn: 'Cooling Towers Count', labelRu: 'Число башенных градирен', value: '4 гиперболоидные башни' },
+      { labelEn: 'Tower Height', labelRu: 'Высота башни', value: '94.0 m' },
+      { labelEn: 'Base Diameter', labelRu: 'Диаметр основания', value: '70.0 m' },
+      { labelEn: 'Circulating Water Flow', labelRu: 'Расход циркуляционной воды', value: '200,000 m³/h' },
+      { labelEn: 'Pump Stations', labelRu: 'Насосные станции', value: '2x БНС (Блочные насосные)' },
+      { labelEn: 'Conduit Diameter', labelRu: 'Диаметр водоводов', value: 'Ду 2200 mm' },
+    ],
+    descriptionEn:
+      'The prominent cluster of 4 hyperboloid cooling towers (2 per VVER-1000 power unit) provides closed-loop circulating water cooling for the main turbine surface condensers. The towers stand 94 meters tall, paired with two dedicated Circulating Water Pumphouses (БНС) supplying cooling water via twin DN 2200mm conduits.',
+    descriptionRu:
+      'Плотная группа из 4 гиперболоидных градирен башенного типа (по 2 башни на каждый энергоблок ВВЭР-1000) обеспечивает оборотное охлаждение конденсаторов турбоагрегатов. Высота каждой башни составляет 94 метра. Между парами градирен размещены блочные насосные станции (БНС), соединенные с машзалом подземными и надземными водоводами Ду 2200 мм.',
+  },
+  {
+    id: 'switchyard',
+    position: [160.0, 18.0, 10.0],
+    titleEn: '500 kV Switchyard & Transformers (ОРУ-500 кВ)',
+    titleRu: 'ОРУ-500 кВ и блочные трансформаторы',
+    categoryEn: 'High-Voltage Power Evacuation',
+    categoryRu: 'Выдача электрической мощности 500 кВ',
+    color: '#f39c12',
+    specs: [
+      { labelEn: 'Switchyard Type', labelRu: 'Тип распредустройства', value: 'Открытое РУ 500 кВ (ОРУ)' },
+      { labelEn: 'Step-Up Transformers', labelRu: 'Блочные трансформаторы', value: 'ТЦ-1000000/500 (24/500 кВ)' },
+      { labelEn: 'Firewalls', labelRu: 'Противопожарные стены', value: 'Железобетонные брандмауэры' },
+      { labelEn: 'Switchgear', labelRu: 'Коммутационные аппараты', value: 'Элегазовые выключатели ВГТ-500' },
+      { labelEn: 'Disconnectors', labelRu: 'Разъединители', value: 'Пантографические РГП-500' },
+      { labelEn: 'Transmission Lines', labelRu: 'Опоры ЛЭП', value: 'Анкерные решетчатые опоры 500 кВ' },
+    ],
+    descriptionEn:
+      'The 500 kV Outdoor Switchyard (ОРУ-500 кВ) connects the NPP power units to the regional electrical grid. Massive step-up transformers (ТЦ-1000000/500) stepping 24 kV up to 500 kV are separated by blast firewalls along the machine hall. The switchyard features steel lattice gantry portals, SF6 circuit breakers, pantograph disconnectors, and overhead lines.',
+    descriptionRu:
+      'Открытое распределительное устройство 500 кВ (ОРУ-500 кВ) осуществляет выдачу 2000 МВт мощности станции в Единую энергосистему. Вдоль стен машзала установлены блочные повышающие трансформаторы ТЦ-1000000/500 с огнестойкими брандмауэрами. Поле ОРУ оснащено порталами ошиновки, элегазовыми выключателями, разъединителями и анкерными опорами ЛЭП.',
+  },
+  {
+    id: 'specialBuilding',
+    position: [-28.0, 22.0, -75.0],
+    titleEn: 'Special Auxiliary Building (Спецкорпус)',
+    titleRu: 'Спецкорпус (Спецводоочистка)',
+    categoryEn: 'Nuclear Auxiliary Systems',
+    categoryRu: 'Комплекс спецводоочистки и ЖРО',
+    color: '#95a5a6',
+    specs: [
+      { labelEn: 'Building Type', labelRu: 'Назначение корпуса', value: 'Спецкорпус РО / Спецводоочистка' },
+      { labelEn: 'Ventilation Stack', labelRu: 'Венттруба спецкорпуса', value: 'Высота 52 m (фильтрованная)' },
+      { labelEn: 'Structural Framing', labelRu: 'Конструкция', value: 'Монолитный биозащитный железобетон' },
+      { labelEn: 'Transport Bay', labelRu: 'Транспортный шлюз', value: 'Защитные гермоворота (ЖД/авто)' },
+      { labelEn: 'Overhead Gallery', labelRu: 'Эстакада трубопроводов', value: 'Связка с РО на отметке +13.5м' },
+    ],
+    descriptionEn:
+      'The Special Auxiliary Building (Спецкорпус) houses specialized radioactive water treatment systems (СВО), liquid and solid radwaste processing facilities, and dedicated active ventilation exhaust systems with a 52m filtered stack. An overhead enclosed gantry pipe rack connects directly to the reactor auxiliary building.',
+    descriptionRu:
+      'Спецкорпус предназначен для размещения установок специальной водоочистки (СВО), узлов переработки жидких и твердых радиоактивных отходов и вентцентра с отдельной фильтрованной венттрубой высотой 52 м. Соединен с обстройкой реакторного отделения надземной технологической эстакадой на отметке +13.5 м.',
+  },
+  {
     id: 'ritmCore',
-    position: [128, 2.3, 80],
+    position: [154, 2.3, 80],
     titleEn: 'RITM-200N Core (Активная зона)',
     titleRu: 'Активная зона РИТМ-200Н',
     categoryEn: 'SMR · Integral Core',
@@ -221,7 +331,7 @@ export const POI_LIST: POIInfo[] = [
   },
   {
     id: 'ritmSG',
-    position: [128, 5.1, 80],
+    position: [154, 5.1, 80],
     titleEn: 'Integral Steam Generator (ПГ)',
     titleRu: 'Встроенный парогенератор (ПГ)',
     categoryEn: 'SMR · Integral Steam Gen',
@@ -242,7 +352,7 @@ export const POI_LIST: POIInfo[] = [
   },
   {
     id: 'ritmCRD',
-    position: [128, 11.5, 80],
+    position: [154, 11.5, 80],
     titleEn: 'Control Rod Drive Mechanisms (СУЗ)',
     titleRu: 'Приводы СУЗ (Крышка реактора)',
     categoryEn: 'SMR · Reactivity Control',
@@ -262,7 +372,7 @@ export const POI_LIST: POIInfo[] = [
   },
   {
     id: 'ritmPump',
-    position: [125.5, 3.5, 82.5],
+    position: [151.5, 3.5, 82.5],
     titleEn: 'Canned Motor Coolant Pumps (ГЦЭН)',
     titleRu: 'Компактные электронасосы (ГЦЭН)',
     categoryEn: 'SMR · Primary Circulation',
@@ -282,7 +392,7 @@ export const POI_LIST: POIInfo[] = [
   },
   {
     id: 'ritmTurbine',
-    position: [160, -0.5, 80],
+    position: [186, -0.5, 80],
     titleEn: 'SMR Turbo-Generator (55-60 MWe)',
     titleRu: 'Турбоагрегат АСММ (55-60 МВт)',
     categoryEn: 'SMR · Power Generation',
@@ -303,7 +413,7 @@ export const POI_LIST: POIInfo[] = [
   },
   {
     id: 'ritmBubbler',
-    position: [117.5, 2.0, 76],
+    position: [143.5, 2.0, 76],
     titleEn: 'Bubbler Tank & Passive ECCS (САОЗ)',
     titleRu: 'Бак-барботер и САОЗ/СПОР',
     categoryEn: 'SMR · Passive Safety',
@@ -323,7 +433,7 @@ export const POI_LIST: POIInfo[] = [
   },
   {
     id: 'ritmMCR',
-    position: [128, 0.5, 69],
+    position: [154, 0.5, 69],
     titleEn: 'SMR Main Control Room (БЩУ)',
     titleRu: 'Пульт управления (БЩУ малой АЭС)',
     categoryEn: 'SMR · Automation & Control',
@@ -359,8 +469,40 @@ export const FLOOR_VIEWS: FloorTarget[] = [
     id: 'view-master-plan',
     label: '🗺️ Генплан: Общий вид всей АЭС / Full Master Plan Site View',
     floorY: 20,
-    cameraPos: [90, 160, 220],
-    target: [45, 15, 10],
+    cameraPos: [65, 175, 235],
+    target: [15, 20, 10],
+    mode: 'orbit',
+  },
+  {
+    id: 'view-cooling-towers',
+    label: '🏗️ Кластер градирен (4 башни и БНС) / Cooling Towers Cluster',
+    floorY: 30,
+    cameraPos: [-145, 115, 175],
+    target: [-147, 45, 15],
+    mode: 'orbit',
+  },
+  {
+    id: 'view-deaerator',
+    label: '🏭 Главный корпус (РО, деаэратор, машзал) / Main Power Block',
+    floorY: 20,
+    cameraPos: [55, 52, -80],
+    target: [28, 24, -12],
+    mode: 'orbit',
+  },
+  {
+    id: 'view-switchyard',
+    label: '⚡ ОРУ-500 кВ и блочные трансформаторы / 500 kV Switchyard',
+    floorY: 15,
+    cameraPos: [215, 68, -40],
+    target: [155, 15, 10],
+    mode: 'orbit',
+  },
+  {
+    id: 'view-special-building',
+    label: '🏢 Спецкорпус водоочистки и венттруба / Special Building',
+    floorY: 15,
+    cameraPos: [-35, 45, -135],
+    target: [-28, 18, -75],
     mode: 'orbit',
   },
   {
@@ -380,6 +522,14 @@ export const FLOOR_VIEWS: FloorTarget[] = [
     mode: 'orbit',
   },
   {
+    id: 'walk-vver-mcr',
+    label: '🖥️ ВВЭР-1000: Блочный щит управления (БЩУ) / Main Control Room',
+    floorY: 13.2,
+    cameraPos: [-32.0, 14.80, 1.8],
+    target: [-32.0, 14.70, -2.5],
+    mode: 'walk',
+  },
+  {
     id: 'view-unit2',
     label: '⚛️ Энергоблок ВВЭР-1000 №2 / VVER-1000 Unit 2',
     floorY: 15,
@@ -391,52 +541,52 @@ export const FLOOR_VIEWS: FloorTarget[] = [
     id: 'view-smr',
     label: '🔋 Комплекс МАЭС РИТМ-200Н: Общий вид / RITM-200N SMR Overview',
     floorY: 10,
-    cameraPos: [179, 48, 130],
-    target: [142, 16, 80],
+    cameraPos: [205, 48, 130],
+    target: [168, 16, 80],
     mode: 'orbit',
   },
   {
     id: 'view-smr-cutaway',
     label: '🔬 РИТМ-200Н: Разрез реакторного блока / SMR Cutaway View',
     floorY: 6,
-    cameraPos: [128, 18, 117],
-    target: [128, 8, 80],
+    cameraPos: [154, 18, 117],
+    target: [154, 8, 80],
     mode: 'orbit',
   },
   {
     id: 'view-smr-core',
     label: '⚛️ РИТМ-200Н: Активная зона, ПГ и ГЦЭН / Core & Steam Gen',
     floorY: 3,
-    cameraPos: [128, 6.5, 94],
-    target: [128, 4.5, 80],
+    cameraPos: [154, 6.5, 94],
+    target: [154, 4.5, 80],
     mode: 'orbit',
   },
   {
     id: 'view-smr-crdm',
     label: '🕹️ РИТМ-200Н: Приводы СУЗ и крышка реактора / CRDM',
     floorY: 12,
-    cameraPos: [128, 15.5, 91],
-    target: [128, 11.5, 80],
+    cameraPos: [154, 15.5, 91],
+    target: [154, 11.5, 80],
     mode: 'orbit',
   },
   {
     id: 'view-smr-turbine',
     label: '⚡ РИТМ-200Н: Машинный зал и турбоагрегат / SMR Turbine Hall',
     floorY: 3,
-    cameraPos: [160, 7.5, 99],
-    target: [160, 1.5, 80],
+    cameraPos: [186, 7.5, 99],
+    target: [186, 1.5, 80],
     mode: 'orbit',
   },
   {
     id: 'walk-smr-mcr',
     label: '🖥️ РИТМ-200Н: Пульт управления (БЩУ) / SMR Control Room',
-    floorY: 1.5,
-    cameraPos: [128, 1.8 + 1.6, 64],
-    target: [128, 2.0, 69],
+    floorY: 3.6,
+    cameraPos: [154, 5.20, 64],
+    target: [154, 4.80, 69],
     mode: 'walk',
   },
   {
-    id: 'view-switchyard',
+    id: 'view-switchyard-grid',
     label: '⚡ ОРУ-500 кВ и ЛЭП / Outdoor Switchyard & Grid',
     floorY: 8,
     cameraPos: [195, 38, -45],
@@ -487,8 +637,8 @@ export const FLOOR_VIEWS: FloorTarget[] = [
     id: 'walk-basement',
     label: '🖥️ Подвал: Серверная АСУ ТП / DCS Server Vault (-5m)',
     floorY: -5.0,
-    cameraPos: [0, -5 + 1.6, 12],
-    target: [0, -4, 0],
+    cameraPos: [-3.5, -3.40, 9.5],
+    target: [0.0, -3.60, 10.5],
     mode: 'walk',
   },
   {
