@@ -82,10 +82,16 @@ function TelemetryReadout({
 
 function InfoModal({ poi, onClose }: { poi: POIInfo; onClose: () => void }) {
   const [lang, setLang] = useState<'en' | 'ru'>('en');
+  const handleClose = () => {
+    onClose();
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('restore-camera-focus'));
+    }
+  };
   return (
     <div
       className="fixed inset-0 z-[70] flex items-center justify-center bg-[#091214]/75 p-4 backdrop-blur-sm"
-      onClick={onClose}
+      onClick={handleClose}
     >
       <article
         className={`${panelStyle} panel-enter max-h-[88dvh] w-full max-w-xl overflow-y-auto rounded-2xl`}
@@ -95,7 +101,7 @@ function InfoModal({ poi, onClose }: { poi: POIInfo; onClose: () => void }) {
         <header className="relative border-b border-[#c9d1c6]/10 px-6 py-5">
           <button
             data-testid="button-close-poi"
-            onClick={onClose}
+            onClick={handleClose}
             aria-label="Close point of interest"
             className="absolute right-4 top-4 rounded-lg p-2 text-[#9caeaa] hover:bg-white/10 hover:text-white cursor-pointer"
           >
@@ -440,7 +446,11 @@ export default function UIOverlay({
                   key={view.id}
                   data-testid={`button-view-${view.id}`}
                   aria-pressed={selected}
-                  onClick={() => onViewChange(view.id)}
+                  onClick={(e) => {
+                    (e.currentTarget as HTMLElement)?.blur();
+                    onViewChange(view.id);
+                    window.dispatchEvent(new CustomEvent('restore-camera-focus'));
+                  }}
                   className={`group flex items-center gap-2.5 rounded-xl border px-3 py-2 text-left shadow-lg backdrop-blur-xl transition cursor-pointer ${
                     selected
                       ? 'border-[#f5c26f] bg-[#1d2b30]/95 shadow-[0_0_20px_rgba(245,194,111,0.25)] text-[#f5c26f]'

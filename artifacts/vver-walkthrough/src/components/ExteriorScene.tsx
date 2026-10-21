@@ -1319,11 +1319,6 @@ function VentilationChimneys({ position }: { position: [number, number, number] 
             <cylinderGeometry args={[radius + 1.2, radius + 1.2, 0.2, 24]} />
             <primitive object={steelTrussMat} attach="material" />
           </mesh>
-          {/* Perimeter circular railing */}
-          <mesh position={[0, 0.65, 0]}>
-            <torusGeometry args={[radius + 1.15, 0.05, 6, 24]} />
-            <primitive object={steelTrussMat} attach="material" />
-          </mesh>
           {/* Vertical railing posts */}
           {Array.from({ length: 8 }).map((_, pi) => {
             const pa = (pi / 8) * Math.PI * 2;

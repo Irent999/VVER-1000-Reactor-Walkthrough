@@ -368,10 +368,6 @@ export default function CoreCatcher() {
         <cylinderGeometry args={[CORE_CATCHER.openingRadius, CORE_CATCHER.topRadius, 1.6, 48, 1, true]} />
         <primitive object={refractorySteelMat} attach="material" />
       </mesh>
-      <mesh position={[0, -4.4, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-        <torusGeometry args={[CORE_CATCHER.openingRadius - 0.08, 0.18, 12, 48]} />
-        <primitive object={darkSteelMat} attach="material" />
-      </mesh>
 
       {/* Main Core Catcher Truncated Conical Vessel (корпус ловушки расплава) */}
       <mesh position={[0, centerY, 0]} castShadow receiveShadow>
@@ -383,11 +379,6 @@ export default function CoreCatcher() {
         <cylinderGeometry args={[CORE_CATCHER.bottomRadius * 0.95, CORE_CATCHER.bottomRadius, 0.3, 40]} />
         <primitive object={refractorySteelMat} attach="material" />
       </mesh>
-      {/* Top vessel flange ring */}
-      <mesh position={[0, CORE_CATCHER.topY - 0.05, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-        <torusGeometry args={[CORE_CATCHER.topRadius - 0.1, 0.18, 12, 48]} />
-        <primitive object={refractorySteelMat} attach="material" />
-      </mesh>
 
       {/* 4. Sacrificial Ceramic Material Blocks inside vessel */}
       <SacrificialCeramicCharge />
@@ -396,10 +387,6 @@ export default function CoreCatcher() {
       <mesh position={[0, centerY, 0]}>
         <cylinderGeometry args={[CORE_CATCHER.topRadius + 0.45, CORE_CATCHER.bottomRadius + 0.45, height + 0.2, 48, 1, true]} />
         <primitive object={waterJacketMat} attach="material" />
-      </mesh>
-      <mesh position={[0, CORE_CATCHER.topY - 0.2, 0]}>
-        <torusGeometry args={[CORE_CATCHER.topRadius + 0.35, 0.12, 10, 48]} />
-        <primitive object={coolantGlowMat} attach="material" />
       </mesh>
 
       {/* 6. Emergency Cooling Piping System */}

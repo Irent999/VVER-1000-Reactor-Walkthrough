@@ -511,10 +511,6 @@ function TurboGeneratorSet() {
                 <cylinderGeometry args={[0.75, 0.75, 1.6, 16]} />
                 <primitive object={steamPipeInsulatedMat} attach="material" />
               </mesh>
-              <mesh position={[0, 0.4, 0]}>
-                <torusGeometry args={[0.82, 0.12, 6, 16]} />
-                <primitive object={machinedSteelMat} attach="material" />
-              </mesh>
             </group>
           ))}
           {[-2.8, 2.8].map((mx) => (
@@ -553,12 +549,6 @@ function TurboGeneratorSet() {
           <mesh key={`gen-shield-${ex}`} position={[ex, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
             <cylinderGeometry args={[2.85, 2.85, 0.8, 24]} />
             <primitive object={turbineDarkMetalMat} attach="material" />
-          </mesh>
-        ))}
-        {[-3.5, 0, 3.5].map((cx) => (
-          <mesh key={`cool-ring-${cx}`} position={[cx, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-            <torusGeometry args={[2.82, 0.12, 6, 28]} />
-            <primitive object={machinedSteelMat} attach="material" />
           </mesh>
         ))}
         {/* Output Terminal Enclosure beneath generator */}

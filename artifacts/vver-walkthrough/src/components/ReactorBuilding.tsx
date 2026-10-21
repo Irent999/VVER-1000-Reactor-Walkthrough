@@ -477,11 +477,6 @@ function ReactorPitDetailing() {
         <ringGeometry args={[pitRadius - 0.2, pitRadius + 0.35, 48]} />
         <primitive object={structuralConcreteDark} attach="material" />
       </mesh>
-      {/* Heavy steel perimeter curbing around pit */}
-      <mesh position={[0, 0.1, 0]}>
-        <torusGeometry args={[pitRadius + 0.3, 0.06, 8, 48]} />
-        <primitive object={darkSteelMat} attach="material" />
-      </mesh>
 
       {/* Circular Protective Safety Yellow Guardrail (#FFCC00) around central reactor pit */}
       {/* Stanchion vertical posts */}
@@ -807,12 +802,6 @@ function ContainmentStructure({ opacity }: { opacity: number }) {
       </mesh>
       <mesh material={outerMatRef} position={[0, domeCenterY, 0]}>
         <sphereGeometry args={[R, 64, 32, 0, Math.PI * 2, 0, Math.PI / 2]} />
-      </mesh>
-
-      {/* 4. Rosatom Lime-Green Decorative Dome Cornice Ring (в точности как на физическом макете) */}
-      <mesh position={[0, domeCenterY, 0]} castShadow receiveShadow>
-        <torusGeometry args={[R + 0.25, 0.55, 12, 64]} />
-        <meshStandardMaterial color="#6FB836" roughness={0.35} metalness={0.15} />
       </mesh>
 
       {/* Solid Foundation Ring Base Slab (Единая фундаментная плита, отметка Y = -5.25м, толщина 0.5м) */}

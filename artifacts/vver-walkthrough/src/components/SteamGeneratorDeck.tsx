@@ -220,13 +220,6 @@ function SteamGenerator({ index }: { index: number }) {
         <sphereGeometry args={[rad, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2]} />
         <primitive object={rosatomLimeGreenMat} attach="material" />
       </mesh>
-      {/* Steel reinforcement girth rings */}
-      {[-3, 0, 3].map((yOffset) => (
-        <mesh key={yOffset} position={[0, yOffset, 0]}>
-          <torusGeometry args={[rad + 0.04, 0.08, 8, 32]} />
-          <primitive object={darkSteelMat} attach="material" />
-        </mesh>
-      ))}
       {/* Heavy support saddles */}
       <mesh position={[0, -len / 3, -rad - 0.5]} castShadow>
         <boxGeometry args={[rad * 2.2, 1.5, 1.5]} />

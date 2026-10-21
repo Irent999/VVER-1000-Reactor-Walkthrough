@@ -168,10 +168,6 @@ export function isPositionSafe(x: number, z: number, floorY: number): boolean {
       if (x < -38.5 || x > -25.5 || z < -4.2 || z > 4.2) {
         return false; // Столкновение со стенами БЩУ
       }
-      // Консоли операторов (X в пределах [-37.0, -27.0], Z в пределах [-2.2, -0.8])
-      if (x >= -37.0 && x <= -27.0 && z >= -2.2 && z <= -0.8) {
-        return false; // Столкновение с центральной консолью БЩУ
-      }
       return true;
     }
     // Коридоры и холлы левого вспомогательного корпуса
@@ -224,41 +220,17 @@ export function isPositionSafe(x: number, z: number, floorY: number): boolean {
   }
 
   // 3. Level-specific floor boundary checks
-  // Upper Deck (+36m): unrestricted 360° circular walkway around central crane opening
+  // Upper Deck (+36m): unrestricted 360° circular walkway and observation platform
   if (floorY > 25) {
-    // Inner yellow safety railing guard (r >= 8.35m) protects from falling into central opening.
-    // Outer containment wall boundary (r <= 21.6m) keeps player safely on circular deck.
-    const innerBarrierR = DECK.upperHoleRadius + 0.35; // 8.35m
-    const outerBarrierR = CONTAINMENT.innerRadius - 0.4; // 21.6m
-    return r >= innerBarrierR && r <= outerBarrierR;
+    // Keep player safely within outer containment boundary (r <= 21.6m)
+    return r <= maxOuterR;
   }
 
-  // Main Deck (+15m): circular deck with central reactor pit guardrail & equipment
+  // Main Deck (+15m): full unobstructed freedom of movement across reactor hall,
+  // central platform, reactor pit cover, steam generator bays, and perimeter walkways.
   if (floorY > 5 && floorY <= 25) {
-    // Central reactor pit yellow railing barrier (r >= 5.6m)
-    if (r < 5.6 || r > maxOuterR) return false;
-
-    // Коллизии 4-х парогенераторов ПГВ-1000 (R ≈ 11.5m по 4 квадрантам)
-    for (let i = 0; i < 4; i++) {
-      const angle = (i / 4) * Math.PI * 2 + Math.PI / 4;
-      const cx = Math.cos(angle) * 11.5;
-      const cz = Math.sin(angle) * 11.5;
-      if (Math.hypot(x - cx, z - cz) < 2.2) {
-        return false; // Корпус парогенератора ПГВ-1000
-      }
-    }
-
-    // Коллизии гидроемкостей САОЗ (ECCS tanks)
-    for (let i = 0; i < 4; i++) {
-      const angle = (i / 4) * Math.PI * 2;
-      const tx = Math.cos(angle) * 18.8;
-      const tz = Math.sin(angle) * 18.8;
-      if (Math.hypot(x - tx, z - tz) < 1.6) {
-        return false; // Бак САОЗ
-      }
-    }
-
-    return true;
+    // Keep player safely within outer containment boundary (r <= 21.6m)
+    return r <= maxOuterR;
   }
 
   // Basement DCS / Server Room (-5m): annular space around core catcher vault

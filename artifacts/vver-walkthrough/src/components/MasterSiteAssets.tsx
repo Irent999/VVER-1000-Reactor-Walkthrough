@@ -373,11 +373,6 @@ export function CylindricalWaterStorageTanks({ position = [64, 0, 86] }: { posit
             <coneGeometry args={[tankRadius + 0.3, 3.2, 32]} />
             <primitive object={waterTankDarkMat} attach="material" />
           </mesh>
-          {/* Perimeter Walkway Guardrail around tank top */}
-          <mesh position={[0, tankHeight + 0.6, 0]} rotation={[Math.PI / 2, 0, 0]}>
-            <torusGeometry args={[tankRadius - 0.2, 0.05, 6, 32]} />
-            <primitive object={steelTrussMat} attach="material" />
-          </mesh>
           {/* Spiral / Vertical Access Ladder & Cage */}
           <mesh position={[0, tankHeight / 2, tankRadius + 0.3]}>
             <boxGeometry args={[1.2, tankHeight, 0.3]} />

@@ -179,6 +179,9 @@ function SmoothCameraController({
           controlsRef.current.update();
         }
         onTransitionEnd?.();
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('restore-camera-focus'));
+        }
       }
       return;
     }
@@ -354,6 +357,9 @@ export default function App() {
       setDronePaused(false);
       setScrubProgress(null);
     }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('restore-camera-focus'));
+    }
   }, [dynamicViews]);
 
   const handlePOISelect = useCallback((poi: POIInfo) => {
@@ -396,6 +402,8 @@ export default function App() {
             scene.background = bgColor;
             gl.setClearColor(bgColor, 1.0);
             gl.setPixelRatio(Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, 2));
+            gl.domElement.tabIndex = 0;
+            gl.domElement.style.outline = 'none';
             camera.near = 0.1;
             camera.far = 1000;
             camera.updateProjectionMatrix();
@@ -522,8 +530,24 @@ export default function App() {
       />
 
       {selectedPOI && !isVRPresenting && (
-        <div className="fixed inset-0 z-50" onClick={() => setSelectedPOI(null)}>
-          <POIModal poi={selectedPOI} onClose={() => setSelectedPOI(null)} />
+        <div
+          className="fixed inset-0 z-50"
+          onClick={() => {
+            setSelectedPOI(null);
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('restore-camera-focus'));
+            }
+          }}
+        >
+          <POIModal
+            poi={selectedPOI}
+            onClose={() => {
+              setSelectedPOI(null);
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('restore-camera-focus'));
+              }
+            }}
+          />
         </div>
       )}
     </div>
