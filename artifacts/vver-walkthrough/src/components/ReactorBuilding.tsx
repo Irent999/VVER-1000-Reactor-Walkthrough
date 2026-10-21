@@ -2,6 +2,8 @@ import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import VVER1000MainControlRoom from './VVER1000MainControlRoom';
+import SpentFuelPool from './SpentFuelPool';
+import EmergencyAlarmSystem from './EmergencyAlarmSystem';
 import {
   CONTAINMENT, CONTAINMENT_GEOMETRY, DECK, POLAR_CRANE, SAFETY_YELLOW,
   DARK_STEEL_COLOR, FLOOR_LEVELS, HIGH_BAY_LIGHTS, RAIL_TRACKS, STAIRS,
@@ -755,16 +757,20 @@ function ContainmentStructure({ opacity }: { opacity: number }) {
       roughness: 0.85,
       metalness: 0.02,
       transparent: true,
-      opacity: 0.15,
+      opacity: 0.25,
       side: THREE.FrontSide,
     })
   ).current;
 
   useFrame(() => {
-    const target = opacity * 0.55;
-    if (Math.abs(outerMatRef.opacity - target) > 0.001) {
-      outerMatRef.opacity = target;
-    }
+    // Плавный послойный срез (Cutaway):
+    // При opacity >= 0.98 — монолитный непрозрачный бетон
+    // При opacity < 0.98 — плавное полупрозрачное прорезание купола и стен
+    const isSolid = opacity >= 0.98;
+    outerMatRef.transparent = !isSolid;
+    outerMatRef.depthWrite = isSolid;
+    const target = isSolid ? 1.0 : Math.max(0.02, opacity * 0.75);
+    outerMatRef.opacity = THREE.MathUtils.lerp(outerMatRef.opacity, target, 0.15);
   });
 
   const R = CONTAINMENT_GEOMETRY.outerRadius;
@@ -811,19 +817,20 @@ function ContainmentStructure({ opacity }: { opacity: number }) {
       </mesh>
 
       {/* Outer Vertical Concrete Buttresses / Stiffener Ribs */}
-      {Array.from({ length: 12 }).map((_, i) => {
-        const a = (i / 12) * Math.PI * 2;
-        return (
-          <mesh
-            key={i}
-            position={[Math.cos(a) * R, wallCenterY, Math.sin(a) * R]}
-            castShadow
-          >
-            <boxGeometry args={[0.9, wallH, 0.7]} />
-            <primitive object={structuralConcreteDark} attach="material" />
-          </mesh>
-        );
-      })}
+      {opacity > 0.35 &&
+        Array.from({ length: 12 }).map((_, i) => {
+          const a = (i / 12) * Math.PI * 2;
+          return (
+            <mesh
+              key={i}
+              position={[Math.cos(a) * R, wallCenterY, Math.sin(a) * R]}
+              castShadow
+            >
+              <boxGeometry args={[0.9, wallH, 0.7]} />
+              <primitive object={structuralConcreteDark} attach="material" />
+            </mesh>
+          );
+        })}
     </group>
   );
 }
@@ -1204,8 +1211,11 @@ export default function ReactorBuilding({
       {/* High-Bay Industrial Floodlights with 4500K warm-white LED tones */}
       <HighBayLightingRing />
 
-      {/* Invisible physical collision walls enclosing floor boundaries & handrails */}
-      <InvisibleCollisionWalls />
+      {/* Spent Fuel Pool (БВ) with Cherenkov radiation and fuel assemblies */}
+      <SpentFuelPool />
+
+      {/* Emergency alarm strobe lights and siren system for AZ-5 */}
+      <EmergencyAlarmSystem />
 
       {children}
     </group>

@@ -2,6 +2,8 @@ import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { reactorStateManager } from '@/scene/reactorStateManager';
+import CherenkovVolumeGlow from './CherenkovVolumeGlow';
+import PrimaryCoolantFlow from './PrimaryCoolantFlow';
 import {
   RPV, STEAM_GEN, MCP, DECK, DARK_STEEL_COLOR, ROSATOM_LIME_GREEN, SAFETY_YELLOW, ECCS_TANKS,
 } from '@/scene/constants';
@@ -99,9 +101,12 @@ function ReactorVessel() {
     if (studRotRef.current) studRotRef.current.rotation.y += dt * 0.015;
     if (crdGroupRef.current) {
       const v = reactorStateManager.vverState;
-      // Вертикальное перемещение 61 группы приводов СУЗ над активной зоной
-      const targetY = RPV.flangeY + 2.2 + (v.crdmPositionPercent / 100) * 0.85;
-      crdGroupRef.current.position.y = THREE.MathUtils.lerp(crdGroupRef.current.position.y, targetY, dt * 6.0);
+      // Мгновенный гравитационный сброс 61 группы ШУОК СУЗ при АЗ-5 (< 2.5 с)
+      const targetY = v.scramActive
+        ? RPV.flangeY + 0.2
+        : RPV.flangeY + 2.2 + (v.crdmPositionPercent / 100) * 0.85;
+      const dropSpeed = v.scramActive ? 18.0 : 6.0;
+      crdGroupRef.current.position.y = THREE.MathUtils.lerp(crdGroupRef.current.position.y, targetY, dt * dropSpeed);
     }
   });
 
@@ -172,7 +177,14 @@ function ReactorVessel() {
         <cylinderGeometry args={[0.8, 0.8, 0.4, 16]} />
         <meshStandardMaterial color="#0a0a12" roughness={0.2} metalness={0.1} />
       </mesh>
-      <CherenkovGlow />
+      {/* Volumetric Cherenkov radiation glow inside RPV and active zone */}
+      <CherenkovVolumeGlow
+        position={[0, RPV.headTopY - 0.5, 0]}
+        radius={1.65}
+        height={4.6}
+        intensity={1.35}
+        color="#00d4ff"
+      />
       {/* 4 inlet/outlet main coolant nozzles */}
       {Array.from({ length: 4 }).map((_, i) => {
         const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
@@ -527,6 +539,8 @@ export default function SteamGeneratorDeck() {
       {[0, 1, 2, 3].map((i) => <MainCoolantPump key={`mcp-${i}`} index={i} />)}
       {/* 4 Primary Coolant Loops */}
       {[0, 1, 2, 3].map((i) => <LoopPipe key={`pipe-${i}`} index={i} />)}
+      {/* Dynamic Animated Coolant Flow along 4 Primary Loops with Temperature Gradients */}
+      <PrimaryCoolantFlow />
       <Pressurizer />
     </group>
   );
