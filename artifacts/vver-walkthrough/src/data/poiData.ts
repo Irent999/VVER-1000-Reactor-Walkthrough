@@ -2,6 +2,7 @@ export type POIId =
   | 'rpv'
   | 'coreCatcher'
   | 'steamGenerator'
+  | 'pressurizer'
   | 'eccsTanks'
   | 'polarCrane'
   | 'serverRoom'
@@ -96,6 +97,28 @@ export const POI_LIST: POIInfo[] = [
       'The PGV-1000 is a horizontal shell-and-tube heat exchanger, 14 meters long and 4 meters in diameter, finished in the iconic Rosatom safety lime-green finish (#8DB600). Primary coolant flows through ~11,000 stainless steel tubes inside the shell, boiling secondary-side water to produce saturated steam at 6.3 MPa.',
     descriptionRu:
       'ПГВ-1000 — горизонтальный парогенератор длиной 14 м и диаметром 4 м в фирменной защитной салатовой окраске Росатома (#8DB600). Теплоноситель первого контура проходит через ~11000 нержавеющих труб, вырабатывая пар 6.3 МПа.',
+  },
+  {
+    id: 'pressurizer',
+    position: [-13.5, 19.5, -8.2],
+    titleEn: 'Pressurizer & Relief Tank (КД В-320)',
+    titleRu: 'Компенсатор давления и бак-барботер',
+    categoryEn: 'Primary Pressure Boundary · 15.7 MPa',
+    categoryRu: 'Граница давления 1-го контура · 15.7 МПа',
+    color: '#00d2ff',
+    specs: [
+      { labelEn: 'Vessel Volume', labelRu: 'Объем сосуда КД', value: '79 m³' },
+      { labelEn: 'Operating Pressure', labelRu: 'Рабочее давление', value: '15.70 MPa' },
+      { labelEn: 'Heater Capacity', labelRu: 'Мощность ТЭН', value: '2520 kW (28 bundles)' },
+      { labelEn: 'Surge Line', labelRu: 'Дыхательный трубопровод', value: 'DN 350 to Loop #4' },
+      { labelEn: 'Spray Line', labelRu: 'Линия впрыска', value: 'DN 150/200' },
+      { labelEn: 'Safety Valves', labelRu: 'Предохранительные клапаны', value: '3x ИПК КД to PRT' },
+      { labelEn: 'Relief Tank (PRT)', labelRu: 'Бак-барботер', value: '30 m³ (Elevation +11.2m)' },
+    ],
+    descriptionEn:
+      'The Pressurizer (КД В-320) maintains and controls the 15.7 MPa primary circuit pressure. It contains 79 m³ of saturated water and steam cushion, equipped with 2520 kW electrical heater bundles in the bottom head and spray nozzles at the top head. In overpressure events, 3 pulse relief valves (ИПК КД) vent steam into the Pressurizer Relief Tank (Бак-барботер).',
+    descriptionRu:
+      'Компенсатор давления (КД В-320) поддерживает и регулирует рабочее давление первого контура 15.7 МПа. Сосуд объемом 79 м³ с паровой подушкой оснащен блоком ТЭН мощностью 2520 кВт в нижнем днище и форсунками впрыска в верхнем куполе. При превышении давления 3 импульсно-предохранительных клапана (ИПК) сбрасывают пар в бак-барботер на отметке +11.2м.',
   },
   {
     id: 'eccsTanks',
@@ -519,6 +542,14 @@ export const FLOOR_VIEWS: FloorTarget[] = [
     floorY: 15,
     cameraPos: [65, 45, -75],
     target: [25, 20, -10],
+    mode: 'orbit',
+  },
+  {
+    id: 'view-pressurizer',
+    label: '🔥 Компенсатор давления и бак-барботер / Pressurizer Box (+19m)',
+    floorY: 19.5,
+    cameraPos: [-9.5, 23.0, -4.5],
+    target: [-13.5, 19.5, -8.2],
     mode: 'orbit',
   },
   {

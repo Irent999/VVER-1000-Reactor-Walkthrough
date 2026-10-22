@@ -25,6 +25,7 @@ import FirstPersonController from '@/components/FirstPersonController';
 import UIOverlay from '@/components/UIOverlay';
 import VVER1000AuxiliaryBuilding from '@/components/VVER1000AuxiliaryBuilding';
 import VVER1000MainControlRoom from '@/components/VVER1000MainControlRoom';
+import VisualizationModeManager, { type RenderVisualizationMode } from '@/components/VisualizationModeManager';
 import WebXRSceneManager from '@/scene/webxrManager';
 import { POI_LIST, FLOOR_VIEWS, type POIInfo, type ViewMode } from '@/data/poiData';
 import {
@@ -227,7 +228,7 @@ function SceneContent({ containmentOpacity, onPOISelect, pois = POI_LIST }: Scen
         <SteamGeneratorDeck />
         <ServerRoom />
         <DeaeratorBuilding />
-        <TurbineHall />
+        <TurbineHall cutaway={1 - containmentOpacity} />
         {/* Левый вспомогательный корпус (обстройка РО / пульт управления) с БЩУ на отметке +13.20м */}
         <VVER1000AuxiliaryBuilding>
           <VVER1000MainControlRoom position={[-32.0, 13.20, 0.0]} />
@@ -295,6 +296,7 @@ export default function App() {
   const [pointerLocked, setPointerLocked] = useState(false);
   const [activeView, setActiveView] = useState('view-aerial');
   const [containmentOpacity, setContainmentOpacity] = useState(0.3);
+  const [renderMode, setRenderMode] = useState<RenderVisualizationMode>('standard');
   const [vrSupported, setVrSupported] = useState<boolean | null>(null);
   const [selectedPOI, setSelectedPOI] = useState<POIInfo | null>(null);
   const [floorTarget, setFloorTarget] = useState<number | null>(null);
@@ -415,6 +417,8 @@ export default function App() {
           activeViewId={activeViewData.id}
         />
         <ScenePerformanceOptimizer onSyncRITM={handleSyncRITM} />
+        {/* Менеджер режимов отображения: Стандарт, Тепловизор, Рентген / Каркас */}
+        <VisualizationModeManager mode={renderMode} />
         {/* Реалистичный природный фон и легкий естественный степной туман по ТЗ */}
         <color attach="background" args={['#d4c5a9']} />
         <fogExp2 attach="fog" args={['#d4c5a9', 0.001]} />
@@ -527,6 +531,8 @@ export default function App() {
         onDroneScrub={(t) => {
           setScrubProgress(t);
         }}
+        renderMode={renderMode}
+        onRenderModeChange={setRenderMode}
       />
 
       {selectedPOI && !isVRPresenting && (

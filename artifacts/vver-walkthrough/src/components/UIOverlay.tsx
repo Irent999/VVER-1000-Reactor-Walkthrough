@@ -2,10 +2,14 @@ import { useState, useEffect } from 'react';
 import {
   Activity, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Cpu, Crosshair, Eye, EyeOff, Footprints, Gauge,
   Info, Layers, Minus, Monitor, Radio, Thermometer, X, Zap, Droplets, Menu, Play, Pause, Compass, Navigation, Video,
+  Flame, ShieldAlert,
 } from 'lucide-react';
 import { FLOOR_VIEWS, POI_LIST, type POIInfo, type ViewMode } from '@/data/poiData';
 import { useTelemetry, type TelemetrySnapshot } from '@/hooks/useTelemetry';
 import type { DroneWaymark } from '@/components/DroneFlyByController';
+import { reactorStateManager } from '@/scene/reactorStateManager';
+import { emergencySiren } from '@/components/EmergencyAlarmSystem';
+import type { RenderVisualizationMode } from '@/components/VisualizationModeManager';
 
 interface UIOverlayProps {
   activeView: string;
@@ -31,6 +35,9 @@ interface UIOverlayProps {
     waymark: DroneWaymark;
   } | null;
   onDroneScrub?: (t: number) => void;
+  // Visual Mode Switcher props:
+  renderMode?: RenderVisualizationMode;
+  onRenderModeChange?: (mode: RenderVisualizationMode) => void;
 }
 
 const panelStyle = 'border border-[#c9d1c6]/15 bg-[#172226]/95 shadow-[0_18px_60px_rgba(4,14,17,.34)] backdrop-blur-xl';
@@ -168,6 +175,8 @@ export default function UIOverlay({
   onDroneTogglePause,
   droneTelemetry,
   onDroneScrub,
+  renderMode = 'standard',
+  onRenderModeChange,
 }: UIOverlayProps) {
   const fallbackTelemetry = useTelemetry();
   const telemetry = propTelemetry ?? fallbackTelemetry;
@@ -189,6 +198,34 @@ export default function UIOverlay({
     message: '',
   });
   const [selectedPOI, setSelectedPOI] = useState<POIInfo | null>(null);
+
+  // Состояние аварийной защиты АЗ-5
+  const [scramActive, setScramActive] = useState(reactorStateManager.vverState.scramActive);
+  const [sirenMuted, setSirenMuted] = useState(false);
+  const [safetyFlapOpen, setSafetyFlapOpen] = useState(false);
+
+  useEffect(() => {
+    const unsub = reactorStateManager.subscribeAll(() => {
+      setScramActive(reactorStateManager.vverState.scramActive);
+    });
+    return unsub;
+  }, []);
+
+  const handleTriggerAZ5 = () => {
+    reactorStateManager.dispatch('vver1000', 'SCRAM_TRIP');
+    reactorStateManager.dispatch('ritm200n', 'SCRAM_TRIP');
+  };
+
+  const handleResetAZ5 = () => {
+    reactorStateManager.dispatch('vver1000', 'RESET_SCRAM');
+    reactorStateManager.dispatch('ritm200n', 'RESET_SCRAM');
+  };
+
+  const handleToggleSirenMute = () => {
+    const next = !sirenMuted;
+    setSirenMuted(next);
+    emergencySiren.setMute(next);
+  };
 
   // 1. Горячая клавиша 'H' (Hide UI) для мгновенного скрытия/показа всех 2D-оверлеев
   useEffect(() => {
@@ -312,6 +349,36 @@ export default function UIOverlay({
 
   return (
     <>
+      {/* Emergency AZ-5 Top Banner when scramActive */}
+      {scramActive && (
+        <aside
+          aria-label="Система аварийной защиты"
+          style={{ position: 'fixed', top: '16px', left: '50%', transform: 'translateX(-50%)', zIndex: 100000 }}
+          className="pointer-events-auto flex items-center gap-3 px-4 py-2 rounded-2xl border-2 border-red-500 bg-red-950/95 text-white shadow-[0_0_35px_rgba(239,68,68,0.7)] backdrop-blur-2xl animate-pulse"
+        >
+          <div className="flex items-center gap-2 font-black text-xs tracking-wider uppercase">
+            <ShieldAlert size={18} className="text-red-400" />
+            <span>АВАРИЙНАЯ ЗАЩИТА АЗ-5 АКТИВИРОВАНА — СБРОС СТЕРЖНЕЙ СУЗ</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={handleResetAZ5}
+              className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white transition shadow cursor-pointer"
+              title="Сбросить статус тревоги и взвести стержни СУЗ"
+            >
+              Взвести СУЗ
+            </button>
+            <button
+              onClick={handleToggleSirenMute}
+              className="px-2 py-1 rounded-lg bg-black/50 hover:bg-black/70 text-xs font-medium text-slate-200 transition cursor-pointer"
+              title="Отключить/включить звук сирены"
+            >
+              {sirenMuted ? '🔇 Сирена: Выкл' : '🔊 Сирена: Вкл'}
+            </button>
+          </div>
+        </aside>
+      )}
+
       {/* 1. Small Floating Circular Button on Top-Left Edge: [ ☰ ] / [ ◀ ] */}
       <div
         style={{ position: 'fixed', top: '16px', left: '16px', zIndex: 10000 }}
@@ -328,11 +395,63 @@ export default function UIOverlay({
         </button>
       </div>
 
-      {/* 2. Pinned Top-Right Toolbar: Drone Fly-by Mode, Dedicated VR Mode Button & Status */}
+      {/* 2. Pinned Top-Right Toolbar: Mode Selector, Drone Fly-by, VR, and Status */}
       <div
         style={{ position: 'fixed', top: '16px', right: '16px', zIndex: 9999 }}
-        className="pointer-events-auto flex items-center gap-2.5"
+        className="pointer-events-auto flex items-center gap-2"
       >
+        {/* Visualization Mode Selector */}
+        <div className={`${panelStyle} flex items-center gap-1 rounded-xl p-1 shadow-lg`}>
+          <button
+            onClick={() => onRenderModeChange?.('standard')}
+            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+              (renderMode ?? 'standard') === 'standard'
+                ? 'bg-[#d69a43]/25 text-[#f5c26f] shadow'
+                : 'text-[#8da09c] hover:text-white'
+            }`}
+            title="Стандартный режим (PBR-текстуры, естественное освещение)"
+          >
+            ☀️ Стандарт
+          </button>
+          <button
+            onClick={() => onRenderModeChange?.('thermal')}
+            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer ${
+              renderMode === 'thermal'
+                ? 'bg-rose-500/25 text-rose-300 shadow ring-1 ring-rose-500/50'
+                : 'text-[#8da09c] hover:text-white'
+            }`}
+            title="Тепловизор (FLIR Ironbow спектр температур оборудования)"
+          >
+            <Flame size={13} />
+            <span>Тепловизор</span>
+          </button>
+          <button
+            onClick={() => onRenderModeChange?.('wireframe')}
+            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer ${
+              renderMode === 'wireframe'
+                ? 'bg-cyan-500/25 text-cyan-300 shadow ring-1 ring-cyan-500/50'
+                : 'text-[#8da09c] hover:text-white'
+            }`}
+            title="Рентген / Каркас (CAD Blueprint каркасный анализ конструкций)"
+          >
+            <Layers size={13} />
+            <span>Рентген</span>
+          </button>
+        </div>
+
+        {/* Quick Emergency AZ-5 Header Button */}
+        <button
+          onClick={scramActive ? handleResetAZ5 : handleTriggerAZ5}
+          className={`px-3 py-2 rounded-xl text-xs font-black tracking-wider transition shadow-lg flex items-center gap-1.5 cursor-pointer ${
+            scramActive
+              ? 'bg-red-600 text-white animate-pulse shadow-[0_0_20px_rgba(239,68,68,0.7)]'
+              : 'border border-red-500/40 bg-red-950/80 hover:bg-red-900 text-red-300'
+          }`}
+          title={scramActive ? 'АЗ-5 сработала! Нажмите для взведения СУЗ' : 'Аварийная защита АЗ-5 (сброс стержней СУЗ)'}
+        >
+          <span>🛑</span>
+          <span>{scramActive ? 'АЗ-5 АКТИВНА' : 'АЗ-5'}</span>
+        </button>
         {/* Dedicated Cinematic Drone Fly-by Launcher Button */}
         <button
           data-testid="button-drone-flyby"
@@ -481,26 +600,160 @@ export default function UIOverlay({
             })}
           </div>
 
-          {/* Quick Containment Shell Opacity Slider */}
+          {/* 1. Послойный срез (X-Ray Cutaway) */}
           <div className="mt-2 pt-2.5 border-t border-white/10 px-1">
             <div className="mb-1.5 flex items-center justify-between text-[10px]">
-              <span className="text-[#9caeaa] uppercase tracking-wider text-[9px] font-semibold">
-                Купол оболочки (Cutaway)
+              <span className="text-[#9caeaa] uppercase tracking-wider text-[9px] font-bold">
+                Послойный срез (Cutaway)
               </span>
-              <span className="mono text-[#f5c26f] font-bold">{Math.round(containmentOpacity * 100)}%</span>
+              <span className="mono text-[#f5c26f] font-bold">{Math.round((1 - containmentOpacity) * 100)}%</span>
             </div>
             <input
               type="range"
               min="0"
               max="1"
               step="0.05"
-              value={containmentOpacity}
-              onChange={(e) => onContainmentOpacityChange(Number(e.target.value))}
+              value={1 - containmentOpacity}
+              onChange={(e) => onContainmentOpacityChange(1 - Number(e.target.value))}
               className="h-1.5 w-full cursor-pointer accent-[#d69a43]"
+              title="Плавное прорезание наружных стен контейнмента и зданий"
             />
+            <div className="mt-1.5 flex justify-between gap-1">
+              <button
+                onClick={() => onContainmentOpacityChange(1.0)}
+                className={`flex-1 py-1 px-1 rounded text-[9px] font-semibold transition cursor-pointer ${
+                  containmentOpacity >= 0.95 ? 'bg-[#d69a43]/30 text-[#f5c26f] font-bold' : 'bg-white/5 text-[#81918d] hover:text-white'
+                }`}
+              >
+                Монолит
+              </button>
+              <button
+                onClick={() => onContainmentOpacityChange(0.5)}
+                className={`flex-1 py-1 px-1 rounded text-[9px] font-semibold transition cursor-pointer ${
+                  containmentOpacity < 0.95 && containmentOpacity > 0.1 ? 'bg-[#d69a43]/30 text-[#f5c26f] font-bold' : 'bg-white/5 text-[#81918d] hover:text-white'
+                }`}
+              >
+                Полусрез
+              </button>
+              <button
+                onClick={() => onContainmentOpacityChange(0.0)}
+                className={`flex-1 py-1 px-1 rounded text-[9px] font-semibold transition cursor-pointer ${
+                  containmentOpacity <= 0.1 ? 'bg-[#d69a43]/30 text-[#f5c26f] font-bold' : 'bg-white/5 text-[#81918d] hover:text-white'
+                }`}
+              >
+                Все внутри
+              </button>
+            </div>
+          </div>
+
+          {/* 2. Интерактивная аварийная защита (Кнопка АЗ-5) */}
+          <div className="mt-2.5 pt-2.5 border-t border-white/10 px-1">
+            <div className="mb-2 flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm">☢️</span>
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#edf0e8]">
+                  Защита АЗ-5
+                </span>
+              </div>
+              <span
+                className={`text-[8px] font-mono px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                  scramActive ? 'bg-red-500/30 text-red-400 border border-red-500/50 animate-pulse' : 'bg-emerald-500/20 text-emerald-400'
+                }`}
+              >
+                {scramActive ? 'АЗ-5 АКТИВНА' : 'НОРМА'}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between text-[10px] text-[#91a19e] mb-1.5">
+              <span>Защитная крышка:</span>
+              <button
+                onClick={() => setSafetyFlapOpen((v) => !v)}
+                className={`text-[9px] font-bold px-2 py-0.5 rounded cursor-pointer transition ${
+                  safetyFlapOpen ? 'bg-amber-500/25 text-amber-300 ring-1 ring-amber-500/40' : 'bg-white/10 text-slate-300'
+                }`}
+              >
+                {safetyFlapOpen ? 'ОТКИНУТА' : 'ЗАКРЫТА'}
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <button
+                onClick={handleTriggerAZ5}
+                disabled={!safetyFlapOpen && !scramActive}
+                className={`w-full py-2 px-3 rounded-xl font-black text-xs tracking-wider flex items-center justify-center gap-2 transition shadow-lg cursor-pointer ${
+                  scramActive
+                    ? 'bg-red-600/30 border border-red-500 text-red-300 shadow-[0_0_20px_rgba(239,68,68,0.4)] animate-pulse'
+                    : safetyFlapOpen
+                    ? 'bg-red-600 hover:bg-red-500 text-white shadow-[0_0_25px_rgba(220,38,38,0.6)] hover:scale-[1.02]'
+                    : 'bg-red-950/40 text-red-400/40 border border-red-900/30 cursor-not-allowed'
+                }`}
+              >
+                <span>🛑</span>
+                <span>КНОПКА АЗ-5 (СБРОС СУЗ)</span>
+              </button>
+
+              {scramActive && (
+                <div className="flex gap-1.5 mt-0.5">
+                  <button
+                    onClick={handleResetAZ5}
+                    className="flex-1 py-1.5 px-2 rounded-lg font-bold text-[10px] bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-500/40 flex items-center justify-center gap-1 transition cursor-pointer"
+                  >
+                    <span>🔄</span>
+                    <span>Взвести СУЗ</span>
+                  </button>
+                  <button
+                    onClick={handleToggleSirenMute}
+                    className="py-1.5 px-2.5 rounded-lg text-[10px] font-medium bg-black/40 hover:bg-black/60 text-slate-300 transition cursor-pointer"
+                    title="Включить / отключить звук аварийной сирены"
+                  >
+                    {sirenMuted ? '🔇' : '🔊'}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </nav>
+
+      {/* FLIR Thermal Cam HUD Overlay */}
+      {renderMode === 'thermal' && (
+        <div className="pointer-events-none fixed inset-0 z-40 overflow-hidden">
+          {/* Central Target Spot Temp Reticle */}
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
+            <div className="w-12 h-12 border border-rose-500/60 rounded-full flex items-center justify-center">
+              <div className="w-1.5 h-1.5 bg-rose-400 rounded-full animate-ping" />
+            </div>
+            <div className="mt-2 px-2.5 py-1 rounded bg-black/85 border border-rose-500/50 text-rose-300 font-mono text-[11px] font-bold shadow-lg">
+              SP01: {scramActive ? '142.6' : '320.4'} °C [1-Й КОНТУР / ТВС]
+            </div>
+          </div>
+
+          {/* Right-Side Vertical Ironbow Spectrum Gradient Bar */}
+          <div className="absolute right-4 top-24 bottom-24 w-12 flex flex-col items-center justify-between py-2 px-1 rounded-xl bg-black/80 border border-white/20 backdrop-blur-md text-[9px] font-mono font-bold text-white shadow-2xl">
+            <span className="text-pink-300">350°C</span>
+            <div className="w-4 h-full my-2 rounded-full overflow-hidden shadow-inner bg-gradient-to-b from-white via-red-500 via-orange-400 via-yellow-300 via-cyan-400 via-blue-600 to-indigo-950" />
+            <span className="text-indigo-400">18°C</span>
+          </div>
+
+          {/* Top FLIR Status Badge */}
+          <div className="absolute top-20 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/80 border border-rose-500/40 text-[10px] font-mono text-rose-400 tracking-wider font-bold">
+            FLIR THERMAL IR · 7.5-14 µm · ε 0.95 · IRONBOW PALETTE
+          </div>
+        </div>
+      )}
+
+      {/* Wireframe Blueprint CAD HUD Overlay */}
+      {renderMode === 'wireframe' && (
+        <div className="pointer-events-none fixed inset-0 z-40 overflow-hidden">
+          {/* Corner CAD coordinate brackets */}
+          <div className="absolute top-20 left-4 font-mono text-[9px] text-cyan-400 bg-black/70 px-2 py-1 rounded border border-cyan-500/30">
+            CAD WIREFRAME / X-RAY SCHEMATIC VIEW · VVER-1000 STRUCTURAL MESH
+          </div>
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 font-mono text-[10px] text-cyan-300 bg-black/75 px-3 py-1 rounded-full border border-cyan-500/40 tracking-wider">
+            GRID: 10.0m · REBAR & PIPING PENETRATION VISIBLE
+          </div>
+        </div>
+      )}
 
       {/* 4. First-Person Walk Mode Crosshair & Click-to-Start Modal */}
       {controlMode === 'walk' && (

@@ -682,7 +682,13 @@ function OperatingDeckAndWalkways() {
 // Positioned at X = 77.0m, Length = 100m, West wall at X = 27.0m
 // ============================================================================
 
-function ArchitecturalFraming({ position }: { position: [number, number, number] }) {
+function ArchitecturalFraming({
+  position,
+  cutaway = 0,
+}: {
+  position: [number, number, number];
+  cutaway?: number;
+}) {
   const len = 100;
   const wid = 36;
   const hgt = 32;
@@ -707,6 +713,9 @@ function ArchitecturalFraming({ position }: { position: [number, number, number]
     return geo;
   }, [len, wid, hgt]);
 
+  // При послойном срезе (cutaway > 0.4) верхние стены скрываются, открывая вид на турбоагрегат и кран
+  const isCutaway = cutaway > 0.4;
+
   return (
     <group position={position}>
       {/* 1. Outer Building Walls: Red-brown skirt (0 to 4.5m) + Warm beige panels */}
@@ -714,7 +723,13 @@ function ArchitecturalFraming({ position }: { position: [number, number, number]
         <primitive object={baseRedBrownSkirtMat} attach="material" />
       </mesh>
 
-      <mesh geometry={upperGeo} position={[0, 4.5 + (hgt - 4.5) / 2, 0]} castShadow receiveShadow>
+      <mesh
+        geometry={upperGeo}
+        position={[0, 4.5 + (hgt - 4.5) / 2, 0]}
+        castShadow
+        receiveShadow
+        visible={!isCutaway}
+      >
         <primitive object={wallBeigePanelMat} attach="material" />
       </mesh>
 
@@ -798,7 +813,7 @@ function ArchitecturalFraming({ position }: { position: [number, number, number]
 // MAIN TURBINE HALL COMPONENT EXPORT
 // ============================================================================
 
-export default function TurbineHall() {
+export default function TurbineHall({ cutaway = 0 }: { cutaway?: number }) {
   const gY = FLOOR_LEVELS.ground;
   // Positioned at X = 77.0m, Length = 100m, West wall at X = 27.0m (outside containment R=23.2m)
   const hallCenterX = 77.0;
@@ -810,7 +825,7 @@ export default function TurbineHall() {
       <TransitionBridge />
 
       {/* 2. Architectural Hall Structure (X = 77m, strictly outside containment dome) */}
-      <ArchitecturalFraming position={[hallCenterX, gY, hallCenterZ]} />
+      <ArchitecturalFraming position={[hallCenterX, gY, hallCenterZ]} cutaway={cutaway} />
 
       {/* 3. Steel-Checkered Operating Deck (+12m) & Maintenance Walkways */}
       <OperatingDeckAndWalkways />

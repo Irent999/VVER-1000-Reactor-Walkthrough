@@ -4,6 +4,8 @@ import * as THREE from 'three';
 import { reactorStateManager } from '@/scene/reactorStateManager';
 import CherenkovVolumeGlow from './CherenkovVolumeGlow';
 import PrimaryCoolantFlow from './PrimaryCoolantFlow';
+import PressurizerSystem from './PressurizerSystem';
+import ECCSAndMakeUpSystem from './ECCSAndMakeUpSystem';
 import {
   RPV, STEAM_GEN, MCP, DECK, DARK_STEEL_COLOR, ROSATOM_LIME_GREEN, SAFETY_YELLOW, ECCS_TANKS,
 } from '@/scene/constants';
@@ -185,15 +187,54 @@ function ReactorVessel() {
         intensity={1.35}
         color="#00d4ff"
       />
-      {/* 4 inlet/outlet main coolant nozzles */}
+      {/* Верхний ярус: 4 выходных патрубка горячих ниток Ду 850 (Y = 15.2м) */}
       {Array.from({ length: 4 }).map((_, i) => {
         const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
-        const nx = Math.cos(a) * (r + 0.2);
-        const nz = Math.sin(a) * (r + 0.2);
+        const nx = Math.cos(a) * (r + 0.35);
+        const nz = Math.sin(a) * (r + 0.35);
         return (
-          <group key={i} position={[nx, RPV.bodyTopY - 1, nz]} rotation={[0, -a, 0]}>
+          <group key={`hot-nozzle-${i}`} position={[nx, 15.2, nz]} rotation={[0, -a, 0]}>
             <mesh castShadow rotation={[0, 0, Math.PI / 2]}>
-              <cylinderGeometry args={[0.65, 0.65, 2.2, 16]} />
+              <cylinderGeometry args={[0.54, 0.58, 1.4, 20]} />
+              <primitive object={darkSteelMat} attach="material" />
+            </mesh>
+            {/* Утолщенный фланец и приварной воротник */}
+            <mesh position={[0.4, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+              <cylinderGeometry args={[0.64, 0.64, 0.22, 20]} />
+              <primitive object={steelMat} attach="material" />
+            </mesh>
+          </group>
+        );
+      })}
+
+      {/* Нижний ярус: 4 входных патрубка холодных ниток Ду 850 (Y = 14.1м) */}
+      {Array.from({ length: 4 }).map((_, i) => {
+        const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+        const nx = Math.cos(a) * (r + 0.35);
+        const nz = Math.sin(a) * (r + 0.35);
+        return (
+          <group key={`cold-nozzle-${i}`} position={[nx, 14.1, nz]} rotation={[0, -a, 0]}>
+            <mesh castShadow rotation={[0, 0, Math.PI / 2]}>
+              <cylinderGeometry args={[0.52, 0.56, 1.4, 20]} />
+              <primitive object={darkSteelMat} attach="material" />
+            </mesh>
+            <mesh position={[0.4, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+              <cylinderGeometry args={[0.62, 0.62, 0.22, 20]} />
+              <primitive object={steelMat} attach="material" />
+            </mesh>
+          </group>
+        );
+      })}
+
+      {/* 4 патрубка подключения САОЗ Ду 350 к шахте и опускному кольцу */}
+      {[-Math.PI * 0.18, Math.PI * 0.68, Math.PI * 1.08, Math.PI * 1.58].map((ea, ei) => {
+        const ey = ei % 2 === 0 ? 14.2 : 15.4;
+        const ex = Math.cos(ea) * (r + 0.25);
+        const ez = Math.sin(ea) * (r + 0.25);
+        return (
+          <group key={`eccs-nozzle-${ei}`} position={[ex, ey, ez]} rotation={[0, -ea, 0]}>
+            <mesh castShadow rotation={[0, 0, Math.PI / 2]}>
+              <cylinderGeometry args={[0.26, 0.28, 0.8, 14]} />
               <primitive object={darkSteelMat} attach="material" />
             </mesh>
           </group>
@@ -270,109 +311,7 @@ function SteamGenerator({ index }: { index: number }) {
   );
 }
 
-/**
- * Emergency Core Cooling Tanks (ЕО САОЗ - Емкости САОЗ / ECCS Hydroaccumulators)
- * 4 high-pressure vertical tanks situated in compartments on the main deck,
- * finished in distinct Rosatom safety lime-green (#8DB600) with metallic reflections (0.3) and roughness (0.3).
- */
-// Калиброванные радиальные углы размещения 4 гидроемкостей САОЗ
-// с гарантированным технологическим зазором > 1.0м от лестничных маршей и перегородок
-const ECCS_SAFE_ANGLES = [
-  -Math.PI * 0.18, // Емкость САОЗ №1: вынесена к наружной стене контайнмента южнее шахты лестницы №1
-  Math.PI * 0.68,  // Емкость САОЗ №2: вынесена к стене западнее шахты лестницы №2
-  Math.PI * 1.08,  // Емкость САОЗ №3: западный технологический отсек
-  Math.PI * 1.58,  // Емкость САОЗ №4: южный технологический отсек
-];
 
-function ECCSTank({ index }: { index: number }) {
-  const angle = ECCS_SAFE_ANGLES[index % 4];
-  const tx = Math.cos(angle) * ECCS_TANKS.centerRadius;
-  const tz = Math.sin(angle) * ECCS_TANKS.centerRadius;
-  const rad = ECCS_TANKS.radius;
-  const h = ECCS_TANKS.height;
-  const y = ECCS_TANKS.y;
-
-  return (
-    <group position={[tx, y, tz]}>
-      {/* Main vertical cylindrical pressure vessel in Rosatom lime-green (#8DB600) */}
-      <mesh castShadow receiveShadow>
-        <cylinderGeometry args={[rad, rad, h, 28]} />
-        <primitive object={rosatomLimeGreenMat} attach="material" />
-      </mesh>
-      {/* Top hemispherical dome in Rosatom lime-green */}
-      <mesh position={[0, h / 2, 0]} castShadow>
-        <sphereGeometry args={[rad, 28, 14, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        <primitive object={rosatomLimeGreenMat} attach="material" />
-      </mesh>
-      {/* Bottom hemispherical head in Rosatom lime-green */}
-      <mesh position={[0, -h / 2, 0]} rotation={[Math.PI, 0, 0]} castShadow>
-        <sphereGeometry args={[rad, 28, 14, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        <primitive object={rosatomLimeGreenMat} attach="material" />
-      </mesh>
-      {/* Structural support skirt anchoring to +15m deck */}
-      <mesh position={[0, -h / 2 - 1.2, 0]} castShadow receiveShadow>
-        <cylinderGeometry args={[rad + 0.15, rad + 0.35, 2.4, 28, 1, true]} />
-        <primitive object={darkSteelMat} attach="material" />
-      </mesh>
-      {/* Top nitrogen pressurization nozzle & safety valve */}
-      <mesh position={[0, h / 2 + rad + 0.4, 0]} castShadow>
-        <cylinderGeometry args={[0.2, 0.2, 0.8, 12]} />
-        <primitive object={pipeMat} attach="material" />
-      </mesh>
-      <mesh position={[0, h / 2 + rad + 0.9, 0]} castShadow>
-        <boxGeometry args={[0.35, 0.45, 0.35]} />
-        <primitive object={safetyYellowMat} attach="material" />
-      </mesh>
-      {/* Bottom emergency injection discharge pipe leading to RPV downcomer */}
-      <mesh position={[0, -h / 2 - rad - 0.3, 0]} castShadow>
-        <cylinderGeometry args={[0.3, 0.3, 1.2, 16]} />
-        <primitive object={pipeMat} attach="material" />
-      </mesh>
-      {/* Level measurement sight glass / instrumentation column */}
-      <mesh position={[rad + 0.25, 0, 0]}>
-        <cylinderGeometry args={[0.06, 0.06, h * 0.75, 8]} />
-        <primitive object={steelMat} attach="material" />
-      </mesh>
-      {/* Tank inspection ladder with safety cage */}
-      <group position={[-rad - 0.25, 0, 0]}>
-        <mesh position={[0, 0, 0.2]}>
-          <cylinderGeometry args={[0.03, 0.03, h, 6]} />
-          <primitive object={safetyYellowMat} attach="material" />
-        </mesh>
-        <mesh position={[0, 0, -0.2]}>
-          <cylinderGeometry args={[0.03, 0.03, h, 6]} />
-          <primitive object={safetyYellowMat} attach="material" />
-        </mesh>
-        {Array.from({ length: 16 }).map((_, rIdx) => (
-          <mesh key={rIdx} position={[0, -h / 2 + 0.4 + rIdx * 0.45, 0]} rotation={[Math.PI / 2, 0, 0]}>
-            <cylinderGeometry args={[0.02, 0.02, 0.4, 6]} />
-            <primitive object={safetyYellowMat} attach="material" />
-          </mesh>
-        ))}
-      </group>
-      {/* Access platform around tank top */}
-      <mesh position={[0, h / 2 - 0.2, 0]} rotation={[0, 0, 0]}>
-        <ringGeometry args={[rad + 0.1, rad + 0.9, 24]} />
-        <primitive object={diamondWalkwayMat} attach="material" side={THREE.DoubleSide} />
-      </mesh>
-      {/* Platform yellow guardrail */}
-      {Array.from({ length: 16 }).map((_, pIdx) => {
-        const pa = (pIdx / 16) * Math.PI * 2;
-        const pr = rad + 0.9;
-        return (
-          <mesh key={`post-${pIdx}`} position={[Math.cos(pa) * pr, h / 2 + 0.4, Math.sin(pa) * pr]}>
-            <cylinderGeometry args={[0.025, 0.025, 1.1, 6]} />
-            <primitive object={safetyYellowMat} attach="material" />
-          </mesh>
-        );
-      })}
-      <mesh position={[0, h / 2 + 0.95, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[rad + 0.9, 0.03, 6, 24]} />
-        <primitive object={safetyYellowMat} attach="material" />
-      </mesh>
-    </group>
-  );
-}
 
 function MainCoolantPump({ index }: { index: number }) {
   const angle = (index / 4) * Math.PI * 2 + Math.PI / 4;
@@ -426,35 +365,47 @@ function MainCoolantPump({ index }: { index: number }) {
   );
 }
 
+/**
+ * 4 циркуляционные петли первого контура (ГЦТ Ду 850):
+ * - Горячая нитка Ду 850 (Y = 15.2м) от корпуса к входному коллектору ПГВ-1000
+ * - Холодная нитка Ду 850 от выходного коллектора ПГВ-1000 к ГЦЭН-195М и возврат в опускное кольцо РК (Y = 14.1м)
+ * - Теплоизоляция из сегментных матов в нержавеющих кожухах
+ * - Сейсмические гидроамортизаторы и пружинные подвески
+ */
 function LoopPipe({ index }: { index: number }) {
   const angle = (index / 4) * Math.PI * 2 + Math.PI / 4;
-  const rVesselX = Math.cos(angle) * (RPV.radius + 0.5);
-  const rVesselZ = Math.sin(angle) * (RPV.radius + 0.5);
+  const rVesselX = Math.cos(angle) * (RPV.radius + 0.35);
+  const rVesselZ = Math.sin(angle) * (RPV.radius + 0.35);
   const sgX = Math.cos(angle) * STEAM_GEN.centerRadius;
   const sgZ = Math.sin(angle) * STEAM_GEN.centerRadius;
   const pumpX = Math.cos(angle) * MCP.centerRadius;
   const pumpZ = Math.sin(angle) * MCP.centerRadius;
-  const nozzleY = RPV.bodyTopY - 1;
+  const hotNozzleY = 15.2;
+  const coldNozzleY = 14.1;
 
   const hotLeg = useMemo(() => {
     const pts = [
-      new THREE.Vector3(rVesselX, nozzleY, rVesselZ),
-      new THREE.Vector3((rVesselX + sgX) / 2, nozzleY + 2, (rVesselZ + sgZ) / 2),
-      new THREE.Vector3(sgX, STEAM_GEN.centerY, sgZ),
+      new THREE.Vector3(rVesselX, hotNozzleY, rVesselZ),
+      new THREE.Vector3(rVesselX * 0.5 + sgX * 0.5, hotNozzleY + 1.2, rVesselZ * 0.5 + sgZ * 0.5),
+      new THREE.Vector3(sgX, STEAM_GEN.centerY + 0.2, sgZ),
     ];
     return new THREE.CatmullRomCurve3(pts);
-  }, [rVesselX, rVesselZ, sgX, sgZ, nozzleY]);
+  }, [rVesselX, rVesselZ, sgX, sgZ, hotNozzleY]);
 
   const coldLeg = useMemo(() => {
     const pts = [
-      new THREE.Vector3(sgX, STEAM_GEN.centerY - 2, sgZ),
-      new THREE.Vector3((sgX + pumpX) / 2, STEAM_GEN.centerY - 3, (sgZ + pumpZ) / 2),
-      new THREE.Vector3(pumpX, MCP.centerY + 1, pumpZ),
-      new THREE.Vector3((pumpX + rVesselX) / 2, nozzleY - 2, (pumpZ + rVesselZ) / 2),
-      new THREE.Vector3(rVesselX, nozzleY, rVesselZ),
+      new THREE.Vector3(sgX, STEAM_GEN.centerY - 1.6, sgZ),
+      new THREE.Vector3((sgX + pumpX) / 2, STEAM_GEN.centerY - 2.0, (sgZ + pumpZ) / 2),
+      new THREE.Vector3(pumpX, MCP.centerY - 0.4, pumpZ),
+      new THREE.Vector3((pumpX + rVesselX) / 2, coldNozzleY + 0.4, (pumpZ + rVesselZ) / 2),
+      new THREE.Vector3(rVesselX, coldNozzleY, rVesselZ),
     ];
     return new THREE.CatmullRomCurve3(pts);
-  }, [sgX, sgZ, pumpX, pumpZ, rVesselX, rVesselZ, nozzleY]);
+  }, [sgX, sgZ, pumpX, pumpZ, rVesselX, rVesselZ, coldNozzleY]);
+
+  // Точки крепления сейсмических гидроамортизаторов (snubbers)
+  const snubberHotPoint = useMemo(() => hotLeg.getPoint(0.5), [hotLeg]);
+  const snubberColdPoint = useMemo(() => coldLeg.getPoint(0.3), [coldLeg]);
 
   const flowMatRef = useRef<THREE.MeshBasicMaterial>(null);
   useFrame((state) => {
@@ -473,75 +424,103 @@ function LoopPipe({ index }: { index: number }) {
   });
 
   return (
-    <group>
-      <mesh castShadow>
-        <tubeGeometry args={[hotLeg, 28, 0.42, 12, false]} />
+    <group key={`primary-loop-${index}`}>
+      {/* Горячая нитка Ду 850 (внешний диаметр ~1.05м с изоляцией) */}
+      <mesh castShadow receiveShadow>
+        <tubeGeometry args={[hotLeg, 32, 0.48, 16, false]} />
         <primitive object={pipeMat} attach="material" />
       </mesh>
-      <mesh castShadow>
-        <tubeGeometry args={[coldLeg, 32, 0.38, 12, false]} />
+      {/* Холодная нитка Ду 850 */}
+      <mesh castShadow receiveShadow>
+        <tubeGeometry args={[coldLeg, 36, 0.46, 16, false]} />
         <primitive object={pipeMat} attach="material" />
       </mesh>
-      {/* Inner pulsing glow — primary coolant flow */}
+
+      {/* Кольца бандажей теплоизоляции на горячей нитке */}
+      {[0.25, 0.5, 0.75].map((tVal, bi) => {
+        const pt = hotLeg.getPoint(tVal);
+        return (
+          <mesh key={`hot-band-${bi}`} position={pt}>
+            <cylinderGeometry args={[0.52, 0.52, 0.12, 16]} />
+            <primitive object={steelMat} attach="material" />
+          </mesh>
+        );
+      })}
+
+      {/* Кольца бандажей теплоизоляции на холодной нитке */}
+      {[0.2, 0.4, 0.6, 0.8].map((tVal, bi) => {
+        const pt = coldLeg.getPoint(tVal);
+        return (
+          <mesh key={`cold-band-${bi}`} position={pt}>
+            <cylinderGeometry args={[0.50, 0.50, 0.12, 16]} />
+            <primitive object={steelMat} attach="material" />
+          </mesh>
+        );
+      })}
+
+      {/* Сейсмические гидроамортизаторы (гидравлические демпферы защиты при землетрясениях) */}
+      <group position={snubberHotPoint}>
+        <mesh position={[0, -0.6, 0]}>
+          <cylinderGeometry args={[0.12, 0.12, 1.2, 12]} />
+          <primitive object={safetyYellowMat} attach="material" />
+        </mesh>
+        <mesh position={[0, -1.2, 0]}>
+          <boxGeometry args={[0.4, 0.15, 0.4]} />
+          <primitive object={darkSteelMat} attach="material" />
+        </mesh>
+      </group>
+
+      <group position={snubberColdPoint}>
+        <mesh position={[0, -0.5, 0]}>
+          <cylinderGeometry args={[0.11, 0.11, 1.0, 12]} />
+          <primitive object={safetyYellowMat} attach="material" />
+        </mesh>
+        <mesh position={[0, -1.0, 0]}>
+          <boxGeometry args={[0.35, 0.15, 0.35]} />
+          <primitive object={darkSteelMat} attach="material" />
+        </mesh>
+      </group>
+
+      {/* Внутреннее свечение потока */}
       <mesh>
         <tubeGeometry args={[hotLeg, 28, 0.18, 8, false]} />
-        <meshBasicMaterial ref={flowMatRef} color="#ff5500" transparent opacity={0.5} />
+        <meshBasicMaterial ref={flowMatRef} color="#ff3300" transparent opacity={0.5} />
       </mesh>
       <mesh>
-        <tubeGeometry args={[coldLeg, 32, 0.15, 8, false]} />
-        <meshBasicMaterial color="#ff7744" transparent opacity={0.25} />
-      </mesh>
-    </group>
-  );
-}
-
-function Pressurizer() {
-  return (
-    <group position={[-15, DECK.mainY + 3, 8]}>
-      {/* Vertical surge tank in Rosatom safety lime-green finish */}
-      <mesh castShadow>
-        <cylinderGeometry args={[1.5, 1.5, 8, 24]} />
-        <primitive object={rosatomLimeGreenMat} attach="material" />
-      </mesh>
-      {/* Top dome */}
-      <mesh position={[0, 4.2, 0]} castShadow>
-        <sphereGeometry args={[1.5, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        <primitive object={rosatomLimeGreenMat} attach="material" />
-      </mesh>
-      {/* Bottom dome */}
-      <mesh position={[0, -4.2, 0]} castShadow>
-        <sphereGeometry args={[1.5, 24, 12, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />
-        <primitive object={rosatomLimeGreenMat} attach="material" />
-      </mesh>
-      {/* Surge line connecting to hot leg */}
-      <mesh position={[4, 2, -3]} rotation={[Math.PI / 2.5, 0, -Math.PI / 3]} castShadow>
-        <cylinderGeometry args={[0.35, 0.35, 8, 12]} />
-        <primitive object={pipeMat} attach="material" />
-      </mesh>
-      {/* Support stand */}
-      <mesh position={[0, -5, 0]} castShadow>
-        <boxGeometry args={[3, 1.5, 3]} />
-        <primitive object={steelMat} attach="material" />
+        <tubeGeometry args={[coldLeg, 32, 0.16, 8, false]} />
+        <meshBasicMaterial color="#0099ff" transparent opacity={0.3} />
       </mesh>
     </group>
   );
 }
 
 export default function SteamGeneratorDeck() {
+  // Точки врезки дыхательного трубопровода и впрыска компенсатора давления к петле №4 (index 2 / 225°)
+  const pzHotLegPoint = useMemo(() => new THREE.Vector3(-7.8, 16.5, -7.2), []);
+  const pzColdLegPoint = useMemo(() => new THREE.Vector3(-6.2, 14.8, -5.5), []);
+
   return (
-    <group>
+    <group name="VVER1000_PrimaryCircuit_Deck">
+      {/* Корпус реактора ВВЭР-1000 строго в геометрическом центре шахты */}
       <ReactorVessel />
-      {/* 4 Horizontal Steam Generators (PGV-1000) in Rosatom lime-green */}
+
+      {/* 4 горизонтальных парогенератора ПГВ-1000 в фирменном покрытии Rosatom Lime-Green */}
       {[0, 1, 2, 3].map((i) => <SteamGenerator key={`sg-${i}`} index={i} />)}
-      {/* 4 Emergency Core Cooling Tanks (ЕО САОЗ / ECCS Hydroaccumulators) in Rosatom lime-green */}
-      {[0, 1, 2, 3].map((i) => <ECCSTank key={`eccs-${i}`} index={i} />)}
-      {/* 4 Main Coolant Pumps */}
+
+      {/* 4 Главных циркуляционных насоса (ГЦЭН-195М) */}
       {[0, 1, 2, 3].map((i) => <MainCoolantPump key={`mcp-${i}`} index={i} />)}
-      {/* 4 Primary Coolant Loops */}
+
+      {/* 4 циркуляционные петли первого контура (ГЦТ Ду 850) */}
       {[0, 1, 2, 3].map((i) => <LoopPipe key={`pipe-${i}`} index={i} />)}
-      {/* Dynamic Animated Coolant Flow along 4 Primary Loops with Temperature Gradients */}
+
+      {/* Физическая визуализация движения теплоносителя по петлям и активной зоне */}
       <PrimaryCoolantFlow />
-      <Pressurizer />
+
+      {/* Система компенсации давления: КД В-320 (79 м³), бак-барботер, ИПК, surge & spray lines */}
+      <PressurizerSystem hotLegPoint={pzHotLegPoint} coldLegPoint={pzColdLegPoint} />
+
+      {/* Система аварийного охлаждения зоны (4 гидроемкости САОЗ по 60 м³ и узел подпитки ТК) */}
+      <ECCSAndMakeUpSystem />
     </group>
   );
 }

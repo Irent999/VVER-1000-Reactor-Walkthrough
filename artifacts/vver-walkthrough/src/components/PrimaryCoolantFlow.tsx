@@ -30,8 +30,8 @@ export default function PrimaryCoolantFlow() {
   // Построение точных 3D-траекторий 4 циркуляционных петель
   const loopsData = useMemo<LoopCurveData[]>(() => {
     const data: LoopCurveData[] = [];
-    const nozzleY = RPV.bodyTopY - 1.0;
-    const inletNozzleY = RPV.bodyBottomY + 2.0;
+    const nozzleY = 15.2;
+    const inletNozzleY = 14.1;
 
     for (let i = 0; i < 4; i++) {
       const angle = (i / 4) * Math.PI * 2 + Math.PI / 4;
@@ -47,17 +47,17 @@ export default function PrimaryCoolantFlow() {
       // 1. Горячая нитка (Hot Leg: RPV -> SG) ~320°C
       const hotPts = [
         new THREE.Vector3(rVesselX, nozzleY, rVesselZ),
-        new THREE.Vector3((rVesselX * 0.6 + sgX * 0.4), nozzleY + 1.8, (rVesselZ * 0.6 + sgZ * 0.4)),
-        new THREE.Vector3(sgX, STEAM_GEN.centerY + 0.4, sgZ),
+        new THREE.Vector3(rVesselX * 0.5 + sgX * 0.5, nozzleY + 1.2, rVesselZ * 0.5 + sgZ * 0.5),
+        new THREE.Vector3(sgX, STEAM_GEN.centerY + 0.2, sgZ),
       ];
       const hotCurve = new THREE.CatmullRomCurve3(hotPts);
 
       // 2. Холодная нитка (Cold Leg: SG -> MCP -> RPV) ~289°C
       const coldPts = [
-        new THREE.Vector3(sgX, STEAM_GEN.centerY - 1.8, sgZ),
-        new THREE.Vector3((sgX + pumpX) / 2, STEAM_GEN.centerY - 2.8, (sgZ + pumpZ) / 2),
-        new THREE.Vector3(pumpX, MCP.centerY + 0.8, pumpZ),
-        new THREE.Vector3((pumpX + rVesselX) / 2, inletNozzleY - 1.0, (pumpZ + rVesselZ) / 2),
+        new THREE.Vector3(sgX, STEAM_GEN.centerY - 1.6, sgZ),
+        new THREE.Vector3((sgX + pumpX) / 2, STEAM_GEN.centerY - 2.0, (sgZ + pumpZ) / 2),
+        new THREE.Vector3(pumpX, MCP.centerY - 0.4, pumpZ),
+        new THREE.Vector3((pumpX + rVesselX) / 2, inletNozzleY + 0.4, (pumpZ + rVesselZ) / 2),
         new THREE.Vector3(rVesselX, inletNozzleY, rVesselZ),
       ];
       const coldCurve = new THREE.CatmullRomCurve3(coldPts);
@@ -65,8 +65,8 @@ export default function PrimaryCoolantFlow() {
       // 3. Восходящий поток теплоносителя сквозь активную зону (RPV bottom -> RPV top)
       const coreR = 0.5 + (i * 0.35);
       const corePts = [
-        new THREE.Vector3(Math.cos(angle) * coreR, inletNozzleY - 1.5, Math.sin(angle) * coreR),
-        new THREE.Vector3(Math.cos(angle) * coreR, (inletNozzleY + nozzleY) / 2, Math.sin(angle) * coreR),
+        new THREE.Vector3(Math.cos(angle) * coreR, 8.5, Math.sin(angle) * coreR),
+        new THREE.Vector3(Math.cos(angle) * coreR, 12.0, Math.sin(angle) * coreR),
         new THREE.Vector3(rVesselX * 0.8, nozzleY, rVesselZ * 0.8),
       ];
       const coreCurve = new THREE.CatmullRomCurve3(corePts);
