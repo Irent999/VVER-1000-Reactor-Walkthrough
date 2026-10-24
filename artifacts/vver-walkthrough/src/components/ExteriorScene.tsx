@@ -1151,7 +1151,7 @@ interface CoolingTowerProps {
 
 function CoolingTower({ position, name = 'CoolingTower', scale = 1 }: CoolingTowerProps) {
   const height = 94;
-  const segments = 36;
+  const segments = 18;
 
   // Hyperbolic profile points
   const lathePoints = useMemo(() => {
