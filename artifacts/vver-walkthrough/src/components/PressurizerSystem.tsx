@@ -171,13 +171,13 @@ export default function PressurizerSystem({
       <group position={[pzX, 0, pzZ]}>
         {/* Опорная цилиндрическая обечайка (юбка) */}
         <mesh position={[0, pzY + 1.6, 0]} castShadow receiveShadow>
-          <cylinderGeometry args={[pzRadius + 0.08, pzRadius + 0.25, 3.2, 32, 1, true]} />
+          <cylinderGeometry args={[pzRadius + 0.08, pzRadius + 0.25, 3.2, 18, 1, true]} />
           <primitive object={pressurizerInsulationMat} attach="material" />
         </mesh>
 
         {/* Нижнее эллиптическое днище КД */}
         <mesh position={[0, bottomHeadCenterY, 0]} rotation={[Math.PI, 0, 0]} castShadow receiveShadow>
-          <sphereGeometry args={[pzRadius, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2]} />
+          <sphereGeometry args={[pzRadius, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />
           <primitive object={pressurizerInsulationMat} attach="material" />
         </mesh>
 
@@ -188,7 +188,7 @@ export default function PressurizerSystem({
             const tr = 0.5 + (i % 3) * 0.35;
             return (
               <mesh key={`ten-${i}`} position={[Math.cos(a) * tr, -0.4, Math.sin(a) * tr]}>
-                <cylinderGeometry args={[0.045, 0.045, 0.8, 8]} />
+                <cylinderGeometry args={[0.045, 0.045, 0.8, 6]} />
                 <primitive object={safetyYellowMat} attach="material" />
               </mesh>
             );
@@ -205,27 +205,27 @@ export default function PressurizerSystem({
 
         {/* Цилиндрическая обечайка корпуса КД с металлизированной изоляцией */}
         <mesh position={[0, cylinderCenterY, 0]} castShadow receiveShadow>
-          <cylinderGeometry args={[pzRadius, pzRadius, cylinderHeight, 32]} />
+          <cylinderGeometry args={[pzRadius, pzRadius, cylinderHeight, 18]} />
           <primitive object={pressurizerInsulationMat} attach="material" />
         </mesh>
 
         {/* Фирменные пояса жесткости и бандажные кольца КД */}
         {[-2.5, 0, 2.5].map((ringY, ri) => (
           <mesh key={`pz-ring-${ri}`} position={[0, cylinderCenterY + ringY, 0]}>
-            <torusGeometry args={[pzRadius + 0.05, 0.06, 8, 32]} />
+            <torusGeometry args={[pzRadius + 0.05, 0.06, 6, 18]} />
             <primitive object={safetyYellowMat} attach="material" />
           </mesh>
         ))}
 
         {/* Верхнее эллиптическое днище КД */}
         <mesh position={[0, topHeadCenterY, 0]} castShadow receiveShadow>
-          <sphereGeometry args={[pzRadius, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2]} />
+          <sphereGeometry args={[pzRadius, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />
           <primitive object={pressurizerInsulationMat} attach="material" />
         </mesh>
 
         {/* Люк-лаз верхний Ду 450 с фланцевой заглушкой */}
         <mesh position={[0, topHeadCenterY + pzRadius + 0.15, 0]}>
-          <cylinderGeometry args={[0.42, 0.42, 0.3, 20]} />
+          <cylinderGeometry args={[0.42, 0.42, 0.3, 14]} />
           <primitive object={pipeMat} attach="material" />
         </mesh>
 
@@ -234,7 +234,7 @@ export default function PressurizerSystem({
           <group key={`ipk-valve-${vi}`} position={[valvX, topHeadCenterY + pzRadius + 0.7, 0.35]}>
             {/* Штуцер клапана */}
             <mesh>
-              <cylinderGeometry args={[0.14, 0.14, 0.6, 12]} />
+              <cylinderGeometry args={[0.14, 0.14, 0.6, 10]} />
               <primitive object={pipeMat} attach="material" />
             </mesh>
             {/* Корпус клапана */}
@@ -244,7 +244,7 @@ export default function PressurizerSystem({
             </mesh>
             {/* Электромагнитный привод импульсного сброса */}
             <mesh position={[0, 0.75, 0]}>
-              <cylinderGeometry args={[0.12, 0.12, 0.45, 12]} />
+              <cylinderGeometry args={[0.12, 0.12, 0.45, 10]} />
               <primitive object={safetyYellowMat} attach="material" />
             </mesh>
           </group>
@@ -255,7 +255,7 @@ export default function PressurizerSystem({
           <group key={`catwalk-${ci}`} position={[0, catY, 0]}>
             {/* Решетчатый настил круговой галереи */}
             <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-              <ringGeometry args={[pzRadius + 0.15, pzRadius + 1.1, 28]} />
+              <ringGeometry args={[pzRadius + 0.15, pzRadius + 1.1, 18]} />
               <primitive object={diamondCatwalkMat} attach="material" side={THREE.DoubleSide} />
             </mesh>
             {/* Опорные кронштейны */}
@@ -270,7 +270,7 @@ export default function PressurizerSystem({
             })}
             {/* Желтое защитное перильное ограждение */}
             <mesh position={[0, 1.1, 0]} rotation={[Math.PI / 2, 0, 0]}>
-              <torusGeometry args={[pzRadius + 1.1, 0.028, 6, 28]} />
+              <torusGeometry args={[pzRadius + 1.1, 0.028, 6, 18]} />
               <primitive object={safetyYellowMat} attach="material" />
             </mesh>
           </group>
@@ -300,18 +300,18 @@ export default function PressurizerSystem({
       {/* ================================================================== */}
       {/* А. Дыхательный трубопровод (surge line Ду 350) с теплоизоляцией */}
       <mesh castShadow receiveShadow>
-        <tubeGeometry args={[surgeCurve, 36, 0.22, 16, false]} />
+        <tubeGeometry args={[surgeCurve, 20, 0.22, 10, false]} />
         <primitive object={pipeMat} attach="material" />
       </mesh>
       {/* Фланцы и сварные швы на дыхательной линии */}
       <mesh position={[pzX, bottomHeadCenterY - pzRadius - 0.25, pzZ]}>
-        <cylinderGeometry args={[0.32, 0.32, 0.15, 16]} />
+        <cylinderGeometry args={[0.32, 0.32, 0.15, 12]} />
         <primitive object={safetyYellowMat} attach="material" />
       </mesh>
 
       {/* Б. Линия впрыска (spray line Ду 150/200) от холодной нитки/подпитки */}
       <mesh castShadow>
-        <tubeGeometry args={[sprayCurve, 32, 0.12, 12, false]} />
+        <tubeGeometry args={[sprayCurve, 18, 0.12, 8, false]} />
         <primitive object={pipeMat} attach="material" />
       </mesh>
       {/* Блок регулирующих клапанов впрыска на отметке +25м */}
@@ -321,14 +321,14 @@ export default function PressurizerSystem({
           <primitive object={valveRedMat} attach="material" />
         </mesh>
         <mesh position={[0, 0.35, 0]}>
-          <cylinderGeometry args={[0.12, 0.12, 0.4, 12]} />
+          <cylinderGeometry args={[0.12, 0.12, 0.4, 10]} />
           <primitive object={safetyYellowMat} attach="material" />
         </mesh>
       </group>
 
       {/* В. Сбросной трубопровод от ИПК в бак-барботер */}
       <mesh castShadow>
-        <tubeGeometry args={[reliefCurve, 32, 0.16, 12, false]} />
+        <tubeGeometry args={[reliefCurve, 18, 0.16, 8, false]} />
         <primitive object={pipeMat} attach="material" />
       </mesh>
 
@@ -338,16 +338,16 @@ export default function PressurizerSystem({
       <group position={[bbX, bbY, bbZ]}>
         {/* Горизонтальный цилиндрический корпус в фирменном покрытии Rosatom */}
         <mesh rotation={[0, 0, Math.PI / 2]} castShadow receiveShadow>
-          <cylinderGeometry args={[bbRadius, bbRadius, bbLength, 28]} />
+          <cylinderGeometry args={[bbRadius, bbRadius, bbLength, 16]} />
           <primitive object={reliefTankMat} attach="material" />
         </mesh>
         {/* Эллиптические днища бака-барботера */}
         <mesh position={[bbLength / 2, 0, 0]} rotation={[0, Math.PI / 2, 0]} castShadow>
-          <sphereGeometry args={[bbRadius, 28, 14, 0, Math.PI * 2, 0, Math.PI / 2]} />
+          <sphereGeometry args={[bbRadius, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
           <primitive object={reliefTankMat} attach="material" />
         </mesh>
         <mesh position={[-bbLength / 2, 0, 0]} rotation={[0, -Math.PI / 2, 0]} castShadow>
-          <sphereGeometry args={[bbRadius, 28, 14, 0, Math.PI * 2, 0, Math.PI / 2]} />
+          <sphereGeometry args={[bbRadius, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
           <primitive object={reliefTankMat} attach="material" />
         </mesh>
 
@@ -361,19 +361,19 @@ export default function PressurizerSystem({
 
         {/* Входной патрубок сброса пара от ИПК КД с барботажным коллектором */}
         <mesh position={[0, bbRadius + 0.3, 0]}>
-          <cylinderGeometry args={[0.22, 0.22, 0.6, 16]} />
+          <cylinderGeometry args={[0.22, 0.22, 0.6, 12]} />
           <primitive object={pipeMat} attach="material" />
         </mesh>
 
         {/* Блок предохранительных разрывных мембран бака-барботера */}
         <mesh position={[1.4, bbRadius + 0.25, 0]}>
-          <cylinderGeometry args={[0.28, 0.28, 0.25, 16]} />
+          <cylinderGeometry args={[0.28, 0.28, 0.25, 12]} />
           <primitive object={safetyYellowMat} attach="material" />
         </mesh>
 
         {/* Штуцеры азотной подушки и уровнемерная колонка */}
         <mesh position={[-1.4, bbRadius + 0.2, 0]}>
-          <cylinderGeometry args={[0.08, 0.08, 0.4, 8]} />
+          <cylinderGeometry args={[0.08, 0.08, 0.4, 6]} />
           <primitive object={pipeMat} attach="material" />
         </mesh>
       </group>

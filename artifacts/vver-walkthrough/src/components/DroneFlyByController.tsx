@@ -69,6 +69,10 @@ interface DroneFlyByControllerProps {
   scrubProgress?: number | null;
 }
 
+const _dronePos = new THREE.Vector3();
+const _droneTgt = new THREE.Vector3();
+const _droneTangent = new THREE.Vector3();
+
 export default function DroneFlyByController({
   active,
   speedMultiplier = 1.0,
@@ -144,27 +148,27 @@ export default function DroneFlyByController({
     const t = (progress.current % 1 + 1) % 1;
 
     // Sample camera position along spline
-    const pos = cameraPath.getPointAt(t);
+    cameraPath.getPointAt(t, _dronePos);
     // Sample camera look-at target along target spline
-    const tgt = targetPath.getPointAt(t);
+    targetPath.getPointAt(t, _droneTgt);
 
     // Smoothly interpolate camera position to eliminate micro-jitter
-    camera.position.lerp(pos, 0.12);
+    camera.position.lerp(_dronePos, 0.12);
 
     // Smoothly interpolate lookAt target for organic cinematic panning
-    smoothedTarget.current.lerp(tgt, 0.08);
+    smoothedTarget.current.lerp(_droneTgt, 0.08);
     camera.lookAt(smoothedTarget.current);
 
     // Compute heading angle and telemetry with throttling (~8 Hz) to eliminate 60 FPS React re-renders
     const now = performance.now();
     if (onTelemetryUpdate && (now - lastTelemetryTime.current > 120 || paused)) {
       lastTelemetryTime.current = now;
-      const tangent = cameraPath.getTangentAt(t);
-      const heading = (Math.atan2(tangent.x, tangent.z) * 180) / Math.PI;
+      cameraPath.getTangentAt(t, _droneTangent);
+      const heading = (Math.atan2(_droneTangent.x, _droneTangent.z) * 180) / Math.PI;
       const normalizedHeading = (heading + 360) % 360;
 
       // Realistic drone telemetry numbers: altitude (m), ground speed ~36 km/h at 1x
-      const altitude = Math.round(pos.y);
+      const altitude = Math.round(_dronePos.y);
       const speedKmh = Math.round(36 * speedMultiplier * (paused ? 0 : 1));
 
       // Find closest landmark based on t

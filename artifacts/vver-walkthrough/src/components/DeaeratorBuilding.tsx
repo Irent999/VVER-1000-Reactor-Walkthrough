@@ -178,7 +178,7 @@ export default function DeaeratorBuilding() {
 
           {/* Горизонтальный цилиндрический бак деаэратора (L = 14m, D = 3.4m) */}
           <mesh rotation={[0, 0, Math.PI / 2]} castShadow receiveShadow>
-            <cylinderGeometry args={[1.7, 1.7, 12.5, 32]} />
+            <cylinderGeometry args={[1.7, 1.7, 12.5, 18]} />
             <primitive object={deaeratorVesselMat} attach="material" />
           </mesh>
           {/* Сферические днища бака */}
@@ -189,25 +189,25 @@ export default function DeaeratorBuilding() {
               rotation={[0, ci === 0 ? -Math.PI / 2 : Math.PI / 2, 0]}
               castShadow
             >
-              <sphereGeometry args={[1.7, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2]} />
+              <sphereGeometry args={[1.7, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
               <primitive object={deaeratorVesselMat} attach="material" />
             </mesh>
           ))}
 
           {/* Вертикальная деаэрационная колонка (К-1000) по центру бака */}
           <mesh position={[0, 2.8, 0]} castShadow>
-            <cylinderGeometry args={[1.1, 1.1, 3.8, 24]} />
+            <cylinderGeometry args={[1.1, 1.1, 3.8, 14]} />
             <primitive object={deaeratorVesselMat} attach="material" />
           </mesh>
           {/* Верхняя крышка деаэрационной колонки */}
           <mesh position={[0, 4.8, 0]} castShadow>
-            <sphereGeometry args={[1.1, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />
+            <sphereGeometry args={[1.1, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
             <primitive object={deaeratorVesselMat} attach="material" />
           </mesh>
 
           {/* Паровые трубопроводы выпара и предохранительные клапаны */}
           <mesh position={[0, 5.8, 0]}>
-            <cylinderGeometry args={[0.22, 0.22, 1.6, 12]} />
+            <cylinderGeometry args={[0.22, 0.22, 1.6, 8]} />
             <primitive object={steamPipeInsulatedMat} attach="material" />
           </mesh>
           <mesh position={[0, 6.7, 0]} castShadow>
@@ -232,13 +232,13 @@ export default function DeaeratorBuilding() {
       {[-18, -6, 6, 18].map((pz, pi) => (
         <group key={`main-steam-${pi}`} position={[0, 20.0, pz]}>
           <mesh rotation={[0, 0, Math.PI / 2]} castShadow>
-            <cylinderGeometry args={[0.55, 0.55, widthX + 1.2, 20]} />
+            <cylinderGeometry args={[0.55, 0.55, widthX + 1.2, 12]} />
             <primitive object={steamPipeInsulatedMat} attach="material" />
           </mesh>
           {/* Фланцевые муфты и компенсаторы */}
           {[-3.5, 3.5].map((fx) => (
             <mesh key={`flange-${fx}`} position={[fx, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-              <cylinderGeometry args={[0.75, 0.75, 0.35, 20]} />
+              <cylinderGeometry args={[0.75, 0.75, 0.35, 12]} />
               <primitive object={steelTrussMat} attach="material" />
             </mesh>
           ))}

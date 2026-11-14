@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo, useCallback } from 'react';
 import {
   Activity, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Cpu, Crosshair, Eye, EyeOff, Footprints, Gauge,
   Info, Layers, Minus, Monitor, Radio, Thermometer, X, Zap, Droplets, Menu, Play, Pause, Compass, Navigation, Video,
@@ -38,6 +38,9 @@ interface UIOverlayProps {
   // Visual Mode Switcher props:
   renderMode?: RenderVisualizationMode;
   onRenderModeChange?: (mode: RenderVisualizationMode) => void;
+  // Shadows & Performance:
+  enableShadows?: boolean;
+  onToggleShadows?: () => void;
 }
 
 const panelStyle = 'border border-[#c9d1c6]/15 bg-[#172226]/95 shadow-[0_18px_60px_rgba(4,14,17,.34)] backdrop-blur-xl';
@@ -158,6 +161,65 @@ function InfoModal({ poi, onClose }: { poi: POIInfo; onClose: () => void }) {
   );
 }
 
+interface ViewpointsListProps {
+  floorViews: typeof FLOOR_VIEWS;
+  activeView: string;
+  onViewChange: (viewId: string) => void;
+}
+
+const MemoizedViewpointsList = memo(function ViewpointsList({
+  floorViews,
+  activeView,
+  onViewChange,
+}: ViewpointsListProps) {
+  return (
+    <div className="flex flex-col gap-1.5 pt-1">
+      {floorViews.map((view, idx) => {
+        const selected = activeView === view.id;
+        return (
+          <button
+            key={view.id}
+            data-testid={`button-view-${view.id}`}
+            aria-pressed={selected}
+            onClick={(e) => {
+              (e.currentTarget as HTMLElement)?.blur();
+              onViewChange(view.id);
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('restore-camera-focus'));
+              }
+            }}
+            className={`group flex items-center gap-2.5 rounded-xl border px-3 py-2 text-left shadow-lg backdrop-blur-xl transition cursor-pointer ${
+              selected
+                ? 'border-[#f5c26f] bg-[#1d2b30]/95 shadow-[0_0_20px_rgba(245,194,111,0.25)] text-[#f5c26f]'
+                : 'border-[#c9d1c6]/15 bg-[#141f23]/90 text-[#d4ded7] hover:border-[#f5c26f]/40 hover:bg-[#1a272c]'
+            }`}
+          >
+            <span
+              className={`mono grid h-6 w-6 shrink-0 place-items-center rounded-lg text-[9px] font-bold ${
+                selected
+                  ? 'bg-[#d69a43]/25 text-[#f5c26f]'
+                  : 'bg-white/[.06] text-[#869692] group-hover:text-white'
+              }`}
+            >
+              0{idx + 1}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-[11px] font-bold tracking-tight">
+              {view.label}
+            </span>
+            {view.mode === 'orbit' ? (
+              <Eye size={13} className={selected ? 'text-[#f5c26f]' : 'text-[#6f7e7a]'} />
+            ) : view.mode === 'drone' ? (
+              <Video size={13} className={selected ? 'text-[#f5c26f]' : 'text-[#8ec8ff]'} />
+            ) : (
+              <Footprints size={13} className={selected ? 'text-[#f5c26f]' : 'text-[#6f7e7a]'} />
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+});
+
 export default function UIOverlay({
   activeView,
   onViewChange,
@@ -177,11 +239,15 @@ export default function UIOverlay({
   onDroneScrub,
   renderMode = 'standard',
   onRenderModeChange,
+  enableShadows = true,
+  onToggleShadows,
 }: UIOverlayProps) {
   const fallbackTelemetry = useTelemetry();
   const telemetry = propTelemetry ?? fallbackTelemetry;
-  // Left HUD panel collapsible state
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  // Left HUD panel collapsible state (isCollapsed provides zero re-renders & display: none when collapsed)
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const isSidebarOpen = !isCollapsed;
+  const toggleSidebar = useCallback(() => setIsCollapsed((prev) => !prev), []);
   // Right drawer panel for live telemetry & equipment list (starts open, collapsible via button or compact pill)
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   // Global 2D UI visibility toggle (hotkey 'H')
@@ -237,6 +303,10 @@ export default function UIOverlay({
       if (e.code === 'KeyH' || e.key.toLowerCase() === 'h' || e.key.toLowerCase() === 'р') {
         e.preventDefault();
         setAllUIHidden((prev) => !prev);
+      }
+      if (e.code === 'KeyV' || e.key.toLowerCase() === 'v' || e.key.toLowerCase() === 'м') {
+        e.preventDefault();
+        setIsCollapsed((prev) => !prev);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -386,14 +456,29 @@ export default function UIOverlay({
       >
         <button
           data-testid="button-toggle-left-panel"
-          onClick={() => setIsSidebarOpen((prev) => !prev)}
-          title={isSidebarOpen ? 'Свернуть панель / Hide Panel' : 'Развернуть панель / Show Panel'}
-          aria-label={isSidebarOpen ? 'Свернуть панель / Hide Panel' : 'Развернуть панель / Show Panel'}
+          onClick={toggleSidebar}
+          title={isCollapsed ? 'Развернуть панель / Show Panel (V)' : 'Свернуть панель / Hide Panel (V)'}
+          aria-label={isCollapsed ? 'Развернуть панель / Show Panel' : 'Свернуть панель / Hide Panel'}
           className="flex h-10 w-10 items-center justify-center rounded-full border border-[#f5c26f]/60 bg-[#142024]/95 text-[#f5c26f] shadow-[0_0_22px_rgba(0,0,0,0.65)] backdrop-blur-xl transition hover:scale-110 hover:border-[#f5c26f] hover:bg-[#1f3036] cursor-pointer"
         >
-          {isSidebarOpen ? <ChevronLeft size={20} /> : <Menu size={18} />}
+          {isCollapsed ? <Menu size={18} /> : <ChevronLeft size={20} />}
         </button>
       </div>
+
+      {/* Floating edge tab when collapsed to easily expand without aiming at top button */}
+      {isCollapsed && !allUIHidden && (
+        <button
+          data-testid="button-expand-viewpoints"
+          onClick={() => setIsCollapsed(false)}
+          title="Развернуть ракурсы (горячая клавиша V)"
+          aria-label="Развернуть меню ракурсов"
+          className="pointer-events-auto fixed top-[68px] left-0 z-[9999] flex items-center gap-1.5 rounded-r-xl border-y border-r border-[#f5c26f]/40 bg-[#142024]/95 px-2.5 py-2 text-[#f5c26f] shadow-[0_4px_22px_rgba(0,0,0,0.65)] backdrop-blur-xl transition hover:border-[#f5c26f] hover:bg-[#1f3036] hover:translate-x-1 cursor-pointer group"
+        >
+          <ChevronRight size={16} className="group-hover:translate-x-0.5 transition" />
+          <span className="text-[11px] font-bold tracking-tight">Ракурсы</span>
+          <span className="mono text-[9px] rounded bg-white/10 px-1 py-0.5 text-[#a8b8b3]">V</span>
+        </button>
+      )}
 
       {/* 2. Pinned Top-Right Toolbar: Mode Selector, Drone Fly-by, VR, and Status */}
       <div
@@ -438,6 +523,21 @@ export default function UIOverlay({
             <span>Рентген</span>
           </button>
         </div>
+
+        {/* Shadows Quality / Performance Toggle */}
+        {onToggleShadows && (
+          <button
+            onClick={onToggleShadows}
+            className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition flex items-center gap-1.5 cursor-pointer shadow-lg ${
+              enableShadows
+                ? 'border-amber-500/40 bg-amber-950/40 text-amber-300 hover:bg-amber-900/50'
+                : 'border-emerald-500/40 bg-emerald-950/40 text-emerald-300 hover:bg-emerald-900/50'
+            }`}
+            title={enableShadows ? 'Тени активны (512px). Нажмите для отключения теней (максимальный FPS)' : 'Тени отключены. Нажмите для включения теней (512px)'}
+          >
+            <span>{enableShadows ? '🌤️ Тени 512px' : '⚡ Без теней (Max FPS)'}</span>
+          </button>
+        )}
 
         {/* Quick Emergency AZ-5 Header Button */}
         <button
@@ -516,7 +616,7 @@ export default function UIOverlay({
         </div>
       </div>
 
-      {/* 3. Left HUD Panel: Slides entirely off-screen via transform: translateX(-100%) with 0.3s ease */}
+      {/* 3. Left HUD Panel: Slides entirely off-screen via transform: translateX(-120%) or display: none when collapsed */}
       <nav
         aria-label="Навигация и ракурсы"
         style={{
@@ -524,10 +624,11 @@ export default function UIOverlay({
           top: '68px',
           left: '16px',
           zIndex: 9999,
-          transform: isSidebarOpen ? 'translateX(0)' : 'translateX(-120%)',
+          display: isCollapsed ? 'none' : 'flex',
+          transform: isCollapsed ? 'translateX(-120%)' : 'translateX(0)',
           transition: 'transform 0.3s ease, opacity 0.3s ease',
-          pointerEvents: isSidebarOpen ? 'auto' : 'none',
-          opacity: isSidebarOpen ? 1 : 0,
+          pointerEvents: isCollapsed ? 'none' : 'auto',
+          opacity: isCollapsed ? 0 : 1,
         }}
         className="w-[min(320px,calc(100vw-32px))] flex flex-col gap-2"
       >
@@ -548,57 +649,24 @@ export default function UIOverlay({
               </div>
             </div>
             <button
-              onClick={() => setIsSidebarOpen(false)}
-              className="text-[#81918d] hover:text-[#f5c26f] text-xs px-1.5 py-0.5 rounded cursor-pointer"
-              title="Свернуть"
+              onClick={() => setIsCollapsed(true)}
+              className="flex items-center gap-1 text-[#81918d] hover:text-[#f5c26f] text-xs px-2 py-1 rounded-lg hover:bg-white/5 transition cursor-pointer"
+              title="Свернуть меню ракурсов (V)"
+              aria-label="Свернуть меню ракурсов"
             >
-              ✕
+              <ChevronLeft size={14} />
+              <span className="text-[10px] font-semibold">Свернуть (V)</span>
             </button>
           </div>
 
-          {/* Expanded Cinematic Viewpoints List */}
-          <div className="flex flex-col gap-1.5 pt-1">
-            {FLOOR_VIEWS.map((view, idx) => {
-              const selected = activeView === view.id;
-              return (
-                <button
-                  key={view.id}
-                  data-testid={`button-view-${view.id}`}
-                  aria-pressed={selected}
-                  onClick={(e) => {
-                    (e.currentTarget as HTMLElement)?.blur();
-                    onViewChange(view.id);
-                    window.dispatchEvent(new CustomEvent('restore-camera-focus'));
-                  }}
-                  className={`group flex items-center gap-2.5 rounded-xl border px-3 py-2 text-left shadow-lg backdrop-blur-xl transition cursor-pointer ${
-                    selected
-                      ? 'border-[#f5c26f] bg-[#1d2b30]/95 shadow-[0_0_20px_rgba(245,194,111,0.25)] text-[#f5c26f]'
-                      : 'border-[#c9d1c6]/15 bg-[#141f23]/90 text-[#d4ded7] hover:border-[#f5c26f]/40 hover:bg-[#1a272c]'
-                  }`}
-                >
-                  <span
-                    className={`mono grid h-6 w-6 shrink-0 place-items-center rounded-lg text-[9px] font-bold ${
-                      selected
-                        ? 'bg-[#d69a43]/25 text-[#f5c26f]'
-                        : 'bg-white/[.06] text-[#869692] group-hover:text-white'
-                    }`}
-                  >
-                    0{idx + 1}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-[11px] font-bold tracking-tight">
-                    {view.label}
-                  </span>
-                  {view.mode === 'orbit' ? (
-                    <Eye size={13} className={selected ? 'text-[#f5c26f]' : 'text-[#6f7e7a]'} />
-                  ) : view.mode === 'drone' ? (
-                    <Video size={13} className={selected ? 'text-[#f5c26f]' : 'text-[#8ec8ff]'} />
-                  ) : (
-                    <Footprints size={13} className={selected ? 'text-[#f5c26f]' : 'text-[#6f7e7a]'} />
-                  )}
-                </button>
-              );
-            })}
-          </div>
+          {/* Expanded Cinematic Viewpoints List (rendered only when visible to prevent React re-renders) */}
+          {!isCollapsed && (
+            <MemoizedViewpointsList
+              floorViews={FLOOR_VIEWS}
+              activeView={activeView}
+              onViewChange={onViewChange}
+            />
+          )}
 
           {/* 1. Послойный срез (X-Ray Cutaway) */}
           <div className="mt-2 pt-2.5 border-t border-white/10 px-1">

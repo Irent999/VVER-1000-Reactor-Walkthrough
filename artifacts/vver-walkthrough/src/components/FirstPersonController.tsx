@@ -2,7 +2,8 @@ import { useRef, useEffect, useCallback } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { EYE_HEIGHT } from '@/scene/constants';
-import { getFloorHeightAt, resolvePlayerMovement } from '@/scene/floorDetection';
+import { getFloorHeightAt } from '@/scene/floorDetection';
+import { globalPhysicsWorld } from '@/scene/physicsWorld';
 
 interface FirstPersonControllerProps {
   targetFloor: number | null;
@@ -12,6 +13,13 @@ interface FirstPersonControllerProps {
   lookAtTarget?: [number, number, number];
 }
 
+const _dir = new THREE.Vector3();
+const _right = new THREE.Vector3();
+const _up = new THREE.Vector3(0, 1, 0);
+const _targetMove = new THREE.Vector3();
+const _origin = new THREE.Vector3();
+const _down = new THREE.Vector3(0, -1, 0);
+
 export default function FirstPersonController({
   targetFloor,
   onArrived,
@@ -19,7 +27,7 @@ export default function FirstPersonController({
   spawnPosition,
   lookAtTarget,
 }: FirstPersonControllerProps) {
-  const { camera, gl, scene } = useThree();
+  const { camera, gl, scene, invalidate } = useThree();
 
   const keys = useRef<Record<string, boolean>>({});
   const velocity = useRef(new THREE.Vector3());
@@ -54,6 +62,7 @@ export default function FirstPersonController({
     const eyeHeight = spawnPosition[1] >= 34.0 ? 1.8 : EYE_HEIGHT;
     currentFloorY.current = spawnPosition[1] - eyeHeight;
     velocity.current.set(0, 0, 0);
+    globalPhysicsWorld.teleportPlayer(spawnPosition[0], currentFloorY.current, spawnPosition[2]);
 
     // Initial look direction: towards lookAtTarget if provided, otherwise towards scene center
     let lookAngle = 0;
@@ -324,6 +333,7 @@ export default function FirstPersonController({
         camera.position.y = targetY + eyeH;
         transitioning.current = false;
         transitionTarget.current = null;
+        globalPhysicsWorld.teleportPlayer(camera.position.x, targetY, camera.position.z);
         onArrived();
       }
       return;
@@ -334,40 +344,53 @@ export default function FirstPersonController({
     const isSprinting = k['ShiftLeft'] || k['ShiftRight'];
     const baseSpeed = isSprinting ? 7.2 : 4.4; // Realistic walking (~4.4 m/s) and brisk walk (~7.2 m/s)
 
-    const dir = new THREE.Vector3();
-    camera.getWorldDirection(dir);
-    dir.y = 0;
-    dir.normalize();
-    const right = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0)).normalize();
+    camera.getWorldDirection(_dir);
+    _dir.y = 0;
+    _dir.normalize();
+    _right.crossVectors(_dir, _up).normalize();
 
-    const targetMove = new THREE.Vector3();
-    if (k['KeyW'] || k['ArrowUp']) targetMove.add(dir);
-    if (k['KeyS'] || k['ArrowDown']) targetMove.sub(dir);
-    if (k['KeyA'] || k['ArrowLeft']) targetMove.sub(right);
-    if (k['KeyD'] || k['ArrowRight']) targetMove.add(right);
+    _targetMove.set(0, 0, 0);
+    if (k['KeyW'] || k['ArrowUp']) _targetMove.add(_dir);
+    if (k['KeyS'] || k['ArrowDown']) _targetMove.sub(_dir);
+    if (k['KeyA'] || k['ArrowLeft']) _targetMove.sub(_right);
+    if (k['KeyD'] || k['ArrowRight']) _targetMove.add(_right);
 
-    if (targetMove.lengthSq() > 0) {
-      targetMove.normalize().multiplyScalar(baseSpeed);
+    if (_targetMove.lengthSq() > 0) {
+      _targetMove.normalize().multiplyScalar(baseSpeed);
     }
 
     // Fluid velocity damping: smooth ramp up and gentle stop without abrupt jarring
-    const accelDamp = targetMove.lengthSq() > 0 ? 18 : 22;
-    velocity.current.x = THREE.MathUtils.damp(velocity.current.x, targetMove.x, accelDamp, frameDt);
-    velocity.current.z = THREE.MathUtils.damp(velocity.current.z, targetMove.z, accelDamp, frameDt);
+    const accelDamp = _targetMove.lengthSq() > 0 ? 18 : 22;
+    velocity.current.x = THREE.MathUtils.damp(velocity.current.x, _targetMove.x, accelDamp, frameDt);
+    velocity.current.z = THREE.MathUtils.damp(velocity.current.z, _targetMove.z, accelDamp, frameDt);
 
     const stepX = velocity.current.x * frameDt;
     const stepZ = velocity.current.z * frameDt;
 
     if (Math.abs(stepX) > 0.0001 || Math.abs(stepZ) > 0.0001) {
-      const [nextX, nextZ] = resolvePlayerMovement(
-        camera.position.x,
-        camera.position.z,
-        stepX,
-        stepZ,
+      // Step Cannon-es rigid physics simulation to resolve physical collisions against walls, steam generators, MCPs, and primary circuit pipes
+      const resolved = globalPhysicsWorld.step(
+        velocity.current.x,
+        velocity.current.z,
+        frameDt,
         currentFloorY.current
       );
-      camera.position.x = nextX;
-      camera.position.z = nextZ;
+      camera.position.x = resolved.x;
+      camera.position.z = resolved.z;
+    }
+
+    // Invalidate frame if moving, turning or damping
+    const isMoving =
+      Math.abs(velocity.current.x) > 0.0001 ||
+      Math.abs(velocity.current.z) > 0.0001 ||
+      _targetMove.lengthSq() > 0 ||
+      transitioning.current;
+    const isRotating =
+      Math.abs(currentYaw.current - targetYaw.current) > 0.0001 ||
+      Math.abs(currentPitch.current - targetPitch.current) > 0.0001;
+
+    if (isMoving || isRotating || isPointerDown.current) {
+      invalidate();
     }
 
     // 4. Raycasting Floor Detection: Support 1.8m eye level on Polar Crane Deck (+36m)
@@ -380,8 +403,8 @@ export default function FirstPersonController({
     let detectedFloorY = getFloorHeightAt(camera.position.x, camera.position.z, camera.position.y);
 
     // Cast downward ray from player position
-    const origin = new THREE.Vector3(camera.position.x, camera.position.y + 0.3, camera.position.z);
-    raycaster.current.set(origin, new THREE.Vector3(0, -1, 0));
+    _origin.set(camera.position.x, camera.position.y + 0.3, camera.position.z);
+    raycaster.current.set(_origin, _down);
 
     if (floorCandidates.current.length > 0) {
       const hits = raycaster.current.intersectObjects(floorCandidates.current, false);
@@ -416,6 +439,7 @@ export default function FirstPersonController({
       camera.position.set(spawnPosition[0], spawnPosition[1], spawnPosition[2]);
       currentFloorY.current = spawnPosition[1] - EYE_HEIGHT;
       velocity.current.set(0, 0, 0);
+      globalPhysicsWorld.teleportPlayer(spawnPosition[0], currentFloorY.current, spawnPosition[2]);
     }
   });
 

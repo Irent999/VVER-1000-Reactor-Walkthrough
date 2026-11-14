@@ -141,28 +141,28 @@ export default function ECCSAndMakeUpSystem({
           <group key={`eccs-accumulator-${idx}`} position={[tx, tankY, tz]}>
             {/* Вертикальный цилиндрический корпус в покрытии Rosatom (#8DB600) */}
             <mesh castShadow receiveShadow>
-              <cylinderGeometry args={[tankRadius, tankRadius, tankHeight, 28]} />
+              <cylinderGeometry args={[tankRadius, tankRadius, tankHeight, 16]} />
               <primitive object={rosatomLimeGreenMat} attach="material" />
             </mesh>
             {/* Верхнее полусферическое днище гидроемкости */}
             <mesh position={[0, tankHeight / 2, 0]} castShadow>
-              <sphereGeometry args={[tankRadius, 28, 14, 0, Math.PI * 2, 0, Math.PI / 2]} />
+              <sphereGeometry args={[tankRadius, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
               <primitive object={rosatomLimeGreenMat} attach="material" />
             </mesh>
             {/* Нижнее полусферическое днище гидроемкости */}
             <mesh position={[0, -tankHeight / 2, 0]} rotation={[Math.PI, 0, 0]} castShadow>
-              <sphereGeometry args={[tankRadius, 28, 14, 0, Math.PI * 2, 0, Math.PI / 2]} />
+              <sphereGeometry args={[tankRadius, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
               <primitive object={rosatomLimeGreenMat} attach="material" />
             </mesh>
             {/* Опорная цилиндрическая обечайка с анкерными болтами к отметке +15м */}
             <mesh position={[0, -tankHeight / 2 - 1.2, 0]} castShadow receiveShadow>
-              <cylinderGeometry args={[tankRadius + 0.15, tankRadius + 0.35, 2.4, 28, 1, true]} />
+              <cylinderGeometry args={[tankRadius + 0.15, tankRadius + 0.35, 2.4, 16, 1, true]} />
               <primitive object={DARK_STEEL_COLOR ? pipeMat : stainlessSteelMat} attach="material" />
             </mesh>
 
             {/* Верхний штуцер подачи азота и импульсный предохранительный клапан */}
             <mesh position={[0, tankHeight / 2 + tankRadius + 0.35, 0]} castShadow>
-              <cylinderGeometry args={[0.18, 0.18, 0.7, 14]} />
+              <cylinderGeometry args={[0.18, 0.18, 0.7, 10]} />
               <primitive object={pipeMat} attach="material" />
             </mesh>
             <mesh position={[0, tankHeight / 2 + tankRadius + 0.8, 0]} castShadow>
@@ -172,18 +172,18 @@ export default function ECCSAndMakeUpSystem({
 
             {/* Колонки дифференциальных уровнемеров и манометров азотной подушки */}
             <mesh position={[tankRadius + 0.25, 0, 0]}>
-              <cylinderGeometry args={[0.05, 0.05, tankHeight * 0.75, 8]} />
+              <cylinderGeometry args={[0.05, 0.05, tankHeight * 0.75, 6]} />
               <primitive object={stainlessSteelMat} attach="material" />
             </mesh>
 
             {/* Круговая смотровая площадка обслуживания гидроемкости */}
             <mesh position={[0, tankHeight / 2 - 0.2, 0]}>
-              <ringGeometry args={[tankRadius + 0.15, tankRadius + 0.95, 24]} />
+              <ringGeometry args={[tankRadius + 0.15, tankRadius + 0.95, 16]} />
               <primitive object={diamondCatwalkMat} attach="material" side={THREE.DoubleSide} />
             </mesh>
             {/* Ограждение площадки безопасности */}
             <mesh position={[0, tankHeight / 2 + 0.95, 0]} rotation={[Math.PI / 2, 0, 0]}>
-              <torusGeometry args={[tankRadius + 0.95, 0.03, 6, 24]} />
+              <torusGeometry args={[tankRadius + 0.95, 0.03, 6, 16]} />
               <primitive object={safetyYellowMat} attach="material" />
             </mesh>
           </group>
@@ -197,7 +197,7 @@ export default function ECCSAndMakeUpSystem({
         <group key={`eccs-pipe-assembly-${idx}`}>
           {/* Трубопровод Ду 350 от емкости прямо в корпус реактора */}
           <mesh castShadow receiveShadow>
-            <tubeGeometry args={[pipe.curve, 32, 0.18, 14, false]} />
+            <tubeGeometry args={[pipe.curve, 18, 0.18, 8, false]} />
             <primitive object={pipeMat} attach="material" />
           </mesh>
 
@@ -288,13 +288,13 @@ export default function ECCSAndMakeUpSystem({
 
       {/* Трубопровод продувки от холодной нитки петли №2 в теплообменник ТК */}
       <mesh castShadow>
-        <tubeGeometry args={[letdownCurve, 24, 0.08, 10, false]} />
+        <tubeGeometry args={[letdownCurve, 16, 0.08, 8, false]} />
         <primitive object={pipeMat} attach="material" />
       </mesh>
 
       {/* Высоконапорный трубопровод подпитки от теплообменника ТК обратно в контур */}
       <mesh castShadow>
-        <tubeGeometry args={[makeUpCurve, 24, 0.08, 10, false]} />
+        <tubeGeometry args={[makeUpCurve, 16, 0.08, 8, false]} />
         <primitive object={pipeMat} attach="material" />
       </mesh>
     </group>

@@ -133,31 +133,31 @@ function ReactorVessel() {
     <group>
       {/* RPV cylindrical body — 12m tall, 4.5m diameter, sitting on the main deck */}
       <mesh position={[0, (RPV.bodyBottomY + RPV.bodyTopY) / 2, 0]} castShadow receiveShadow>
-        <cylinderGeometry args={[r, r + 0.1, RPV.bodyHeight, 36]} />
+        <cylinderGeometry args={[r, r + 0.1, RPV.bodyHeight, 20]} />
         <primitive object={steelMat} attach="material" />
       </mesh>
       {/* RPV bottom hemispherical head */}
       <mesh position={[0, RPV.bodyBottomY, 0]} castShadow>
-        <sphereGeometry args={[r + 0.1, 36, 18, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />
+        <sphereGeometry args={[r + 0.1, 20, 10, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />
         <primitive object={steelMat} attach="material" />
       </mesh>
       {/* Top flange ring */}
       <mesh position={[0, RPV.flangeY, 0]} castShadow>
-        <cylinderGeometry args={[r + 0.25, r + 0.25, 1.0, 36]} />
+        <cylinderGeometry args={[r + 0.25, r + 0.25, 1.0, 20]} />
         <primitive object={darkSteelMat} attach="material" />
       </mesh>
       {/* Top hemispherical head */}
       <mesh position={[0, RPV.flangeY, 0]} castShadow>
-        <sphereGeometry args={[r, 36, 18, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <sphereGeometry args={[r, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />
         <primitive object={steelMat} attach="material" />
       </mesh>
       {/* Closure studs around flange */}
       <group ref={studRotRef} position={[0, RPV.flangeY, 0]}>
-        {Array.from({ length: 32 }).map((_, i) => {
-          const a = (i / 32) * Math.PI * 2;
+        {Array.from({ length: 16 }).map((_, i) => {
+          const a = (i / 16) * Math.PI * 2;
           return (
             <mesh key={i} position={[Math.cos(a) * (r + 0.25), 0.5, Math.sin(a) * (r + 0.25)]} castShadow>
-              <cylinderGeometry args={[0.08, 0.08, 1.5, 8]} />
+              <cylinderGeometry args={[0.08, 0.08, 1.5, 6]} />
               <primitive object={safetyYellowMat} attach="material" />
             </mesh>
           );
@@ -168,7 +168,7 @@ function ReactorVessel() {
       <group ref={crdGroupRef} position={[0, RPV.flangeY + 2.2, 0]}>
         {crdPositions.map(([cx, cz], i) => (
           <mesh key={`crd-shuok-${i}`} position={[cx, 0, cz]} castShadow>
-            <cylinderGeometry args={[0.045, 0.045, 2.2, 8]} />
+            <cylinderGeometry args={[0.045, 0.045, 2.2, 6]} />
             <primitive object={i === 0 ? safetyYellowMat : darkSteelMat} attach="material" />
           </mesh>
         ))}
@@ -176,7 +176,7 @@ function ReactorVessel() {
 
       {/* Central inspection aperture with Cherenkov glow */}
       <mesh position={[0, RPV.headTopY, 0]}>
-        <cylinderGeometry args={[0.8, 0.8, 0.4, 16]} />
+        <cylinderGeometry args={[0.8, 0.8, 0.4, 14]} />
         <meshStandardMaterial color="#0a0a12" roughness={0.2} metalness={0.1} />
       </mesh>
       {/* Volumetric Cherenkov radiation glow inside RPV and active zone */}
@@ -195,12 +195,12 @@ function ReactorVessel() {
         return (
           <group key={`hot-nozzle-${i}`} position={[nx, 15.2, nz]} rotation={[0, -a, 0]}>
             <mesh castShadow rotation={[0, 0, Math.PI / 2]}>
-              <cylinderGeometry args={[0.54, 0.58, 1.4, 20]} />
+              <cylinderGeometry args={[0.54, 0.58, 1.4, 14]} />
               <primitive object={darkSteelMat} attach="material" />
             </mesh>
             {/* Утолщенный фланец и приварной воротник */}
             <mesh position={[0.4, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-              <cylinderGeometry args={[0.64, 0.64, 0.22, 20]} />
+              <cylinderGeometry args={[0.64, 0.64, 0.22, 14]} />
               <primitive object={steelMat} attach="material" />
             </mesh>
           </group>
@@ -215,11 +215,11 @@ function ReactorVessel() {
         return (
           <group key={`cold-nozzle-${i}`} position={[nx, 14.1, nz]} rotation={[0, -a, 0]}>
             <mesh castShadow rotation={[0, 0, Math.PI / 2]}>
-              <cylinderGeometry args={[0.52, 0.56, 1.4, 20]} />
+              <cylinderGeometry args={[0.52, 0.56, 1.4, 14]} />
               <primitive object={darkSteelMat} attach="material" />
             </mesh>
             <mesh position={[0.4, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-              <cylinderGeometry args={[0.62, 0.62, 0.22, 20]} />
+              <cylinderGeometry args={[0.62, 0.62, 0.22, 14]} />
               <primitive object={steelMat} attach="material" />
             </mesh>
           </group>
@@ -234,7 +234,7 @@ function ReactorVessel() {
         return (
           <group key={`eccs-nozzle-${ei}`} position={[ex, ey, ez]} rotation={[0, -ea, 0]}>
             <mesh castShadow rotation={[0, 0, Math.PI / 2]}>
-              <cylinderGeometry args={[0.26, 0.28, 0.8, 14]} />
+              <cylinderGeometry args={[0.26, 0.28, 0.8, 12]} />
               <primitive object={darkSteelMat} attach="material" />
             </mesh>
           </group>
@@ -242,7 +242,7 @@ function ReactorVessel() {
       })}
       {/* RPV support skirt */}
       <mesh position={[0, RPV.bodyBottomY - 0.5, 0]} castShadow>
-        <cylinderGeometry args={[r + 0.3, r + 0.5, 1, 36, 1, true]} />
+        <cylinderGeometry args={[r + 0.3, r + 0.5, 1, 20, 1, true]} />
         <primitive object={darkSteelMat} attach="material" />
       </mesh>
     </group>
@@ -261,16 +261,16 @@ function SteamGenerator({ index }: { index: number }) {
     <group position={[cx, STEAM_GEN.centerY, cz]} rotation={[0, -angle + Math.PI / 2, Math.PI / 2]}>
       {/* Horizontal cylindrical shell in Rosatom safety lime-green (#8DB600) */}
       <mesh castShadow receiveShadow>
-        <cylinderGeometry args={[rad, rad, len, 32]} />
+        <cylinderGeometry args={[rad, rad, len, 18]} />
         <primitive object={rosatomLimeGreenMat} attach="material" />
       </mesh>
       {/* Dished ends in Rosatom safety lime-green */}
       <mesh position={[0, len / 2, 0]} castShadow>
-        <sphereGeometry args={[rad, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <sphereGeometry args={[rad, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />
         <primitive object={rosatomLimeGreenMat} attach="material" />
       </mesh>
       <mesh position={[0, -len / 2, 0]} rotation={[Math.PI, 0, 0]} castShadow>
-        <sphereGeometry args={[rad, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <sphereGeometry args={[rad, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />
         <primitive object={rosatomLimeGreenMat} attach="material" />
       </mesh>
       {/* Heavy support saddles */}
@@ -284,17 +284,17 @@ function SteamGenerator({ index }: { index: number }) {
       </mesh>
       {/* Steam collector manifold on top */}
       <mesh position={[rad - 0.2, len / 4, 0]} rotation={[0, 0, Math.PI / 2.5]} castShadow>
-        <cylinderGeometry args={[0.55, 0.55, 2.5, 16]} />
+        <cylinderGeometry args={[0.55, 0.55, 2.5, 12]} />
         <primitive object={pipeMat} attach="material" />
       </mesh>
       {/* Steam relief safety valve cluster */}
       <mesh position={[rad + 1.2, len / 4, 0]} rotation={[0, 0, Math.PI / 2.5]} castShadow>
-        <cylinderGeometry args={[0.3, 0.3, 0.6, 12]} />
+        <cylinderGeometry args={[0.3, 0.3, 0.6, 10]} />
         <primitive object={safetyYellowMat} attach="material" />
       </mesh>
       {/* Feedwater inlet nozzle on bottom */}
       <mesh position={[-rad + 0.2, -len / 4, 0]} rotation={[0, 0, -Math.PI / 2.5]} castShadow>
-        <cylinderGeometry args={[0.42, 0.42, 2, 14]} />
+        <cylinderGeometry args={[0.42, 0.42, 2, 10]} />
         <primitive object={pipeMat} attach="material" />
       </mesh>
       {/* Service inspection catwalk alongside steam generator */}
@@ -331,12 +331,12 @@ function MainCoolantPump({ index }: { index: number }) {
     <group position={[px, MCP.centerY, pz]} rotation={[0, -angle, 0]}>
       {/* Pump casing */}
       <mesh position={[0, -1, 0]} castShadow>
-        <cylinderGeometry args={[MCP.radius, MCP.radius + 0.2, 2, 20]} />
+        <cylinderGeometry args={[MCP.radius, MCP.radius + 0.2, 2, 14]} />
         <primitive object={darkSteelMat} attach="material" />
       </mesh>
       {/* Motor housing */}
       <mesh position={[0, 1, 0]} castShadow>
-        <cylinderGeometry args={[0.7, 0.7, 2.5, 16]} />
+        <cylinderGeometry args={[0.7, 0.7, 2.5, 12]} />
         <meshStandardMaterial color="#3a4855" roughness={0.35} metalness={0.85} />
       </mesh>
       {/* Motor cooling fins */}
@@ -348,7 +348,7 @@ function MainCoolantPump({ index }: { index: number }) {
       ))}
       {/* Safety yellow coupling shroud */}
       <mesh position={[0, -0.05, 0]} castShadow>
-        <cylinderGeometry args={[0.82, 0.82, 0.4, 16]} />
+        <cylinderGeometry args={[0.82, 0.82, 0.4, 12]} />
         <primitive object={safetyYellowMat} attach="material" />
       </mesh>
       {/* Rotating indicator */}
@@ -427,12 +427,12 @@ function LoopPipe({ index }: { index: number }) {
     <group key={`primary-loop-${index}`}>
       {/* Горячая нитка Ду 850 (внешний диаметр ~1.05м с изоляцией) */}
       <mesh castShadow receiveShadow>
-        <tubeGeometry args={[hotLeg, 32, 0.48, 16, false]} />
+        <tubeGeometry args={[hotLeg, 20, 0.48, 10, false]} />
         <primitive object={pipeMat} attach="material" />
       </mesh>
       {/* Холодная нитка Ду 850 */}
       <mesh castShadow receiveShadow>
-        <tubeGeometry args={[coldLeg, 36, 0.46, 16, false]} />
+        <tubeGeometry args={[coldLeg, 22, 0.46, 10, false]} />
         <primitive object={pipeMat} attach="material" />
       </mesh>
 
@@ -441,7 +441,7 @@ function LoopPipe({ index }: { index: number }) {
         const pt = hotLeg.getPoint(tVal);
         return (
           <mesh key={`hot-band-${bi}`} position={pt}>
-            <cylinderGeometry args={[0.52, 0.52, 0.12, 16]} />
+            <cylinderGeometry args={[0.52, 0.52, 0.12, 10]} />
             <primitive object={steelMat} attach="material" />
           </mesh>
         );
@@ -452,7 +452,7 @@ function LoopPipe({ index }: { index: number }) {
         const pt = coldLeg.getPoint(tVal);
         return (
           <mesh key={`cold-band-${bi}`} position={pt}>
-            <cylinderGeometry args={[0.50, 0.50, 0.12, 16]} />
+            <cylinderGeometry args={[0.50, 0.50, 0.12, 10]} />
             <primitive object={steelMat} attach="material" />
           </mesh>
         );
@@ -461,7 +461,7 @@ function LoopPipe({ index }: { index: number }) {
       {/* Сейсмические гидроамортизаторы (гидравлические демпферы защиты при землетрясениях) */}
       <group position={snubberHotPoint}>
         <mesh position={[0, -0.6, 0]}>
-          <cylinderGeometry args={[0.12, 0.12, 1.2, 12]} />
+          <cylinderGeometry args={[0.12, 0.12, 1.2, 8]} />
           <primitive object={safetyYellowMat} attach="material" />
         </mesh>
         <mesh position={[0, -1.2, 0]}>
@@ -472,7 +472,7 @@ function LoopPipe({ index }: { index: number }) {
 
       <group position={snubberColdPoint}>
         <mesh position={[0, -0.5, 0]}>
-          <cylinderGeometry args={[0.11, 0.11, 1.0, 12]} />
+          <cylinderGeometry args={[0.11, 0.11, 1.0, 8]} />
           <primitive object={safetyYellowMat} attach="material" />
         </mesh>
         <mesh position={[0, -1.0, 0]}>
@@ -483,11 +483,11 @@ function LoopPipe({ index }: { index: number }) {
 
       {/* Внутреннее свечение потока */}
       <mesh>
-        <tubeGeometry args={[hotLeg, 28, 0.18, 8, false]} />
+        <tubeGeometry args={[hotLeg, 16, 0.18, 6, false]} />
         <meshBasicMaterial ref={flowMatRef} color="#ff3300" transparent opacity={0.5} />
       </mesh>
       <mesh>
-        <tubeGeometry args={[coldLeg, 32, 0.16, 8, false]} />
+        <tubeGeometry args={[coldLeg, 18, 0.16, 6, false]} />
         <meshBasicMaterial color="#0099ff" transparent opacity={0.3} />
       </mesh>
     </group>

@@ -280,11 +280,11 @@ function HeavyShieldAccessDoor({
       {/* Mechanical Central Locking Handwheel */}
       <group position={[0, 0, 0.38]}>
         <mesh ref={wheelRef}>
-          <torusGeometry args={[0.32, 0.035, 12, 24]} />
+          <torusGeometry args={[0.32, 0.035, 8, 14]} />
           <primitive object={safetyYellowMat} attach="material" />
         </mesh>
         <mesh rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.06, 0.06, 0.15, 12]} />
+          <cylinderGeometry args={[0.06, 0.06, 0.15, 8]} />
           <primitive object={darkSteelMat} attach="material" />
         </mesh>
         {/* Wheel 4 spokes */}
@@ -334,49 +334,49 @@ export default function CoreCatcher() {
     <group>
       {/* 1. Subterranean Heavy Foundation Slab at -10.0m / -10.2m */}
       <mesh position={[0, -10.25, 0]} receiveShadow castShadow>
-        <cylinderGeometry args={[vaultRadius + 1.2, vaultRadius + 1.2, 0.5, 48]} />
+        <cylinderGeometry args={[vaultRadius + 1.2, vaultRadius + 1.2, 0.5, 24]} />
         <primitive object={concreteShieldMat} attach="material" />
       </mesh>
       {/* Foundation diamond-plate inspection floor ring */}
       <mesh position={[0, -9.98, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <ringGeometry args={[CORE_CATCHER.bottomRadius + 0.5, vaultRadius - 0.2, 48]} />
+        <ringGeometry args={[CORE_CATCHER.bottomRadius + 0.5, vaultRadius - 0.2, 24]} />
         <primitive object={diamondPlateMat} attach="material" side={THREE.DoubleSide} />
       </mesh>
 
       {/* 2. Thick Concrete Biological Shielding Walls enclosing Core Catcher Vault */}
       {/* Outer reinforced concrete biological shielding cylinder (1.2m thick) */}
       <mesh position={[0, -7.5, 0]} receiveShadow castShadow>
-        <cylinderGeometry args={[vaultRadius, vaultRadius, vaultHeight, 64, 1, true]} />
+        <cylinderGeometry args={[vaultRadius, vaultRadius, vaultHeight, 28, 1, true]} />
         <primitive object={concreteShieldMat} attach="material" />
       </mesh>
 
       {/* Vault Ceiling Slab at -5.0m (acts as DCS Server Room floor support) */}
       <mesh position={[0, -5.15, 0]} receiveShadow castShadow>
-        <cylinderGeometry args={[vaultRadius + 0.2, vaultRadius + 0.2, 0.35, 48]} />
+        <cylinderGeometry args={[vaultRadius + 0.2, vaultRadius + 0.2, 0.35, 24]} />
         <primitive object={concreteShieldMat} attach="material" />
       </mesh>
 
       {/* Inner biological shielding pit wall directly around the core catcher funnel */}
       <mesh position={[0, -7.5, 0]} receiveShadow>
-        <cylinderGeometry args={[CORE_CATCHER.shieldRadius, CORE_CATCHER.shieldRadius, vaultHeight, 48, 1, true]} />
+        <cylinderGeometry args={[CORE_CATCHER.shieldRadius, CORE_CATCHER.shieldRadius, vaultHeight, 24, 1, true]} />
         <primitive object={concreteShieldMat} attach="material" />
       </mesh>
 
       {/* 3. Conical Core Catcher Guide Funnel (направляющая воронка) directly under RPV */}
       {/* Upper guide funnel widening towards RPV cavity base */}
       <mesh position={[0, -5.2, 0]} castShadow receiveShadow>
-        <cylinderGeometry args={[CORE_CATCHER.openingRadius, CORE_CATCHER.topRadius, 1.6, 48, 1, true]} />
+        <cylinderGeometry args={[CORE_CATCHER.openingRadius, CORE_CATCHER.topRadius, 1.6, 24, 1, true]} />
         <primitive object={refractorySteelMat} attach="material" />
       </mesh>
 
       {/* Main Core Catcher Truncated Conical Vessel (корпус ловушки расплава) */}
       <mesh position={[0, centerY, 0]} castShadow receiveShadow>
-        <cylinderGeometry args={[CORE_CATCHER.topRadius, CORE_CATCHER.bottomRadius, height, 48, 1, true]} />
+        <cylinderGeometry args={[CORE_CATCHER.topRadius, CORE_CATCHER.bottomRadius, height, 24, 1, true]} />
         <primitive object={refractorySteelMat} attach="material" />
       </mesh>
       {/* Heavy bottom dished plate of containment vessel */}
       <mesh position={[0, CORE_CATCHER.bottomY + 0.15, 0]} castShadow>
-        <cylinderGeometry args={[CORE_CATCHER.bottomRadius * 0.95, CORE_CATCHER.bottomRadius, 0.3, 40]} />
+        <cylinderGeometry args={[CORE_CATCHER.bottomRadius * 0.95, CORE_CATCHER.bottomRadius, 0.3, 20]} />
         <primitive object={refractorySteelMat} attach="material" />
       </mesh>
 
@@ -385,7 +385,7 @@ export default function CoreCatcher() {
 
       {/* 5. Translucent Annular Water Cooling Jacket surrounding vessel */}
       <mesh position={[0, centerY, 0]}>
-        <cylinderGeometry args={[CORE_CATCHER.topRadius + 0.45, CORE_CATCHER.bottomRadius + 0.45, height + 0.2, 48, 1, true]} />
+        <cylinderGeometry args={[CORE_CATCHER.topRadius + 0.45, CORE_CATCHER.bottomRadius + 0.45, height + 0.2, 24, 1, true]} />
         <primitive object={waterJacketMat} attach="material" />
       </mesh>
 

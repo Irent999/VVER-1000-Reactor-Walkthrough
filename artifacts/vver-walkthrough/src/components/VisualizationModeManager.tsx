@@ -35,10 +35,12 @@ export default function VisualizationModeManager({ mode }: VisualizationModeMana
   const { scene, gl } = useThree();
   const prevMode = useRef<RenderVisualizationMode>('standard');
   const originalMaterials = useRef<Map<THREE.Mesh, THREE.Material | THREE.Material[]>>(new Map());
+  const thermalCoreMeshes = useRef<THREE.Mesh[]>([]);
 
   // Сохраняем и восстанавливаем материалы при переключении
   useEffect(() => {
     if (prevMode.current === mode) return;
+    thermalCoreMeshes.current = [];
 
     if (mode === 'standard') {
       // Восстанавливаем оригинальные материалы
@@ -104,6 +106,10 @@ export default function VisualizationModeManager({ mode }: VisualizationModeMana
           });
 
           obj.material = thermalMat;
+
+          if (name.includes('core') || name.includes('rpv')) {
+            thermalCoreMeshes.current.push(obj);
+          }
         }
       });
     } else if (mode === 'wireframe') {
@@ -142,23 +148,23 @@ export default function VisualizationModeManager({ mode }: VisualizationModeMana
     prevMode.current = mode;
   }, [mode, scene, gl]);
 
-  // Непрерывный мониторинг температур оборудования для тепловизора
+  // Непрерывный мониторинг температур оборудования для тепловизора без обхода всей сцены
   useFrame((state) => {
-    if (mode !== 'thermal') return;
+    if (mode !== 'thermal' || thermalCoreMeshes.current.length === 0) return;
     const v = reactorStateManager.vverState;
     const t = state.clock.elapsedTime;
 
     // Пульсация температуры активной зоны при работе
     const pulse = Math.sin(t * 2.0) * 0.1;
-    scene.traverse((obj) => {
-      if (obj instanceof THREE.Mesh && obj.material instanceof THREE.MeshStandardMaterial) {
-        const name = (obj.name || obj.parent?.name || '').toLowerCase();
-        if (name.includes('core') || name.includes('rpv')) {
-          const powerRatio = v.scramActive ? 0.2 : v.powerPercent / 100;
-          obj.material.emissiveIntensity = 0.5 + powerRatio * 0.5 + pulse * 0.1;
-        }
+    const powerRatio = v.scramActive ? 0.2 : v.powerPercent / 100;
+    const targetIntensity = 0.5 + powerRatio * 0.5 + pulse * 0.1;
+
+    for (let i = 0; i < thermalCoreMeshes.current.length; i++) {
+      const obj = thermalCoreMeshes.current[i];
+      if (obj.material instanceof THREE.MeshStandardMaterial) {
+        obj.material.emissiveIntensity = targetIntensity;
       }
-    });
+    }
   });
 
   return null;

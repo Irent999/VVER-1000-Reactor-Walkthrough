@@ -129,17 +129,23 @@ export default function EmergencyAlarmSystem() {
     };
   }, []);
 
+  const wasScram = useRef(false);
+
   useFrame((state) => {
     const isScram = reactorStateManager.vverState.scramActive;
     const t = state.clock.elapsedTime;
 
     if (!isScram) {
-      if (reactorHallStrobeRef.current) reactorHallStrobeRef.current.intensity = 0;
-      if (mcrStrobeRef.current) mcrStrobeRef.current.intensity = 0;
-      if (beaconMeshRef.current) (beaconMeshRef.current.material as THREE.MeshBasicMaterial).color.set('#330000');
-      if (mcrBeaconRef.current) (mcrBeaconRef.current.material as THREE.MeshBasicMaterial).color.set('#330000');
+      if (wasScram.current) {
+        wasScram.current = false;
+        if (reactorHallStrobeRef.current) reactorHallStrobeRef.current.intensity = 0;
+        if (mcrStrobeRef.current) mcrStrobeRef.current.intensity = 0;
+        if (beaconMeshRef.current) (beaconMeshRef.current.material as THREE.MeshBasicMaterial).color.set('#330000');
+        if (mcrBeaconRef.current) (mcrBeaconRef.current.material as THREE.MeshBasicMaterial).color.set('#330000');
+      }
       return;
     }
+    wasScram.current = true;
 
     // Резкий аварийный импульс стробоскопа (частота 2.4 Гц)
     const strobePhase = (t * 2.4) % 1.0;

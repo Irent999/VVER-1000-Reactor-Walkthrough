@@ -338,7 +338,7 @@ export default function VVER1000AuxiliaryBuilding({ children }: VVER1000Auxiliar
         {[-4.0, 4.0].map((cx, ci) => (
           <group key={`roof-chiller-${ci}`} position={[cx, 1.0, 7.0]}>
             <mesh castShadow>
-              <cylinderGeometry args={[1.5, 1.5, 1.8, 16]} />
+              <cylinderGeometry args={[1.5, 1.5, 1.8, 10]} />
               <primitive object={steelTrussMat} attach="material" />
             </mesh>
           </group>

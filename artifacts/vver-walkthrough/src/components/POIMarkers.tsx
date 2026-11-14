@@ -15,13 +15,14 @@ function POIMarker({ poi, onSelect }: POIMarkerProps) {
   const [hovered, setHovered] = useState(false);
 
   useFrame((state) => {
+    if (!hovered) return;
     const t = state.clock.elapsedTime;
     if (ringRef.current) {
-      const s = 1 + Math.sin(t * 2.5) * 0.2 + (hovered ? 0.5 : 0);
+      const s = 1.3 + Math.sin(t * 3.5) * 0.2;
       ringRef.current.scale.set(s, s, 1);
     }
     if (coreRef.current) {
-      coreRef.current.scale.setScalar(hovered ? 1.5 : 1);
+      coreRef.current.scale.setScalar(1.4);
     }
   });
 

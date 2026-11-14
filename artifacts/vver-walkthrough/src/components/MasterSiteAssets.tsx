@@ -135,19 +135,19 @@ export function VVERUnit2({
       <group position={[0, 0, 0]} name="VVERUnit2_Containment">
         {/* Concrete Foundation Base Ring (Строго на одной горизонтальной плоскости с энергоблоком №1: Y = -5.25м) */}
         <mesh position={[0, fCenterY, 0]} castShadow receiveShadow>
-          <cylinderGeometry args={[fRadius, fRadius, fThick, 64]} />
+          <cylinderGeometry args={[fRadius, fRadius, fThick, 32]} />
           <primitive object={concreteDarkMat} attach="material" />
         </mesh>
 
         {/* Cylindrical Containment Shell (Строго одинаковая высота 37.5м, центр Y = 13.75м) */}
-        <mesh position={[0, wallCenterY, 0]} castShadow receiveShadow>
-          <cylinderGeometry args={[R, R, wallH, 64]} />
+        <mesh position={[0, wallCenterY, 0]} receiveShadow>
+          <cylinderGeometry args={[R, R, wallH, 20]} />
           <primitive object={exteriorConcreteMat} attach="material" />
         </mesh>
 
         {/* Spherical Containment Dome (Центр сферы на отметке верха цилиндра Y = 32.5м, радиус 23.2м, верхняя точка купола = +55.7м) */}
-        <mesh position={[0, domeCenterY, 0]} castShadow receiveShadow>
-          <sphereGeometry args={[R, 64, 32, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <mesh position={[0, domeCenterY, 0]} receiveShadow>
+          <sphereGeometry args={[R, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />
           <primitive object={exteriorConcreteMat} attach="material" />
         </mesh>
 
@@ -169,7 +169,7 @@ export function VVERUnit2({
         {/* Ventilation Stack Unit 2 */}
         <group position={[-22, gY, -16]}>
           <mesh position={[0, 1.5, 0]} castShadow>
-            <cylinderGeometry args={[2.6, 3.0, 3, 16]} />
+            <cylinderGeometry args={[2.6, 3.0, 3, 12]} />
             <primitive object={concreteDarkMat} attach="material" />
           </mesh>
           {Array.from({ length: 7 }).map((_, i) => {
@@ -177,7 +177,7 @@ export function VVERUnit2({
             const isRed = i % 2 === 0;
             return (
               <mesh key={`u2-vent-${i}`} position={[0, y, 0]} castShadow>
-                <cylinderGeometry args={[1.6, 1.6, 58 / 7, 20]} />
+                <cylinderGeometry args={[1.6, 1.6, 58 / 7, 12]} />
                 <primitive object={isRed ? ventRedBandMat : ventWhiteBandMat} attach="material" />
               </mesh>
             );
@@ -185,7 +185,7 @@ export function VVERUnit2({
           {/* External Access Ladder & Platforms */}
           {[20, 36, 52].map((py, pi) => (
             <mesh key={`u2-vplat-${pi}`} position={[0, py, 0]}>
-              <cylinderGeometry args={[2.4, 2.4, 0.4, 16]} />
+              <cylinderGeometry args={[2.4, 2.4, 0.4, 12]} />
               <primitive object={steelTrussMat} attach="material" />
             </mesh>
           ))}
@@ -320,7 +320,7 @@ export function InterUnitOverheadPipeBridge() {
       {/* Running Insulated Inter-Unit Steam & Feedwater Pipe Bundle on top */}
       {[-1.4, -0.5, 0.5, 1.4].map((px, pi) => (
         <mesh key={`bundle-p-${pi}`} position={[px, 2.4, 0]}>
-          <cylinderGeometry args={[0.32, 0.32, lenZ + 2, 16]} />
+          <cylinderGeometry args={[0.32, 0.32, lenZ + 2, 10]} />
           <primitive object={pipeInsulatedMat} attach="material" />
         </mesh>
       ))}
@@ -365,12 +365,12 @@ export function CylindricalWaterStorageTanks({ position = [64, 0, 86] }: { posit
         <group key={`tank-${ti}`} position={[tx, gY + 1.2, 0]}>
           {/* Main Tank Cylindrical Shell */}
           <mesh position={[0, tankHeight / 2, 0]} castShadow receiveShadow>
-            <cylinderGeometry args={[tankRadius, tankRadius, tankHeight, 32]} />
+            <cylinderGeometry args={[tankRadius, tankRadius, tankHeight, 18]} />
             <primitive object={waterTankDarkMat} attach="material" />
           </mesh>
           {/* Conical Tank Roof */}
           <mesh position={[0, tankHeight + 1.6, 0]} castShadow>
-            <coneGeometry args={[tankRadius + 0.3, 3.2, 32]} />
+            <coneGeometry args={[tankRadius + 0.3, 3.2, 18]} />
             <primitive object={waterTankDarkMat} attach="material" />
           </mesh>
           {/* Spiral / Vertical Access Ladder & Cage */}
@@ -383,7 +383,7 @@ export function CylindricalWaterStorageTanks({ position = [64, 0, 86] }: { posit
 
       {/* Interconnecting Process Piping */}
       <mesh position={[0, gY + 3.2, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <cylinderGeometry args={[0.4, 0.4, 24, 16]} />
+        <cylinderGeometry args={[0.4, 0.4, 24, 10]} />
         <primitive object={pipeInsulatedMat} attach="material" />
       </mesh>
     </group>

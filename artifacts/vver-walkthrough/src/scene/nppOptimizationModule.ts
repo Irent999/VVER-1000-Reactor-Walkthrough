@@ -221,12 +221,12 @@ export function configureNPPRenderer(
   options: NPPRendererOptimizationOptions = {}
 ): void {
   const {
-    maxPixelRatio = 2.0,
-    enableSoftShadows = true,
-    shadowMapSize = 1024,
+    maxPixelRatio = 1.5,
+    enableSoftShadows = false,
+    shadowMapSize = 512,
   } = options;
 
-  // Ограничение PixelRatio до Math.min(window.devicePixelRatio, 2)
+  // Ограничение PixelRatio до Math.min(window.devicePixelRatio, 1.5)
   const currentDpr = typeof window !== 'undefined' ? window.devicePixelRatio : 1;
   const clampedDpr = Math.min(currentDpr, maxPixelRatio);
   renderer.setPixelRatio(clampedDpr);
@@ -236,10 +236,10 @@ export function configureNPPRenderer(
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.08;
 
-  // Оптимизация теней
+  // Оптимизация теней: быстрый PCFShadowMap без тяжелых многопроходных сэмплов
   if (enableSoftShadows) {
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     renderer.shadowMap.autoUpdate = true;
   } else {
     renderer.shadowMap.enabled = false;
@@ -316,11 +316,11 @@ export function applySceneOptimizations(
           obj.geometry.computeBoundingBox();
         }
 
-        // 3. Отключение теней для мелких и вспомогательных объектов (повышение FPS)
-        if (disableSmallShadowCasters && obj.castShadow && obj.geometry.boundingSphere) {
+        // 3. Отключение теней для мелких и второстепенных объектов (резкое повышение FPS)
+        if (disableSmallShadowCasters && obj.geometry.boundingSphere) {
           const radius = obj.geometry.boundingSphere.radius * Math.max(obj.scale.x, obj.scale.y, obj.scale.z);
           const name = (obj.name || obj.parent?.name || '').toLowerCase();
-          const isDecorative =
+          const isSecondaryOrInterior =
             name.includes('fence') ||
             name.includes('curb') ||
             name.includes('rail') ||
@@ -329,10 +329,31 @@ export function applySceneOptimizations(
             name.includes('reed') ||
             name.includes('shrub') ||
             name.includes('light') ||
-            name.includes('marker');
-          if (radius < 0.9 || isDecorative) {
+            name.includes('marker') ||
+            name.includes('pipe') ||
+            name.includes('valve') ||
+            name.includes('cable') ||
+            name.includes('step') ||
+            name.includes('stair') ||
+            name.includes('handrail') ||
+            name.includes('console') ||
+            name.includes('screen') ||
+            name.includes('switch') ||
+            name.includes('button') ||
+            name.includes('chair') ||
+            name.includes('cabinet') ||
+            name.includes('plate') ||
+            name.includes('nozzle') ||
+            name.includes('flange') ||
+            name.includes('tree') ||
+            name.includes('pebble');
+
+          if (obj.castShadow && (radius < 2.5 || isSecondaryOrInterior)) {
             obj.castShadow = false;
             stats.shadowCastersCulled++;
+          }
+          if (obj.receiveShadow && (radius < 1.0 || isSecondaryOrInterior)) {
+            obj.receiveShadow = false;
           }
         }
       }

@@ -574,7 +574,7 @@ export class MCRCanvasMonitorRenderer {
   }
 
   public update(now: number = performance.now()) {
-    if (now - this.lastRenderTime < 33) return; // 30 FPS cap
+    if (now - this.lastRenderTime < 100) return; // 10 FPS monitor refresh rate (optimal for SCADA screens)
     this.lastRenderTime = now;
 
     if (this.reactorId === 'vver1000') {

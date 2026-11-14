@@ -151,7 +151,7 @@ function SafetyHandrail({
   const angle = Math.atan2(dz, dx);
   const midX = (start[0] + end[0]) / 2;
   const midZ = (start[1] + end[1]) / 2;
-  const postSpacing = 2.4;
+  const postSpacing = 4.5;
   const postCount = Math.max(2, Math.floor(length / postSpacing) + 1);
 
   return (
@@ -176,7 +176,7 @@ function SafetyHandrail({
         const px = -length / 2 + (i / (postCount - 1)) * length;
         return (
           <mesh key={`hpost-${i}`} position={[px, height / 2, 0]}>
-            <cylinderGeometry args={[0.03, 0.03, height, 6]} />
+            <cylinderGeometry args={[0.03, 0.03, height, 5]} />
             <primitive object={safetyHandrailMat} attach="material" />
           </mesh>
         );
@@ -289,7 +289,7 @@ function OverheadBridgeCrane({ hallSpan = 33, positionX = 77 }: { hallSpan?: num
           </mesh>
           {[-2.0, 2.0].map((wx) => (
             <mesh key={`wheel-${wx}`} position={[wx, -0.4, 0]} rotation={[0, 0, Math.PI / 2]}>
-              <cylinderGeometry args={[0.42, 0.42, 0.35, 16]} />
+              <cylinderGeometry args={[0.42, 0.42, 0.35, 12]} />
               <primitive object={machinedSteelMat} attach="material" />
             </mesh>
           ))}
@@ -303,11 +303,11 @@ function OverheadBridgeCrane({ hallSpan = 33, positionX = 77 }: { hallSpan?: num
           <primitive object={craneYellowMat} attach="material" />
         </mesh>
         <mesh position={[-0.8, 0.8, 0]} rotation={[0, 0, Math.PI / 2]}>
-          <cylinderGeometry args={[0.7, 0.7, 2.6, 16]} />
+          <cylinderGeometry args={[0.7, 0.7, 2.6, 12]} />
           <primitive object={machinedSteelMat} attach="material" />
         </mesh>
         <mesh position={[1.1, 0.6, 0]} rotation={[0, 0, Math.PI / 2]}>
-          <cylinderGeometry args={[0.45, 0.45, 2.2, 16]} />
+          <cylinderGeometry args={[0.45, 0.45, 2.2, 12]} />
           <primitive object={machinedSteelMat} attach="material" />
         </mesh>
         <mesh position={[-0.8, 0.8, -1.8]}>
@@ -315,7 +315,7 @@ function OverheadBridgeCrane({ hallSpan = 33, positionX = 77 }: { hallSpan?: num
           <primitive object={turbineDarkMetalMat} attach="material" />
         </mesh>
         <mesh position={[-0.8, -4.5, 0]}>
-          <cylinderGeometry args={[0.04, 0.04, 8, 8]} />
+          <cylinderGeometry args={[0.04, 0.04, 8, 6]} />
           <primitive object={structuralSteelMat} attach="material" />
         </mesh>
         <mesh position={[-0.8, -8.6, 0]} castShadow>
@@ -323,7 +323,7 @@ function OverheadBridgeCrane({ hallSpan = 33, positionX = 77 }: { hallSpan?: num
           <primitive object={craneYellowMat} attach="material" />
         </mesh>
         <mesh position={[-0.8, -9.8, 0]}>
-          <torusGeometry args={[0.45, 0.16, 8, 16, Math.PI * 1.5]} />
+          <torusGeometry args={[0.45, 0.16, 6, 12, Math.PI * 1.5]} />
           <primitive object={machinedSteelMat} attach="material" />
         </mesh>
       </group>
@@ -379,7 +379,7 @@ function TurboGeneratorSet() {
 
       {/* Continuous Polished Steel Rotor Shaft Line */}
       <mesh position={[77, shaftY, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <cylinderGeometry args={[0.65, 0.65, 80, 24]} />
+        <cylinderGeometry args={[0.65, 0.65, 80, 14]} />
         <primitive object={machinedSteelMat} attach="material" />
       </mesh>
 
@@ -390,7 +390,7 @@ function TurboGeneratorSet() {
       <group position={[38, shaftY, 0]}>
         {/* Main HP Turbine Outer Casing */}
         <mesh castShadow receiveShadow rotation={[0, 0, Math.PI / 2]}>
-          <cylinderGeometry args={[2.4, 2.6, 8.5, 24]} />
+          <cylinderGeometry args={[2.4, 2.6, 8.5, 16]} />
           <primitive object={turbineLimeOliveMat} attach="material" />
         </mesh>
         {/* Horizontal split-flange bolted joint ring */}
@@ -401,7 +401,7 @@ function TurboGeneratorSet() {
         {/* Stiffening annular rings */}
         {[-3.2, -1.1, 1.1, 3.2].map((rx) => (
           <mesh key={`hp-ring-${rx}`} position={[rx, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-            <cylinderGeometry args={[2.7, 2.7, 0.4, 24]} />
+            <cylinderGeometry args={[2.7, 2.7, 0.4, 16]} />
             <primitive object={turbineDarkMetalMat} attach="material" />
           </mesh>
         ))}
@@ -415,20 +415,20 @@ function TurboGeneratorSet() {
         ].map((v, vi) => (
           <group key={`hp-valve-${vi}`} position={v.pos}>
             <mesh castShadow>
-              <cylinderGeometry args={[0.65, 0.65, 1.8, 16]} />
+              <cylinderGeometry args={[0.65, 0.65, 1.8, 12]} />
               <primitive object={turbineDarkMetalMat} attach="material" />
             </mesh>
             <mesh position={[0, 1.3, 0]}>
-              <cylinderGeometry args={[0.42, 0.52, 0.9, 12]} />
+              <cylinderGeometry args={[0.42, 0.52, 0.9, 10]} />
               <primitive object={safetyHandrailMat} attach="material" />
             </mesh>
             <mesh position={[0, 1.85, 0]}>
-              <cylinderGeometry args={[0.55, 0.55, 0.12, 16]} />
+              <cylinderGeometry args={[0.55, 0.55, 0.12, 12]} />
               <primitive object={safetyHandrailMat} attach="material" />
             </mesh>
             {/* Steam feed pipe connecting from west wall interface */}
             <mesh position={[-4.5, 0.4, 0]} rotation={[0, 0, Math.PI / 2]}>
-              <cylinderGeometry args={[0.45, 0.45, 7.5, 16]} />
+              <cylinderGeometry args={[0.45, 0.45, 7.5, 12]} />
               <primitive object={steamPipeInsulatedMat} attach="material" />
             </mesh>
           </group>
@@ -438,7 +438,7 @@ function TurboGeneratorSet() {
         {[-8, 8].map((ez) => (
           <group key={`hp-exh-${ez}`} position={[3.2, -0.6, ez / 2]}>
             <mesh rotation={[Math.PI / 2, 0, 0]}>
-              <cylinderGeometry args={[0.7, 0.7, 4.5, 16]} />
+              <cylinderGeometry args={[0.7, 0.7, 4.5, 12]} />
               <primitive object={steamPipeInsulatedMat} attach="material" />
             </mesh>
           </group>
@@ -456,19 +456,19 @@ function TurboGeneratorSet() {
       ].map((spp, si) => (
         <group key={`spp-${si}`} position={[spp.x, 14.5, spp.z]}>
           <mesh castShadow receiveShadow>
-            <cylinderGeometry args={[1.8, 1.8, 8.5, 24]} />
+            <cylinderGeometry args={[1.8, 1.8, 8.5, 16]} />
             <primitive object={turbineLimeOliveMat} attach="material" />
           </mesh>
           <mesh position={[0, 4.25, 0]}>
-            <sphereGeometry args={[1.8, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />
+            <sphereGeometry args={[1.8, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
             <primitive object={turbineLimeOliveMat} attach="material" />
           </mesh>
           <mesh position={[0, -3.2, 0]}>
-            <cylinderGeometry args={[1.85, 1.95, 2.5, 24]} />
+            <cylinderGeometry args={[1.85, 1.95, 2.5, 16]} />
             <primitive object={turbineDarkMetalMat} attach="material" />
           </mesh>
           <mesh position={[0, 2.2, spp.z > 0 ? -4.0 : 4.0]} rotation={[Math.PI / 2, 0, 0]}>
-            <cylinderGeometry args={[0.6, 0.6, 7.0, 16]} />
+            <cylinderGeometry args={[0.6, 0.6, 7.0, 12]} />
             <primitive object={steamPipeInsulatedMat} attach="material" />
           </mesh>
         </group>
@@ -491,7 +491,7 @@ function TurboGeneratorSet() {
           </mesh>
           {/* Upper cylindrical curved roof */}
           <mesh position={[0, 3.2, 0]} rotation={[0, 0, Math.PI / 2]}>
-            <cylinderGeometry args={[4.1, 4.1, 10.4, 24, 1, false, 0, Math.PI]} />
+            <cylinderGeometry args={[4.1, 4.1, 10.4, 14, 1, false, 0, Math.PI]} />
             <primitive object={turbineLimeOliveMat} attach="material" />
           </mesh>
           <mesh position={[0, 0.2, 0]}>
@@ -508,14 +508,14 @@ function TurboGeneratorSet() {
           {[-2.2, 2.2].map((nz) => (
             <group key={`lp-inlet-${nz}`} position={[0, 5.2, nz]}>
               <mesh>
-                <cylinderGeometry args={[0.75, 0.75, 1.6, 16]} />
+                <cylinderGeometry args={[0.75, 0.75, 1.6, 12]} />
                 <primitive object={steamPipeInsulatedMat} attach="material" />
               </mesh>
             </group>
           ))}
           {[-2.8, 2.8].map((mx) => (
             <mesh key={`manhole-${mx}`} position={[mx, 2.8, 4.15]}>
-              <circleGeometry args={[0.42, 12]} />
+              <circleGeometry args={[0.42, 10]} />
               <primitive object={turbineDarkMetalMat} attach="material" />
             </mesh>
           ))}
@@ -530,7 +530,7 @@ function TurboGeneratorSet() {
             <primitive object={turbineDarkMetalMat} attach="material" />
           </mesh>
           <mesh position={[0, 1.8, 0]} rotation={[0, 0, Math.PI / 2]}>
-            <cylinderGeometry args={[1.1, 1.1, 2.65, 16]} />
+            <cylinderGeometry args={[1.1, 1.1, 2.65, 12]} />
             <primitive object={machinedSteelMat} attach="material" />
           </mesh>
         </group>
@@ -542,12 +542,12 @@ function TurboGeneratorSet() {
           ---------------------------------------------------------------------- */}
       <group position={[101, shaftY, 0]}>
         <mesh castShadow receiveShadow rotation={[0, 0, Math.PI / 2]}>
-          <cylinderGeometry args={[2.75, 2.75, 13.5, 28]} />
+          <cylinderGeometry args={[2.75, 2.75, 13.5, 16]} />
           <primitive object={turbineLimeOliveMat} attach="material" />
         </mesh>
         {[-6.8, 6.8].map((ex) => (
           <mesh key={`gen-shield-${ex}`} position={[ex, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-            <cylinderGeometry args={[2.85, 2.85, 0.8, 24]} />
+            <cylinderGeometry args={[2.85, 2.85, 0.8, 16]} />
             <primitive object={turbineDarkMetalMat} attach="material" />
           </mesh>
         ))}
@@ -560,7 +560,7 @@ function TurboGeneratorSet() {
         {[-1.6, 0, 1.6].map((bz) => (
           <group key={`busbar-${bz}`} position={[0, -3.2, bz]}>
             <mesh rotation={[Math.PI / 2, 0, 0]}>
-              <cylinderGeometry args={[0.55, 0.55, 14, 16]} />
+              <cylinderGeometry args={[0.55, 0.55, 14, 12]} />
               <primitive object={busbarHousingMat} attach="material" />
             </mesh>
           </group>
@@ -572,7 +572,7 @@ function TurboGeneratorSet() {
           ---------------------------------------------------------------------- */}
       <group position={[112, shaftY, 0]}>
         <mesh castShadow rotation={[0, 0, Math.PI / 2]}>
-          <cylinderGeometry args={[1.5, 1.5, 5.2, 20]} />
+          <cylinderGeometry args={[1.5, 1.5, 5.2, 14]} />
           <primitive object={turbineDarkMetalMat} attach="material" />
         </mesh>
         <mesh position={[0, 1.8, 1.4]}>

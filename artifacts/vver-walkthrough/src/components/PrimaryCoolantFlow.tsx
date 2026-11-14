@@ -23,6 +23,8 @@ const TOTAL_PARTICLES = 4 * (PARTICLES_PER_HOT_LEG + PARTICLES_PER_COLD_LEG + PA
  * 4. Нагрев в активной зоне реактора (снизу вверх с цветовым градиентом от синего к красному)
  * 5. Динамическая скорость потока по каждой петле согласно реальным RPM насосов ГЦЭН
  */
+const _tempCurvePt = new THREE.Vector3();
+
 export default function PrimaryCoolantFlow() {
   const instancedMeshRef = useRef<THREE.InstancedMesh>(null);
   const dummy = useMemo(() => new THREE.Object3D(), []);
@@ -142,10 +144,10 @@ export default function PrimaryCoolantFlow() {
       // 1. Частицы горячей нитки (RPV -> SG)
       for (let p = 0; p < PARTICLES_PER_HOT_LEG; p++) {
         const t = (baseOffset + p / PARTICLES_PER_HOT_LEG) % 1.0;
-        const pt = hotCurve.getPoint(t);
+        hotCurve.getPoint(t, _tempCurvePt);
         const scale = 0.16 + Math.sin(t * Math.PI) * 0.05;
 
-        dummy.position.copy(pt);
+        dummy.position.copy(_tempCurvePt);
         dummy.scale.set(scale, scale, scale);
         dummy.updateMatrix();
 
@@ -156,10 +158,10 @@ export default function PrimaryCoolantFlow() {
       // 2. Частицы холодной нитки (SG -> MCP -> RPV)
       for (let p = 0; p < PARTICLES_PER_COLD_LEG; p++) {
         const t = (baseOffset + p / PARTICLES_PER_COLD_LEG) % 1.0;
-        const pt = coldCurve.getPoint(t);
+        coldCurve.getPoint(t, _tempCurvePt);
         const scale = 0.15 + Math.sin(t * Math.PI) * 0.04;
 
-        dummy.position.copy(pt);
+        dummy.position.copy(_tempCurvePt);
         dummy.scale.set(scale, scale, scale);
         dummy.updateMatrix();
 
@@ -170,10 +172,10 @@ export default function PrimaryCoolantFlow() {
       // 3. Частицы нагрева внутри активной зоны
       for (let p = 0; p < PARTICLES_PER_CORE; p++) {
         const t = (baseOffset + p / PARTICLES_PER_CORE) % 1.0;
-        const pt = coreCurve.getPoint(t);
+        coreCurve.getPoint(t, _tempCurvePt);
         const scale = 0.14 + Math.sin(t * Math.PI) * 0.04;
 
-        dummy.position.copy(pt);
+        dummy.position.copy(_tempCurvePt);
         dummy.scale.set(scale, scale, scale);
         dummy.updateMatrix();
 

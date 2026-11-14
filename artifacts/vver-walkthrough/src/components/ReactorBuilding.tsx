@@ -236,12 +236,12 @@ function PolarCrane() {
 
           {/* Main 320t Hoist Grooved Wire Rope Winch Drum */}
           <mesh position={[-0.5, 0.85, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
-            <cylinderGeometry args={[0.55, 0.55, 1.8, 24]} />
+            <cylinderGeometry args={[0.55, 0.55, 1.8, 14]} />
             <primitive object={darkSteelMat} attach="material" />
           </mesh>
           {/* Main hoist drive electric motor + reduction gearbox */}
           <mesh position={[-0.5, 0.85, 1.2]} rotation={[Math.PI / 2, 0, 0]}>
-            <cylinderGeometry args={[0.4, 0.4, 0.9, 16]} />
+            <cylinderGeometry args={[0.4, 0.4, 0.9, 12]} />
             <primitive object={darkSteelMat} attach="material" />
           </mesh>
           <mesh position={[-0.5, 0.85, 0.7]}>
@@ -251,7 +251,7 @@ function PolarCrane() {
 
           {/* Auxiliary 32t Hoist Winch Drum */}
           <mesh position={[0.9, 0.6, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
-            <cylinderGeometry args={[0.32, 0.32, 1.4, 20]} />
+            <cylinderGeometry args={[0.32, 0.32, 1.4, 12]} />
             <primitive object={darkSteelMat} attach="material" />
           </mesh>
 
@@ -277,11 +277,11 @@ function PolarCrane() {
             </mesh>
             {/* Heavy forged steel crane hook */}
             <mesh position={[0, -1.0, 0]}>
-              <torusGeometry args={[0.35, 0.12, 12, 24, Math.PI * 1.5]} />
+              <torusGeometry args={[0.35, 0.12, 8, 14, Math.PI * 1.5]} />
               <primitive object={steelMat} attach="material" />
             </mesh>
             <mesh position={[0.3, -0.6, 0]}>
-              <sphereGeometry args={[0.16, 12, 12]} />
+              <sphereGeometry args={[0.16, 8, 8]} />
               <primitive object={steelMat} attach="material" />
             </mesh>
           </group>
@@ -361,25 +361,25 @@ function InvisibleCollisionWalls() {
     <group>
       {/* 1. +15m Main Deck central reactor pit barrier (cylinder r=5.45, h=3.2m) */}
       <mesh position={[0, DECK.mainY + 1.6, 0]} visible={false}>
-        <cylinderGeometry args={[5.45, 5.45, 3.2, 32, 1, true]} />
+        <cylinderGeometry args={[5.45, 5.45, 3.2, 14, 1, true]} />
         <meshBasicMaterial transparent opacity={0} wireframe />
       </mesh>
 
       {/* 2. +36m Upper Deck central void barrier (cylinder guarding central opening at r = 8.35m) */}
       <mesh position={[0, DECK.upperY + 2.0, 0]} visible={false}>
-        <cylinderGeometry args={[DECK.upperHoleRadius + 0.35, DECK.upperHoleRadius + 0.35, 4.0, 32, 1, true]} />
+        <cylinderGeometry args={[DECK.upperHoleRadius + 0.35, DECK.upperHoleRadius + 0.35, 4.0, 14, 1, true]} />
         <meshBasicMaterial transparent opacity={0} wireframe />
       </mesh>
 
       {/* 3. Outer containment boundary barrier (cylinder r=21.6, h=60m) */}
       <mesh position={[0, 20, 0]} visible={false}>
-        <cylinderGeometry args={[CONTAINMENT.innerRadius - 0.4, CONTAINMENT.innerRadius - 0.4, 60, 32, 1, true]} />
+        <cylinderGeometry args={[CONTAINMENT.innerRadius - 0.4, CONTAINMENT.innerRadius - 0.4, 60, 14, 1, true]} />
         <meshBasicMaterial transparent opacity={0} wireframe />
       </mesh>
 
       {/* 4. -5m Basement DCS bio-shield vault cylinder barrier (cylinder r=7.25, h=6m) */}
       <mesh position={[0, FLOOR_LEVELS.basement + 3.0, 0]} visible={false}>
-        <cylinderGeometry args={[7.25, 7.25, 6.0, 32, 1, true]} />
+        <cylinderGeometry args={[7.25, 7.25, 6.0, 14, 1, true]} />
         <meshBasicMaterial transparent opacity={0} wireframe />
       </mesh>
     </group>
@@ -504,17 +504,17 @@ function ReactorPitDetailing() {
 
       {/* Top handrail at 1.15m height */}
       <mesh position={[0, 1.2, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[guardrailRadius, 0.035, 8, 48, Math.PI * 1.85]} />
+        <torusGeometry args={[guardrailRadius, 0.035, 6, 24, Math.PI * 1.85]} />
         <primitive object={safetyYellowMat} attach="material" />
       </mesh>
       {/* Mid-rail at 0.6m height */}
       <mesh position={[0, 0.65, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[guardrailRadius, 0.025, 8, 48, Math.PI * 1.85]} />
+        <torusGeometry args={[guardrailRadius, 0.025, 6, 24, Math.PI * 1.85]} />
         <primitive object={safetyYellowMat} attach="material" />
       </mesh>
       {/* Safety kickplate / toe-board (0.12m tall) */}
       <mesh position={[0, 0.08, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[guardrailRadius, 0.05, 4, 48, Math.PI * 1.85]} />
+        <torusGeometry args={[guardrailRadius, 0.05, 4, 24, Math.PI * 1.85]} />
         <primitive object={safetyYellowMat} attach="material" />
       </mesh>
 
@@ -547,7 +547,7 @@ function ReactorPitDetailing() {
             {/* Recessed flush lifting eye rings */}
             {[-0.5, 0.5].map((lx) => (
               <mesh key={lx} position={[lx, 0.035, 0]}>
-                <torusGeometry args={[0.08, 0.02, 6, 12]} />
+                <torusGeometry args={[0.08, 0.02, 6, 10]} />
                 <primitive object={steelMat} attach="material" />
               </mesh>
             ))}
@@ -562,19 +562,19 @@ function ReactorPitDetailing() {
         return (
           <group key={`manhole-${i}`} position={[Math.cos(a) * mhRadius, 0.015, Math.sin(a) * mhRadius]}>
             <mesh>
-              <cylinderGeometry args={[0.55, 0.55, 0.03, 20]} />
+              <cylinderGeometry args={[0.55, 0.55, 0.03, 14]} />
               <primitive object={steelMat} attach="material" />
             </mesh>
             <mesh position={[0, 0.02, 0]}>
-              <cylinderGeometry args={[0.45, 0.45, 0.02, 20]} />
+              <cylinderGeometry args={[0.45, 0.45, 0.02, 14]} />
               <primitive object={diamondPlateMat} attach="material" />
             </mesh>
             {/* Flange bolts around manhole perimeter */}
-            {Array.from({ length: 8 }).map((_, bIdx) => {
-              const ba = (bIdx / 8) * Math.PI * 2;
+            {Array.from({ length: 6 }).map((_, bIdx) => {
+              const ba = (bIdx / 6) * Math.PI * 2;
               return (
                 <mesh key={bIdx} position={[Math.cos(ba) * 0.5, 0.03, Math.sin(ba) * 0.5]}>
-                  <cylinderGeometry args={[0.02, 0.02, 0.03, 6]} />
+                  <cylinderGeometry args={[0.02, 0.02, 0.03, 5]} />
                   <primitive object={safetyYellowMat} attach="material" />
                 </mesh>
               );
@@ -644,23 +644,23 @@ function DeckPlates() {
         rotation={[-Math.PI / 2, 0, 0]}
         receiveShadow
       >
-        <ringGeometry args={[DECK.outerRadius - 1.8, DECK.outerRadius, 64]} />
+        <ringGeometry args={[DECK.outerRadius - 1.8, DECK.outerRadius, 32]} />
         <primitive object={diamondPlateMat} attach="material" side={THREE.DoubleSide} />
       </mesh>
 
       {/* Perimeter Yellow Safety Railing at +15m with calibrated 1.0m+ technological gap */}
-      {Array.from({ length: 48 }).map((_, i) => {
-        const a = (i / 48) * Math.PI * 2;
+      {Array.from({ length: 24 }).map((_, i) => {
+        const a = (i / 24) * Math.PI * 2;
         const pr = 17.2; // Сокращенный радиус для свободного технологического прохода перед САОЗ
         return (
           <mesh key={`p-rail-${i}`} position={[Math.cos(a) * pr, DECK.mainY + 0.6, Math.sin(a) * pr]} castShadow>
-            <cylinderGeometry args={[0.03, 0.03, 1.2, 6]} />
+            <cylinderGeometry args={[0.03, 0.03, 1.2, 5]} />
             <primitive object={safetyYellowMat} attach="material" />
           </mesh>
         );
       })}
       <mesh position={[0, DECK.mainY + 1.2, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[17.2, 0.03, 6, 48]} />
+        <torusGeometry args={[17.2, 0.03, 6, 24]} />
         <primitive object={safetyYellowMat} attach="material" />
       </mesh>
 
@@ -687,7 +687,7 @@ function DeckPlates() {
           receiveShadow
           userData={{ isFloor: true, isWalkableFloor: true, floorLevel: 36, floorY: 36.0, levelName: 'Level33Floor' }}
         >
-          <ringGeometry args={[DECK.upperHoleRadius, DECK.outerRadius, 64]} />
+          <ringGeometry args={[DECK.upperHoleRadius, DECK.outerRadius, 32]} />
           <meshStandardMaterial
             map={diamondPlateMap}
             normalMap={diamondPlateNormalMap}
@@ -706,7 +706,7 @@ function DeckPlates() {
           visible={false}
           userData={{ isFloor: true, isWalkableFloor: true, floorLevel: 36, floorY: 36.0, levelName: 'PolarCraneDeck' }}
         >
-          <ringGeometry args={[DECK.upperHoleRadius, DECK.outerRadius, 64]} />
+          <ringGeometry args={[DECK.upperHoleRadius, DECK.outerRadius, 32]} />
           <meshBasicMaterial side={THREE.DoubleSide} />
         </mesh>
 
@@ -717,28 +717,28 @@ function DeckPlates() {
           rotation={[-Math.PI / 2, 0, 0]}
           receiveShadow
         >
-          <ringGeometry args={[18.0 - 0.08, 18.0 + 0.08, 64]} />
+          <ringGeometry args={[18.0 - 0.08, 18.0 + 0.08, 32]} />
           <primitive object={railSteelMat} attach="material" />
         </mesh>
       </group>
 
       {/* Upper Deck Yellow Safety Railings around the central hole */}
-      {Array.from({ length: 48 }).map((_, i) => {
-        const a = (i / 48) * Math.PI * 2;
+      {Array.from({ length: 24 }).map((_, i) => {
+        const a = (i / 24) * Math.PI * 2;
         const r = DECK.upperHoleRadius + 0.35;
         return (
           <mesh key={`ur-${i}`} position={[Math.cos(a) * r, DECK.upperY + 0.6, Math.sin(a) * r]} castShadow>
-            <cylinderGeometry args={[0.03, 0.03, 1.2, 6]} />
+            <cylinderGeometry args={[0.03, 0.03, 1.2, 5]} />
             <primitive object={safetyYellowMat} attach="material" />
           </mesh>
         );
       })}
       <mesh position={[0, DECK.upperY + 1.2, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[DECK.upperHoleRadius + 0.35, 0.035, 6, 48]} />
+        <torusGeometry args={[DECK.upperHoleRadius + 0.35, 0.035, 6, 24]} />
         <primitive object={safetyYellowMat} attach="material" />
       </mesh>
       <mesh position={[0, DECK.upperY + 0.65, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[DECK.upperHoleRadius + 0.35, 0.025, 6, 48]} />
+        <torusGeometry args={[DECK.upperHoleRadius + 0.35, 0.025, 6, 24]} />
         <primitive object={safetyYellowMat} attach="material" />
       </mesh>
     </group>
@@ -763,14 +763,14 @@ function ContainmentStructure({ opacity }: { opacity: number }) {
   ).current;
 
   useFrame(() => {
-    // Плавный послойный срез (Cutaway):
-    // При opacity >= 0.98 — монолитный непрозрачный бетон
-    // При opacity < 0.98 — плавное полупрозрачное прорезание купола и стен
+    // Плавный послойный срез (Cutaway): обновляем только при изменении целевой прозрачности
     const isSolid = opacity >= 0.98;
-    outerMatRef.transparent = !isSolid;
-    outerMatRef.depthWrite = isSolid;
     const target = isSolid ? 1.0 : Math.max(0.02, opacity * 0.75);
-    outerMatRef.opacity = THREE.MathUtils.lerp(outerMatRef.opacity, target, 0.15);
+    if (Math.abs(outerMatRef.opacity - target) > 0.002) {
+      outerMatRef.transparent = !isSolid;
+      outerMatRef.depthWrite = isSolid;
+      outerMatRef.opacity = THREE.MathUtils.lerp(outerMatRef.opacity, target, 0.15);
+    }
   });
 
   const R = CONTAINMENT_GEOMETRY.outerRadius;
@@ -790,7 +790,7 @@ function ContainmentStructure({ opacity }: { opacity: number }) {
         position={[0, wallCenterY, 0]}
         receiveShadow
       >
-        <cylinderGeometry args={[innerR, innerR, wallH, 64, 1, true]} />
+        <cylinderGeometry args={[innerR, innerR, wallH, 20, 1, true]} />
       </mesh>
 
       {/* 2. Interior Upper Dome Surface (Seamless concrete PBR, roughness 0.85) */}
@@ -799,20 +799,20 @@ function ContainmentStructure({ opacity }: { opacity: number }) {
         position={[0, domeCenterY, 0]}
         receiveShadow
       >
-        <sphereGeometry args={[innerR, 64, 32, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <sphereGeometry args={[innerR, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />
       </mesh>
 
       {/* 3. Exterior Cutaway Containment Shell (transparency controlled by slider) */}
       <mesh material={outerMatRef} position={[0, wallCenterY, 0]}>
-        <cylinderGeometry args={[R, R, wallH, 64, 1, true]} />
+        <cylinderGeometry args={[R, R, wallH, 20, 1, true]} />
       </mesh>
       <mesh material={outerMatRef} position={[0, domeCenterY, 0]}>
-        <sphereGeometry args={[R, 64, 32, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <sphereGeometry args={[R, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />
       </mesh>
 
       {/* Solid Foundation Ring Base Slab (Единая фундаментная плита, отметка Y = -5.25м, толщина 0.5м) */}
-      <mesh position={[0, fCenterY, 0]} receiveShadow castShadow>
-        <cylinderGeometry args={[fRadius, fRadius, fThick, 64]} />
+      <mesh position={[0, fCenterY, 0]} receiveShadow>
+        <cylinderGeometry args={[fRadius, fRadius, fThick, 20]} />
         <primitive object={exteriorConcreteMat} attach="material" />
       </mesh>
 
@@ -840,7 +840,7 @@ function ContainmentStructure({ opacity }: { opacity: number }) {
  * Connecting -5.0m DCS Server Room to +15.0m Main Steam Generator Deck.
  */
 function Stairwell1() {
-  const steps = 30;
+  const steps = 20;
   const { xMin, xMax, zMin, zMax, yStart, yEnd } = {
     xMin: STAIRS.s1.xMin, xMax: STAIRS.s1.xMax, zMin: STAIRS.s1.zMin, zMax: STAIRS.s1.zMax,
     yStart: STAIRS.s1.yStart, yEnd: STAIRS.s1.yEnd,
@@ -906,7 +906,7 @@ function Stairwell1() {
             rotation={[-inclineAngle, 0, 0]}
             castShadow
           >
-            <cylinderGeometry args={[0.025, 0.025, stairLength + 0.4, 8]} />
+            <cylinderGeometry args={[0.025, 0.025, stairLength + 0.4, 6]} />
             <primitive object={safetyYellowMat} attach="material" />
           </mesh>
           {/* Mid-Rail at 0.55m above steps */}
@@ -914,7 +914,7 @@ function Stairwell1() {
             position={[hx, midY + 0.58, midZ]}
             rotation={[-inclineAngle, 0, 0]}
           >
-            <cylinderGeometry args={[0.018, 0.018, stairLength + 0.4, 8]} />
+            <cylinderGeometry args={[0.018, 0.018, stairLength + 0.4, 6]} />
             <primitive object={safetyYellowMat} attach="material" />
           </mesh>
           {/* Toe Kickplate Bar along bottom */}
@@ -927,13 +927,13 @@ function Stairwell1() {
           </mesh>
 
           {/* Vertical Stanchion Posts every 3 steps along the incline */}
-          {Array.from({ length: 10 }).map((_, pIdx) => {
-            const t = pIdx / 9;
+          {Array.from({ length: 6 }).map((_, pIdx) => {
+            const t = pIdx / 5;
             const pz = zMin + 0.6 + t * (zMax - zMin - 1.2);
             const py = yStart + t * (yEnd - yStart);
             return (
               <mesh key={`post-1-${hi}-${pIdx}`} position={[hx, py + 0.55, pz]} castShadow>
-                <cylinderGeometry args={[0.022, 0.022, 1.1, 6]} />
+                <cylinderGeometry args={[0.02, 0.02, 1.1, 5]} />
                 <primitive object={safetyYellowMat} attach="material" />
               </mesh>
             );

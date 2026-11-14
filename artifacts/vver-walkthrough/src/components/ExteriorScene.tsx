@@ -1,4 +1,4 @@
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { FLOOR_LEVELS } from '@/scene/constants';
@@ -424,10 +424,10 @@ function UndulatingSteppeTerrain() {
   const gY = FLOOR_LEVELS.ground;
   const waterLevelY = gY - 0.45;
 
-  // 1. Высокодетализированный степной рельеф 1200м x 1200м с сеткой 256x256 полигонов
-  // Исключает эффект сетки и ступенчатых квадратов, обеспечивает плавный рельеф
+  // 1. Оптимизированный степной рельеф 1200м x 1200м с легкой плавной сеткой 64x64
+  // Обеспечивает стабильные 60 FPS без избыточных полигонов
   const terrainGeo = useMemo(() => {
-    const geo = new THREE.PlaneGeometry(1200, 1200, 256, 256);
+    const geo = new THREE.PlaneGeometry(1200, 1200, 64, 64);
     const pos = geo.attributes.position;
 
     for (let i = 0; i < pos.count; i++) {
@@ -502,9 +502,9 @@ function UndulatingSteppeTerrain() {
     return geo;
   }, [gY, waterLevelY]);
 
-  // 2. Горные гряды и холмы на дальнем горизонте с процедурным шумом (без разрывов)
+  // 2. Горные гряды и холмы на дальнем горизонте с процедурным шумом
   const hillsGeo = useMemo(() => {
-    const geo = new THREE.PlaneGeometry(1600, 1600, 128, 128);
+    const geo = new THREE.PlaneGeometry(1600, 1600, 48, 48);
     const pos = geo.attributes.position;
 
     for (let i = 0; i < pos.count; i++) {
@@ -622,12 +622,12 @@ function RockyOutcrops() {
     return matrices;
   }, [rockPositions]);
 
-  useFrame(() => {
+  useEffect(() => {
     if (rockMeshRef.current && rockMatrices.length > 0) {
       rockMatrices.forEach((m, i) => rockMeshRef.current?.setMatrixAt(i, m));
       rockMeshRef.current.instanceMatrix.needsUpdate = true;
     }
-  });
+  }, [rockMatrices]);
 
   const rockGeo = useMemo(() => new THREE.DodecahedronGeometry(1.0, 0), []);
 
@@ -775,12 +775,12 @@ function WindingRiverReservoir() {
 
   const pebbleGeo = useMemo(() => new THREE.DodecahedronGeometry(1.0, 1), []);
 
-  useFrame(() => {
+  useEffect(() => {
     if (pebblesRef.current && pebbleMatrices.length > 0) {
       pebbleMatrices.forEach((m, idx) => pebblesRef.current?.setMatrixAt(idx, m));
       pebblesRef.current.instanceMatrix.needsUpdate = true;
     }
-  });
+  }, [pebbleMatrices]);
 
   return (
     <group name="WindingRiverReservoirGroup">
@@ -972,7 +972,7 @@ function PerimeterShelterbelts() {
     };
   }, []);
 
-  useFrame(() => {
+  useEffect(() => {
     if (pineTrunkRef.current && pineTrunkMats.length > 0) {
       pineTrunkMats.forEach((m, i) => pineTrunkRef.current?.setMatrixAt(i, m));
       pineTrunkRef.current.instanceMatrix.needsUpdate = true;
@@ -989,7 +989,7 @@ function PerimeterShelterbelts() {
       decFoliageMats.forEach((m, i) => decFoliageRef.current?.setMatrixAt(i, m));
       decFoliageRef.current.instanceMatrix.needsUpdate = true;
     }
-  });
+  }, [pineTrunkMats, pineFoliageMats, decTrunkMats, decFoliageMats]);
 
   const pineTrunkGeo = useMemo(() => new THREE.CylinderGeometry(0.2, 0.32, 3.8, 6), []);
   const pineFoliageGeo = useMemo(() => new THREE.ConeGeometry(2.1, 8.2, 7), []);
@@ -1105,7 +1105,7 @@ function SteppeVegetationDensity() {
     return { grassMatrices: gMats, shrubMatrices: sMats };
   }, [gY]);
 
-  useFrame(() => {
+  useEffect(() => {
     if (grassRef.current && grassMatrices.length > 0) {
       grassMatrices.forEach((m, i) => grassRef.current?.setMatrixAt(i, m));
       grassRef.current.instanceMatrix.needsUpdate = true;
@@ -1114,7 +1114,7 @@ function SteppeVegetationDensity() {
       shrubMatrices.forEach((m, i) => shrubRef.current?.setMatrixAt(i, m));
       shrubRef.current.instanceMatrix.needsUpdate = true;
     }
-  });
+  }, [grassMatrices, shrubMatrices]);
 
   const coneGeo = useMemo(() => new THREE.ConeGeometry(0.5, 0.95, 4), []);
   const dodecaGeo = useMemo(() => new THREE.DodecahedronGeometry(0.7, 0), []);
@@ -2421,8 +2421,7 @@ export default function ExteriorScene() {
       {/* 6. Спецкорпус водоочистки и дезактивации */}
       <SpecialAuxiliaryBuilding position={[-28, gY, -75]} />
 
-      {/* 7. Блочные трансформаторы ТЦ-1000000/500 */}
-      <StepUpTransformers position={[112, 0, -12]} />
+      {/* 7. Блочные трансформаторы ТЦ-1000000/500 вынесены к торцевой стене машзала в SiteEngineeringInfrastructure */}
 
       {/* 8. Вентиляционные трубы РО */}
       <VentilationChimneys position={[-22, gY, -28]} />

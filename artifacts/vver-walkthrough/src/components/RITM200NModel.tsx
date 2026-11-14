@@ -213,12 +213,12 @@ export function IntegralReactorVesselRITM200N({ position = [0, 0, 0] }: Integral
       {/* ------------------------------------------------------------- */}
       {/* Задняя полуцилиндрическая стенка корпуса */}
       <mesh position={[0, rpvHeight / 2, 0]} castShadow receiveShadow>
-        <cylinderGeometry args={[rpvRadius, rpvRadius, rpvHeight, 32, 1, false, Math.PI, Math.PI]} />
+        <cylinderGeometry args={[rpvRadius, rpvRadius, rpvHeight, 18, 1, false, Math.PI, Math.PI]} />
         <primitive object={reactorVesselSteelMat} attach="material" />
       </mesh>
       {/* Внутренняя рубашка задней стенки */}
       <mesh position={[0, rpvHeight / 2, 0]}>
-        <cylinderGeometry args={[rpvRadius - 0.15, rpvRadius - 0.15, rpvHeight, 32, 1, false, Math.PI, Math.PI]} />
+        <cylinderGeometry args={[rpvRadius - 0.15, rpvRadius - 0.15, rpvHeight, 18, 1, false, Math.PI, Math.PI]} />
         <primitive object={vesselInnerSteelMat} attach="material" />
       </mesh>
       {/* Боковые торцевые кромки разреза корпуса */}
@@ -231,13 +231,13 @@ export function IntegralReactorVesselRITM200N({ position = [0, 0, 0] }: Integral
 
       {/* Нижнее эллиптическое днище корпуса */}
       <mesh position={[0, 0.2, 0]} castShadow receiveShadow>
-        <sphereGeometry args={[rpvRadius, 32, 16, Math.PI, Math.PI, Math.PI / 2, Math.PI / 2]} />
+        <sphereGeometry args={[rpvRadius, 18, 10, Math.PI, Math.PI, Math.PI / 2, Math.PI / 2]} />
         <primitive object={reactorVesselSteelMat} attach="material" />
       </mesh>
 
       {/* Верхний фланец корпуса реактора */}
       <mesh position={[0, rpvHeight, 0]} castShadow>
-        <cylinderGeometry args={[rpvRadius + 0.35, rpvRadius + 0.35, 0.6, 32, 1, false, Math.PI, Math.PI]} />
+        <cylinderGeometry args={[rpvRadius + 0.35, rpvRadius + 0.35, 0.6, 18, 1, false, Math.PI, Math.PI]} />
         <primitive object={reactorVesselSteelMat} attach="material" />
       </mesh>
       {/* Шпильки главного разъема фланца */}
@@ -254,13 +254,13 @@ export function IntegralReactorVesselRITM200N({ position = [0, 0, 0] }: Integral
 
       {/* Верхняя полусферическая крышка реактора */}
       <mesh position={[0, rpvHeight + 0.3, 0]} castShadow>
-        <sphereGeometry args={[rpvRadius, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <sphereGeometry args={[rpvRadius, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />
         <primitive object={reactorVesselSteelMat} attach="material" />
       </mesh>
 
       {/* Центральная шахта реактора (разделительная обечайка между опускным участком и ПГ) */}
       <mesh position={[0, rpvHeight / 2, 0]}>
-        <cylinderGeometry args={[0.95, 0.95, rpvHeight - 1.2, 24, 1, false, Math.PI, Math.PI]} />
+        <cylinderGeometry args={[0.95, 0.95, rpvHeight - 1.2, 14, 1, false, Math.PI, Math.PI]} />
         <primitive object={coreBasketMat} attach="material" />
       </mesh>
 
@@ -270,14 +270,14 @@ export function IntegralReactorVesselRITM200N({ position = [0, 0, 0] }: Integral
       <group position={[0, 1.2, 0]} name="RITM200N_Core">
         {/* Нижняя опорная плита активной зоны */}
         <mesh position={[0, 0.2, 0]} castShadow>
-          <cylinderGeometry args={[1.55, 1.55, 0.35, 24]} />
+          <cylinderGeometry args={[1.55, 1.55, 0.35, 14]} />
           <primitive object={coreBasketMat} attach="material" />
         </mesh>
 
         {/* Черенковское свечение вокруг активной зоны */}
         <group ref={coreRef}>
           <mesh position={[0, 1.8, 0]}>
-            <cylinderGeometry args={[1.52, 1.52, 3.2, 24, 1, true]} />
+            <cylinderGeometry args={[1.52, 1.52, 3.2, 14, 1, true]} />
             <primitive object={cherenkovGlowMat} attach="material" />
           </mesh>
         </group>
@@ -319,7 +319,7 @@ export function IntegralReactorVesselRITM200N({ position = [0, 0, 0] }: Integral
 
         {/* Верхняя дистанционирующая и защитная плита активной зоны */}
         <mesh position={[0, 3.45, 0]} castShadow>
-          <cylinderGeometry args={[1.55, 1.55, 0.25, 24]} />
+          <cylinderGeometry args={[1.55, 1.55, 0.25, 14]} />
           <primitive object={coreBasketMat} attach="material" />
         </mesh>
       </group>
@@ -342,18 +342,18 @@ export function IntegralReactorVesselRITM200N({ position = [0, 0, 0] }: Integral
               {/* Имитация змеевикового трубного пучка (горизонтальные ребра теплообменных труб) */}
               {[-1.4, -0.9, -0.4, 0.1, 0.6, 1.1].map((ty) => (
                 <mesh key={`sg-tube-${ty}`} position={[0.22, ty, 0]}>
-                  <cylinderGeometry args={[0.03, 0.03, 0.48, 8]} />
+                  <cylinderGeometry args={[0.03, 0.03, 0.48, 6]} />
                   <primitive object={reactorVesselSteelMat} attach="material" />
                 </mesh>
               ))}
               {/* Верхний коллектор перегретого пара */}
               <mesh position={[0, 1.9, 0]} rotation={[0, 0, Math.PI / 2]}>
-                <cylinderGeometry args={[0.08, 0.08, 0.45, 12]} />
+                <cylinderGeometry args={[0.08, 0.08, 0.45, 10]} />
                 <primitive object={steamPipeMat} attach="material" />
               </mesh>
               {/* Нижний коллектор питательной воды */}
               <mesh position={[0, -1.9, 0]} rotation={[0, 0, Math.PI / 2]}>
-                <cylinderGeometry args={[0.07, 0.07, 0.45, 12]} />
+                <cylinderGeometry args={[0.07, 0.07, 0.45, 10]} />
                 <primitive object={feedwaterPipeMat} attach="material" />
               </mesh>
             </group>
@@ -362,7 +362,7 @@ export function IntegralReactorVesselRITM200N({ position = [0, 0, 0] }: Integral
 
         {/* Кольцевой паровой коллектор 2-го контура над парогенераторами */}
         <mesh position={[0, 2.1, 0]} rotation={[Math.PI / 2, 0, 0]}>
-          <torusGeometry args={[1.4, 0.12, 12, 32]} />
+          <torusGeometry args={[1.4, 0.12, 8, 18]} />
           <primitive object={steamPipeMat} attach="material" />
         </mesh>
       </group>
@@ -386,17 +386,17 @@ export function IntegralReactorVesselRITM200N({ position = [0, 0, 0] }: Integral
             <group key={`crdm-${di}`} position={[px, 0, pz]}>
               {/* Чехол привода СУЗ */}
               <mesh position={[0, 1.2, 0]} castShadow>
-                <cylinderGeometry args={[0.065, 0.075, 2.4, 12]} />
+                <cylinderGeometry args={[0.065, 0.075, 2.4, 8]} />
                 <primitive object={crdmHousingMat} attach="material" />
               </mesh>
               {/* Электромагнитная катушка и блок датчиков положения */}
               <mesh position={[0, 1.8, 0]}>
-                <cylinderGeometry args={[0.095, 0.095, 0.6, 12]} />
+                <cylinderGeometry args={[0.095, 0.095, 0.6, 8]} />
                 <primitive object={crdmIndicatorMat} attach="material" />
               </mesh>
               {/* Верхняя защитная штанга */}
               <mesh position={[0, 2.6, 0]}>
-                <cylinderGeometry args={[0.03, 0.03, 0.8, 8]} />
+                <cylinderGeometry args={[0.03, 0.03, 0.8, 6]} />
                 <primitive object={reactorVesselSteelMat} attach="material" />
               </mesh>
             </group>
@@ -429,17 +429,17 @@ export function IntegralReactorVesselRITM200N({ position = [0, 0, 0] }: Integral
             <group key={`pump-${pi}`} position={[px, pumpY, pz]} rotation={[0, -p.angle, 0]}>
               {/* Горизонтальный соединительный патрубок корпуса */}
               <mesh position={[-0.35, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-                <cylinderGeometry args={[0.22, 0.24, 0.7, 16]} />
+                <cylinderGeometry args={[0.22, 0.24, 0.7, 10]} />
                 <primitive object={reactorVesselSteelMat} attach="material" />
               </mesh>
               {/* Улитка и спиральный корпус насоса */}
               <mesh position={[0.1, 0, 0]} castShadow>
-                <sphereGeometry args={[0.42, 16, 16]} />
+                <sphereGeometry args={[0.42, 12, 8]} />
                 <primitive object={pumpCasingMat} attach="material" />
               </mesh>
               {/* Герметичный гермоэлектродвигатель (электромашинная часть ГЦЭН) */}
               <mesh position={[0.7, 0, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
-                <cylinderGeometry args={[0.34, 0.34, 0.95, 16]} />
+                <cylinderGeometry args={[0.34, 0.34, 0.95, 12]} />
                 <primitive object={pumpCasingMat} attach="material" />
               </mesh>
               {/* Клеммная коробка и контур водяного охлаждения статора */}
@@ -479,7 +479,7 @@ export function SMRReactorBuilding({ position = [0, 0, 0] }: SMRReactorBuildingP
 
       {/* Цилиндрическая шахта биологической защиты реактора РИТМ-200Н */}
       <mesh position={[0, gY + 5.0, 0]} castShadow receiveShadow>
-        <cylinderGeometry args={[2.8, 3.1, 8.0, 32, 1, false, Math.PI, Math.PI]} />
+        <cylinderGeometry args={[2.8, 3.1, 8.0, 18, 1, false, Math.PI, Math.PI]} />
         <primitive object={bioShieldConcreteMat} attach="material" />
       </mesh>
 
@@ -617,13 +617,13 @@ export function SMRAuxiliarySafetySystems({ position = [0, 0, 0] }: { position?:
       <group position={[-10.5, gY + 7.5, -4]} name="RITM200N_BubblerTank">
         {/* Цилиндрический горизонтальный корпус бака-барботера */}
         <mesh rotation={[0, 0, Math.PI / 2]} castShadow receiveShadow>
-          <cylinderGeometry args={[1.4, 1.4, 6.2, 24]} />
+          <cylinderGeometry args={[1.4, 1.4, 6.2, 16]} />
           <primitive object={reactorVesselSteelMat} attach="material" />
         </mesh>
         {/* Сферические днища */}
         {[-3.1, 3.1].map((dx) => (
           <mesh key={`b-dish-${dx}`} position={[dx, 0, 0]} rotation={[0, dx < 0 ? -Math.PI / 2 : Math.PI / 2, 0]}>
-            <sphereGeometry args={[1.4, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2]} />
+            <sphereGeometry args={[1.4, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
             <primitive object={reactorVesselSteelMat} attach="material" />
           </mesh>
         ))}
@@ -636,7 +636,7 @@ export function SMRAuxiliarySafetySystems({ position = [0, 0, 0] }: { position?:
         ))}
         {/* Предохранительный клапан и барботажные сбросные трубы */}
         <mesh position={[0, 1.6, 0]}>
-          <cylinderGeometry args={[0.12, 0.12, 1.2, 12]} />
+          <cylinderGeometry args={[0.12, 0.12, 1.2, 8]} />
           <primitive object={steamPipeMat} attach="material" />
         </mesh>
       </group>
@@ -648,24 +648,24 @@ export function SMRAuxiliarySafetySystems({ position = [0, 0, 0] }: { position?:
       {[-8.5, -12.5].map((hx, hi) => (
         <group key={`eccs-tank-${hi}`} position={[hx, gY + 7.8, 8]} name={`RITM200N_ECCS_Tank_${hi + 1}`}>
           <mesh castShadow receiveShadow>
-            <cylinderGeometry args={[0.9, 0.9, 3.8, 20]} />
+            <cylinderGeometry args={[0.9, 0.9, 3.8, 14]} />
             <primitive object={reactorVesselSteelMat} attach="material" />
           </mesh>
           {/* Сферические крышки */}
           {[-1.9, 1.9].map((ey) => (
             <mesh key={`e-dish-${ey}`} position={[0, ey, 0]} rotation={[ey < 0 ? Math.PI : 0, 0, 0]}>
-              <sphereGeometry args={[0.9, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />
+              <sphereGeometry args={[0.9, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
               <primitive object={reactorVesselSteelMat} attach="material" />
             </mesh>
           ))}
           {/* Сигнальные зеленые маркировочные полосы САОЗ */}
           <mesh position={[0, 0, 0]}>
-            <cylinderGeometry args={[0.92, 0.92, 0.35, 20]} />
+            <cylinderGeometry args={[0.92, 0.92, 0.35, 14]} />
             <primitive object={feedwaterPipeMat} attach="material" />
           </mesh>
           {/* Трубопровод аварийного впрыска в корпус реактора */}
           <mesh position={[1.2, -1.2, 0]} rotation={[0, 0, Math.PI / 2]}>
-            <cylinderGeometry args={[0.08, 0.08, 2.4, 12]} />
+            <cylinderGeometry args={[0.08, 0.08, 2.4, 8]} />
             <primitive object={feedwaterPipeMat} attach="material" />
           </mesh>
         </group>
@@ -682,7 +682,7 @@ export function SMRAuxiliarySafetySystems({ position = [0, 0, 0] }: { position?:
         {/* Аварийные паропроводы и патрубки сброса пара */}
         {[-1.4, 1.4].map((px) => (
           <mesh key={`dh-pipe-${px}`} position={[px, 1.6, 0]}>
-            <cylinderGeometry args={[0.1, 0.1, 1.2, 12]} />
+            <cylinderGeometry args={[0.1, 0.1, 1.2, 8]} />
             <primitive object={steamPipeMat} attach="material" />
           </mesh>
         ))}
@@ -741,18 +741,18 @@ export function SMRTurbineHall({ position = [26, 0, 0] }: { position?: [number, 
 
         {/* А. Паровая турбина: Цилиндр высокого давления (ЦВД) */}
         <mesh position={[0, 1.0, -5.5]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-          <cylinderGeometry args={[1.1, 1.3, 3.4, 24]} />
+          <cylinderGeometry args={[1.1, 1.3, 3.4, 14]} />
           <primitive object={turbineMetalMat} attach="material" />
         </mesh>
         {/* Стопорно-регулирующие паровые клапаны ЦВД */}
         {[-1.4, 1.4].map((vx) => (
           <group key={`valve-${vx}`} position={[vx, 1.4, -6.2]}>
             <mesh>
-              <cylinderGeometry args={[0.22, 0.22, 1.4, 12]} />
+              <cylinderGeometry args={[0.22, 0.22, 1.4, 8]} />
               <primitive object={steamPipeMat} attach="material" />
             </mesh>
             <mesh position={[0, 0.8, 0]}>
-              <cylinderGeometry args={[0.32, 0.32, 0.4, 12]} />
+              <cylinderGeometry args={[0.32, 0.32, 0.4, 8]} />
               <primitive object={safetyYellowMat} attach="material" />
             </mesh>
           </group>
@@ -760,7 +760,7 @@ export function SMRTurbineHall({ position = [26, 0, 0] }: { position?: [number, 
 
         {/* Б. Паровая турбина: Цилиндр низкого давления (ЦНД) */}
         <mesh position={[0, 1.4, -0.8]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-          <cylinderGeometry args={[1.7, 1.9, 5.2, 24]} />
+          <cylinderGeometry args={[1.7, 1.9, 5.2, 14]} />
           <primitive object={turbineMetalMat} attach="material" />
         </mesh>
 
@@ -772,18 +772,18 @@ export function SMRTurbineHall({ position = [26, 0, 0] }: { position?: [number, 
 
         {/* Г. Синхронный Турбогенератор (55-60 МВт) в синем кожухе */}
         <mesh position={[0, 1.2, 5.8]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-          <cylinderGeometry args={[1.45, 1.45, 5.4, 24]} />
+          <cylinderGeometry args={[1.45, 1.45, 5.4, 16]} />
           <primitive object={generatorCasingMat} attach="material" />
         </mesh>
         {/* Блок бесщеточного возбудителя генератора */}
         <mesh position={[0, 0.8, 9.2]} rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.7, 0.7, 1.6, 16]} />
+          <cylinderGeometry args={[0.7, 0.7, 1.6, 12]} />
           <primitive object={generatorCasingMat} attach="material" />
         </mesh>
 
         {/* Валоповоротное устройство и муфты между валами */}
         <mesh position={[0, 0.6, 2.3]} rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.35, 0.35, 1.4, 16]} />
+          <cylinderGeometry args={[0.35, 0.35, 1.4, 10]} />
           <primitive object={reactorVesselSteelMat} attach="material" />
         </mesh>
 
@@ -800,7 +800,7 @@ export function SMRTurbineHall({ position = [26, 0, 0] }: { position?: [number, 
       <group position={[-13.5, gY + 11.0, -5.5]}>
         {/* Паропровод острого пара через разделительную стену */}
         <mesh rotation={[0, 0, Math.PI / 2]}>
-          <cylinderGeometry args={[0.3, 0.3, 5.0, 16]} />
+          <cylinderGeometry args={[0.3, 0.3, 5.0, 10]} />
           <primitive object={steamPipeMat} attach="material" />
         </mesh>
         {/* Быстродействующая защитная отсечная арматура (БЗОК) */}
@@ -1102,7 +1102,7 @@ export default function RITM200NFullComplex({ position = [168, 0, 80] }: RITM200
       {/* 6. Вентиляционная труба малой АЭС с дневной красно-белой маркировкой (у западной стены) */}
       <group position={[-31, gY, -10]} name="RITM200N_VentStack">
         <mesh position={[0, 1.5, 0]} castShadow>
-          <cylinderGeometry args={[1.8, 2.2, 3, 16]} />
+          <cylinderGeometry args={[1.8, 2.2, 3, 12]} />
           <primitive object={containmentWallConcreteMat} attach="material" />
         </mesh>
         {Array.from({ length: 5 }).map((_, i) => {
@@ -1110,7 +1110,7 @@ export default function RITM200NFullComplex({ position = [168, 0, 80] }: RITM200
           const isRed = i % 2 === 0;
           return (
             <mesh key={`smr-stack-seg-${i}`} position={[0, y, 0]} castShadow>
-              <cylinderGeometry args={[1.1, 1.1, 8, 16]} />
+              <cylinderGeometry args={[1.1, 1.1, 8, 12]} />
               <meshStandardMaterial
                 color={isRed ? '#b82a24' : '#f2f2ec'}
                 roughness={0.65}

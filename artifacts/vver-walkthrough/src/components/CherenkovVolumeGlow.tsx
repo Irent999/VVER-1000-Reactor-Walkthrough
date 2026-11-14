@@ -107,7 +107,7 @@ export default function CherenkovVolumeGlow({
     <group position={position}>
       {/* 1. Внутренний яркий гиперболический сердечник свечения */}
       <mesh>
-        <cylinderGeometry args={[radius * 0.35, radius * 0.65, height, 24, 1, true]} />
+        <cylinderGeometry args={[radius * 0.35, radius * 0.65, height, 14, 1, true]} />
         <meshBasicMaterial
           ref={coreMatRef}
           color={color}
@@ -121,7 +121,7 @@ export default function CherenkovVolumeGlow({
 
       {/* 2. Внешняя объемная оболочка рассеяния в толще воды */}
       <mesh>
-        <cylinderGeometry args={[radius * 0.75, radius * 1.15, height * 1.05, 24, 1, true]} />
+        <cylinderGeometry args={[radius * 0.75, radius * 1.15, height * 1.05, 14, 1, true]} />
         <meshBasicMaterial
           ref={outerMatRef}
           color="#00ffff"
@@ -136,7 +136,7 @@ export default function CherenkovVolumeGlow({
       {/* 3. Горизонтальные рассеивающие диски ореола (Fresnel-эффект водной глади) */}
       {[-0.35, 0.0, 0.35].map((yFrac, idx) => (
         <mesh key={`halo-${idx}`} position={[0, yFrac * height, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[0.1, radius * (0.8 + idx * 0.2), 24]} />
+          <ringGeometry args={[0.1, radius * (0.8 + idx * 0.2), 14]} />
           <meshBasicMaterial
             color="#00e5ff"
             transparent

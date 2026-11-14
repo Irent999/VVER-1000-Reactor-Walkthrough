@@ -625,6 +625,22 @@ export const FLOOR_VIEWS: FloorTarget[] = [
     mode: 'orbit',
   },
   {
+    id: 'view-gsu-transformers',
+    label: '⚡ Блочные трансформаторы и ошиновка / GSU Transformers',
+    floorY: 10,
+    cameraPos: [156, 26, -42],
+    target: [136, 9, -12],
+    mode: 'orbit',
+  },
+  {
+    id: 'view-process-trestles',
+    label: '🏗️ Эстакады коммуникаций и подпитка / Trestles & Piping',
+    floorY: 9,
+    cameraPos: [-48, 22, -8],
+    target: [-26, 9, -16],
+    mode: 'orbit',
+  },
+  {
     id: 'view-cooling-tower-1',
     label: '🌀 Градирня №1 / Cooling Tower 1',
     floorY: 25,

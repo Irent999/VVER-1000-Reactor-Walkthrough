@@ -25,6 +25,7 @@ import FirstPersonController from '@/components/FirstPersonController';
 import UIOverlay from '@/components/UIOverlay';
 import VVER1000AuxiliaryBuilding from '@/components/VVER1000AuxiliaryBuilding';
 import VVER1000MainControlRoom from '@/components/VVER1000MainControlRoom';
+import SiteEngineeringInfrastructure from '@/components/SiteEngineeringInfrastructure';
 import VisualizationModeManager, { type RenderVisualizationMode } from '@/components/VisualizationModeManager';
 import WebXRSceneManager from '@/scene/webxrManager';
 import { POI_LIST, FLOOR_VIEWS, type POIInfo, type ViewMode } from '@/data/poiData';
@@ -52,7 +53,7 @@ function ScenePerformanceOptimizer({ onSyncRITM }: ScenePerformanceOptimizerProp
   useEffect(() => {
     configureNPPRenderer(gl, {
       maxPixelRatio: 1.5,
-      enableSoftShadows: true,
+      enableSoftShadows: false,
     });
     applySceneOptimizations(scene, {
       disableSmallShadowCasters: true,
@@ -88,6 +89,24 @@ interface SmoothCameraControllerProps {
   mode: ViewMode;
   viewId?: string;
   onTransitionEnd?: () => void;
+  onMovingChange?: (moving: boolean) => void;
+}
+
+/** Менеджер рендеринга по требованию (frameloop="demand"): гарантирует рендеринг при движениях камеры/дрона/ходьбе и 0% нагрузки в покое */
+function DemandRenderBridge({ active }: { active: boolean }) {
+  const { invalidate } = useThree();
+
+  useEffect(() => {
+    invalidate();
+  }, [active, invalidate]);
+
+  useFrame(() => {
+    if (active) {
+      invalidate();
+    }
+  });
+
+  return null;
 }
 
 function SmoothCameraController({
@@ -96,8 +115,9 @@ function SmoothCameraController({
   mode,
   viewId,
   onTransitionEnd,
+  onMovingChange,
 }: SmoothCameraControllerProps) {
-  const { camera, scene } = useThree();
+  const { camera, scene, invalidate } = useThree();
   const controlsRef = useRef<OCImpl | null>(null);
 
   // Параметры перехода хранятся в refs и обрабатываются строго в цикле useFrame
@@ -120,6 +140,8 @@ function SmoothCameraController({
 
     if (mode === 'drone') {
       isTransitioning.current = false;
+      onMovingChange?.(false);
+      invalidate();
       return;
     }
 
@@ -146,17 +168,20 @@ function SmoothCameraController({
     targetLook.current.set(...los.adjustedTarget);
     transitionStart.current = performance.now();
     isTransitioning.current = true;
+    onMovingChange?.(true);
+    invalidate();
 
     // Временно отключаем ручное вращение OrbitControls во время плавного перелета камеры
     if (controlsRef.current) {
       controlsRef.current.enabled = false;
     }
-  }, [camera, cameraPos, lookAt, mode, scene, viewId, currentKey]);
+  }, [camera, cameraPos, lookAt, mode, scene, viewId, currentKey, invalidate, onMovingChange]);
 
   useFrame(() => {
     if (mode === 'drone') return;
 
     if (isTransitioning.current) {
+      invalidate();
       const elapsed = (performance.now() - transitionStart.current) / 1000;
       const progress = Math.min(1.0, elapsed / transitionDuration);
       // Плавная кубическая кривая smoothstep: t * t * (3 - 2 * t)
@@ -172,6 +197,7 @@ function SmoothCameraController({
 
       if (progress >= 1.0) {
         isTransitioning.current = false;
+        onMovingChange?.(false);
         camera.position.copy(targetPos.current);
         camera.lookAt(targetLook.current);
         if (controlsRef.current) {
@@ -179,6 +205,7 @@ function SmoothCameraController({
           controlsRef.current.enabled = mode === 'orbit';
           controlsRef.current.update();
         }
+        invalidate();
         onTransitionEnd?.();
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('restore-camera-focus'));
@@ -204,6 +231,7 @@ function SmoothCameraController({
       maxDistance={420}
       maxPolarAngle={Math.PI * 0.88}
       makeDefault
+      onChange={() => invalidate()}
     />
   );
 }
@@ -245,6 +273,8 @@ function SceneContent({ containmentOpacity, onPOISelect, pois = POI_LIST }: Scen
 
       {/* Exterior Site, Cooling Towers (x2), Switchyard, ABK, Roads & Steppe Landscape */}
       <ExteriorScene />
+      {/* Site Engineering Infrastructure: Trestles, GSU Transformers with Flexible Busbars, Make-up/Blowdown lines */}
+      <SiteEngineeringInfrastructure />
       <POIMarkers pois={pois} onSelect={onPOISelect} />
     </group>
   );
@@ -302,6 +332,9 @@ export default function App() {
   const [floorTarget, setFloorTarget] = useState<number | null>(null);
   const [isVRPresenting, setIsVRPresenting] = useState(false);
 
+  const [enableShadows, setEnableShadows] = useState(true);
+  const [cameraMoving, setCameraMoving] = useState(false);
+
   // Динамические POI и Viewpoints (синхронизируются с глобальной матрицей РИТМ-200Н)
   const [dynamicPOIs, setDynamicPOIs] = useState<POIInfo[]>(POI_LIST);
   const [dynamicViews, setDynamicViews] = useState(FLOOR_VIEWS);
@@ -320,6 +353,12 @@ export default function App() {
 
   const activeViewData = dynamicViews.find((v) => v.id === activeView) ?? dynamicViews[0];
   const controlMode: ViewMode = activeViewData.mode;
+
+  // Непрерывный рендеринг активируется только при активных движениях (дрон, перелет камеры, VR)
+  const isContinuousRendering =
+    cameraMoving ||
+    controlMode === 'drone' ||
+    isVRPresenting;
 
   const handleSyncRITM = useCallback((pois: POIInfo[], views: typeof FLOOR_VIEWS) => {
     setDynamicPOIs([...pois]);
@@ -389,21 +428,24 @@ export default function App() {
 
       {webglAvailable ? (
         <Canvas
-          shadows
+          frameloop="demand"
+          shadows={enableShadows}
           camera={{ position: [50, 30, 60], fov: 60, near: 0.1, far: 1000 }}
           gl={{
-            antialias: true,
+            antialias: false,
             alpha: false,
+            stencil: false,
+            depth: true,
             toneMapping: THREE.ACESFilmicToneMapping,
             toneMappingExposure: 1.08,
             powerPreference: 'high-performance',
           }}
-          dpr={[1, Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, 2)]}
+          dpr={[1, Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, 1.5)]}
           onCreated={({ gl, scene, camera }) => {
             const bgColor = new THREE.Color('#d4c5a9');
             scene.background = bgColor;
             gl.setClearColor(bgColor, 1.0);
-            gl.setPixelRatio(Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, 2));
+            gl.setPixelRatio(Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, 1.5));
             gl.domElement.tabIndex = 0;
             gl.domElement.style.outline = 'none';
             camera.near = 0.1;
@@ -411,6 +453,7 @@ export default function App() {
             camera.updateProjectionMatrix();
           }}
         >
+        <DemandRenderBridge active={isContinuousRendering} />
         <WebXRSceneManager
           activeSpawnPos={activeViewData.cameraPos}
           floorY={activeViewData.floorY}
@@ -445,9 +488,9 @@ export default function App() {
           position={[95, 110, 85]}
           intensity={2.8}
           color="#fff3dc"
-          castShadow
-          shadow-mapSize-width={1024}
-          shadow-mapSize-height={1024}
+          castShadow={enableShadows}
+          shadow-mapSize-width={512}
+          shadow-mapSize-height={512}
           shadow-camera-left={-130}
           shadow-camera-right={130}
           shadow-camera-top={130}
@@ -457,16 +500,19 @@ export default function App() {
         />
         <directionalLight position={[-55, 35, -65]} intensity={0.45} color="#88aaff" />
 
-        {/* Smooth ambient occlusion contact shadows on +15m deck */}
-        <ContactShadows
-          position={[0, 15.01, 0]}
-          opacity={0.5}
-          scale={44}
-          blur={1.8}
-          far={8}
-          resolution={512}
-          color="#0c1417"
-        />
+        {/* Smooth ambient occlusion contact shadows on +15m deck - baked once */}
+        {enableShadows && (
+          <ContactShadows
+            position={[0, 15.01, 0]}
+            opacity={0.35}
+            scale={40}
+            blur={1.5}
+            far={6}
+            resolution={256}
+            color="#0c1417"
+            frames={1}
+          />
+        )}
 
         <XR store={xrStore}>
           <TeleportTarget>
@@ -489,6 +535,7 @@ export default function App() {
           lookAt={activeViewData.target ?? [0, activeViewData.floorY, 0]}
           mode={controlMode}
           viewId={activeViewData.id}
+          onMovingChange={setCameraMoving}
         />
 
         {controlMode === 'drone' ? (
@@ -533,6 +580,8 @@ export default function App() {
         }}
         renderMode={renderMode}
         onRenderModeChange={setRenderMode}
+        enableShadows={enableShadows}
+        onToggleShadows={() => setEnableShadows((s) => !s)}
       />
 
       {selectedPOI && !isVRPresenting && (
