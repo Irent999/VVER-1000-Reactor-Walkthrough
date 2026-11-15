@@ -10,8 +10,8 @@ interface AssemblyComponentProps {
 export default function AssemblyComponent({ position = [0, 0, 0], scale = [1, 1, 1] }: AssemblyComponentProps) {
   const groupRef = useRef<THREE.Group>(null);
   
-  // Загружаем GLB модель из папки public приложения
-  const { scene } = useGLTF('/assets/aistudio/Сборка.glb');
+  // Файл лежит прямо в корне папки public
+  const { scene } = useGLTF('/assembly.glb');
 
   return (
     <group ref={groupRef} position={position} scale={scale}>
@@ -30,4 +30,4 @@ export default function AssemblyComponent({ position = [0, 0, 0], scale = [1, 1,
   );
 }
 
-useGLTF.preload('/assets/aistudio/Сборка.glb');
+useGLTF.preload('/assembly.glb');
