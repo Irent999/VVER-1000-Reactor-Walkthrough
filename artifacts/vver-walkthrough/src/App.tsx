@@ -246,20 +246,15 @@ interface SceneContentProps {
 function SceneContent({ containmentOpacity, onPOISelect, pois = POI_LIST }: SceneContentProps) {
   return (
     <group>
-      {/* Заменено на вашу новую детальную 3D модель из GLB файла */}
+      {/* Оставляем исключительно вашу новую детальную модель */}
       <AssemblyComponent position={[0, 0, 0]} scale={[1, 1, 1]} />
 
-      {/* Full Combined NPP Site Master Plan Infrastructure (оставляем окружение Low-Poly для VR) */}
-      {/* Unit 2: Строго на одной горизонтальной оси (position.y = 0), масштаб [1, 1, 1], смещение ΔZ = +70 */}
+      {/* Внешняя инфраструктура, второй блок и окружение */}
       <VVERUnit2 position={[0, 0, 70]} scale={[1, 1, 1]} />
       <InterUnitOverheadPipeBridge />
-      {/* Комплекс МАЭС РИТМ-200Н: четкий технологический проход/разрыв от стен машзала (X=168, Z=80) */}
       <RITM200NComplex position={[168, 0, 80]} />
       <CylindricalWaterStorageTanks position={[64, 0, 86]} />
-
-      {/* Exterior Site, Cooling Towers (x2), Switchyard, ABK, Roads & Steppe Landscape */}
       <ExteriorScene />
-      {/* Site Engineering Infrastructure: Trestles, GSU Transformers with Flexible Busbars, Make-up/Blowdown lines */}
       <SiteEngineeringInfrastructure />
       <POIMarkers pois={pois} onSelect={onPOISelect} />
     </group>
