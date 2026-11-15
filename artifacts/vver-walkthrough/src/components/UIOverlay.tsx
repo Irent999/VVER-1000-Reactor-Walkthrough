@@ -41,6 +41,8 @@ interface UIOverlayProps {
   // Shadows & Performance:
   enableShadows?: boolean;
   onToggleShadows?: () => void;
+  // Walk / Orbit toggle:
+  onToggleWalkMode?: () => void;
 }
 
 const panelStyle = 'border border-[#c9d1c6]/15 bg-[#172226]/95 shadow-[0_18px_60px_rgba(4,14,17,.34)] backdrop-blur-xl';
@@ -167,53 +169,76 @@ interface ViewpointsListProps {
   onViewChange: (viewId: string) => void;
 }
 
+const GROUP_HEADERS: Array<{ key: 'overview' | 'vver' | 'ritm'; label: string }> = [
+  { key: 'overview', label: 'Генплан и навигация' },
+  { key: 'vver', label: 'Энергоблок ВВЭР-1000' },
+  { key: 'ritm', label: 'АСММ РИТМ-200Н' },
+];
+
 const MemoizedViewpointsList = memo(function ViewpointsList({
   floorViews,
   activeView,
   onViewChange,
 }: ViewpointsListProps) {
+  let globalIndex = 0;
+
   return (
-    <div className="flex flex-col gap-1.5 pt-1">
-      {floorViews.map((view, idx) => {
-        const selected = activeView === view.id;
+    <div className="flex flex-col gap-2 pt-1">
+      {GROUP_HEADERS.map((group) => {
+        const items = floorViews.filter((v) => v.group === group.key);
+        if (items.length === 0) return null;
+
         return (
-          <button
-            key={view.id}
-            data-testid={`button-view-${view.id}`}
-            aria-pressed={selected}
-            onClick={(e) => {
-              (e.currentTarget as HTMLElement)?.blur();
-              onViewChange(view.id);
-              if (typeof window !== 'undefined') {
-                window.dispatchEvent(new CustomEvent('restore-camera-focus'));
-              }
-            }}
-            className={`group flex items-center gap-2.5 rounded-xl border px-3 py-2 text-left shadow-lg backdrop-blur-xl transition cursor-pointer ${
-              selected
-                ? 'border-[#f5c26f] bg-[#1d2b30]/95 shadow-[0_0_20px_rgba(245,194,111,0.25)] text-[#f5c26f]'
-                : 'border-[#c9d1c6]/15 bg-[#141f23]/90 text-[#d4ded7] hover:border-[#f5c26f]/40 hover:bg-[#1a272c]'
-            }`}
-          >
-            <span
-              className={`mono grid h-6 w-6 shrink-0 place-items-center rounded-lg text-[9px] font-bold ${
-                selected
-                  ? 'bg-[#d69a43]/25 text-[#f5c26f]'
-                  : 'bg-white/[.06] text-[#869692] group-hover:text-white'
-              }`}
-            >
-              0{idx + 1}
-            </span>
-            <span className="min-w-0 flex-1 truncate text-[11px] font-bold tracking-tight">
-              {view.label}
-            </span>
-            {view.mode === 'orbit' ? (
-              <Eye size={13} className={selected ? 'text-[#f5c26f]' : 'text-[#6f7e7a]'} />
-            ) : view.mode === 'drone' ? (
-              <Video size={13} className={selected ? 'text-[#f5c26f]' : 'text-[#8ec8ff]'} />
-            ) : (
-              <Footprints size={13} className={selected ? 'text-[#f5c26f]' : 'text-[#6f7e7a]'} />
-            )}
-          </button>
+          <div key={group.key} className="flex flex-col gap-1">
+            <p className="px-1 pt-1 text-[9px] font-extrabold uppercase tracking-[.14em] text-[#7e918d]">
+              {group.label}
+            </p>
+            {items.map((view) => {
+              globalIndex += 1;
+              const numLabel = globalIndex < 10 ? `0${globalIndex}` : `${globalIndex}`;
+              const selected = activeView === view.id;
+
+              return (
+                <button
+                  key={view.id}
+                  data-testid={`button-view-${view.id}`}
+                  aria-pressed={selected}
+                  onClick={(e) => {
+                    (e.currentTarget as HTMLElement)?.blur();
+                    onViewChange(view.id);
+                    if (typeof window !== 'undefined') {
+                      window.dispatchEvent(new CustomEvent('restore-camera-focus'));
+                    }
+                  }}
+                  className={`group flex items-center gap-2.5 rounded-xl border px-3 py-2 text-left shadow-lg backdrop-blur-xl transition cursor-pointer ${
+                    selected
+                      ? 'border-[#f5c26f] bg-[#1d2b30]/95 shadow-[0_0_20px_rgba(245,194,111,0.25)] text-[#f5c26f]'
+                      : 'border-[#c9d1c6]/15 bg-[#141f23]/90 text-[#d4ded7] hover:border-[#f5c26f]/40 hover:bg-[#1a272c]'
+                  }`}
+                >
+                  <span
+                    className={`mono grid h-6 w-6 shrink-0 place-items-center rounded-lg text-[9px] font-bold ${
+                      selected
+                        ? 'bg-[#d69a43]/25 text-[#f5c26f]'
+                        : 'bg-white/[.06] text-[#869692] group-hover:text-white'
+                    }`}
+                  >
+                    {numLabel}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-[11px] font-bold tracking-tight">
+                    {view.label}
+                  </span>
+                  {view.mode === 'orbit' ? (
+                    <Eye size={13} className={selected ? 'text-[#f5c26f]' : 'text-[#6f7e7a]'} />
+                  ) : view.mode === 'drone' ? (
+                    <Video size={13} className={selected ? 'text-[#f5c26f]' : 'text-[#8ec8ff]'} />
+                  ) : (
+                    <Footprints size={13} className={selected ? 'text-[#f5c26f]' : 'text-[#62d1a2]'} />
+                  )}
+                </button>
+              );
+            })}
+          </div>
         );
       })}
     </div>
@@ -241,6 +266,7 @@ export default function UIOverlay({
   onRenderModeChange,
   enableShadows = true,
   onToggleShadows,
+  onToggleWalkMode,
 }: UIOverlayProps) {
   const fallbackTelemetry = useTelemetry();
   const telemetry = propTelemetry ?? fallbackTelemetry;
@@ -332,16 +358,6 @@ export default function UIOverlay({
 
   const choosePOI = (poi: POIInfo) => setSelectedPOI(poi);
 
-  const safeAlert = (msg: string) => {
-    try {
-      if (typeof window !== 'undefined' && typeof window.alert === 'function') {
-        window.alert(msg);
-      }
-    } catch {
-      // In sandbox iframes, window.alert can be prohibited; caught cleanly
-    }
-  };
-
   /**
    * Robust WebXR / OpenXR Initialization & Error Handling:
    * Checks navigator.xr and isSessionSupported('immersive-vr') before launching.
@@ -350,7 +366,6 @@ export default function UIOverlay({
   const handleEnterVR = async () => {
     if (typeof navigator === 'undefined' || !navigator.xr) {
       const msg = 'WebXR API не поддерживается данным браузером. Используйте Chrome/Edge или браузер VR-шлема.';
-      safeAlert(msg);
       setVrModal({
         open: true,
         title: 'WebXR не поддерживается',
@@ -362,7 +377,6 @@ export default function UIOverlay({
     try {
       const supported = await navigator.xr.isSessionSupported('immersive-vr');
       if (supported) {
-        // Init WebXR Session safely
         const btn = document.getElementById('vr-btn');
         if (btn) {
           btn.click();
@@ -371,7 +385,6 @@ export default function UIOverlay({
         await navigator.xr.requestSession('immersive-vr');
       } else {
         const msg = 'VR-оборудование (OpenXR Runtime) не обнаружено. Подключите шлем (Meta Quest / SteamVR).';
-        safeAlert(msg);
         setVrModal({
           open: true,
           title: 'VR-оборудование не обнаружено',
@@ -382,7 +395,6 @@ export default function UIOverlay({
       const errMsg = err instanceof Error ? err.message : String(err);
       console.warn('WebXR Error:', err);
       const msg = 'Ошибка инициализации VR: ' + errMsg;
-      safeAlert(msg);
       setVrModal({
         open: true,
         title: 'Ошибка инициализации VR',
@@ -552,6 +564,25 @@ export default function UIOverlay({
           <span>🛑</span>
           <span>{scramActive ? 'АЗ-5 АКТИВНА' : 'АЗ-5'}</span>
         </button>
+        {/* Walk / Orbit Mode Toggle */}
+        {onToggleWalkMode && controlMode !== 'drone' && (
+          <button
+            data-testid="button-toggle-walk-mode"
+            onClick={onToggleWalkMode}
+            title={controlMode === 'walk' ? 'Переключиться на свободный обзор камеры (Орбита)' : 'Включить режим ходьбы от первого лица (WASD)'}
+            className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition shadow-lg cursor-pointer ${
+              controlMode === 'walk'
+                ? 'border-[#62d1a2] bg-[#102922]/95 text-[#62d1a2] shadow-[0_0_18px_rgba(98,209,162,0.3)]'
+                : 'border-white/15 bg-[#142024]/95 text-[#c5d4cd] hover:border-[#f5c26f]/50 hover:text-[#f5c26f]'
+            }`}
+          >
+            <Footprints size={14} />
+            <span className="hidden lg:inline">
+              {controlMode === 'walk' ? 'Прогулка (WASD)' : 'Орбита'}
+            </span>
+          </button>
+        )}
+
         {/* Dedicated Cinematic Drone Fly-by Launcher Button */}
         <button
           data-testid="button-drone-flyby"
@@ -641,10 +672,10 @@ export default function UIOverlay({
               </div>
               <div>
                 <p className="text-[10px] font-extrabold uppercase tracking-[.15em] text-[#edf0e8]">
-                  Ракурсы / Viewpoints
+                  Навигация по объектам
                 </p>
                 <p className="mono text-[8px] uppercase tracking-[.12em] text-[#81918d]">
-                  VVER-1000 · Genplan Twin
+                  ВВЭР-1000 · РИТМ-200Н · VR
                 </p>
               </div>
             </div>
@@ -823,7 +854,7 @@ export default function UIOverlay({
         </div>
       )}
 
-      {/* 4. First-Person Walk Mode Crosshair & Click-to-Start Modal */}
+      {/* 4. First-Person Walk Mode Crosshair & Non-Blocking Interactive Prompt */}
       {controlMode === 'walk' && (
         <>
           <div
@@ -839,7 +870,7 @@ export default function UIOverlay({
               data-testid="button-click-to-walk"
               role="button"
               tabIndex={0}
-              aria-label="Кликните по экрану для включения обзора мышью (WASD — перемещение, Esc — выход)"
+              aria-label="Кликните по сцене для захвата курсора (WASD — ходьба, зажатая ЛКМ — обзор)"
               onClick={() => {
                 window.dispatchEvent(new Event('request-pointer-lock'));
                 const canvas = document.querySelector('canvas');
@@ -851,42 +882,14 @@ export default function UIOverlay({
                   }
                 }
               }}
-              className="panel-enter fixed inset-0 z-50 flex cursor-pointer items-center justify-center bg-black/40 backdrop-blur-sm transition-opacity"
+              className="pointer-events-auto fixed bottom-5 left-1/2 z-40 flex -translate-x-1/2 cursor-pointer items-center gap-3 rounded-2xl border border-[#e2a34f]/60 bg-[#142024]/92 px-4 py-2.5 text-xs text-[#e9eee7] shadow-[0_12px_40px_rgba(0,0,0,0.65)] backdrop-blur-xl transition hover:border-[#f5c26f] hover:bg-[#1a2b30] max-w-[92vw]"
             >
-              <div
-                className="relative mx-4 max-w-lg rounded-2xl border-2 border-[#e2a34f]/80 bg-[#142024]/95 p-6 text-center shadow-[0_0_60px_rgba(226,163,79,0.35)] backdrop-blur-2xl"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  window.dispatchEvent(new Event('request-pointer-lock'));
-                  const canvas = document.querySelector('canvas');
-                  if (canvas) canvas.requestPointerLock();
-                }}
-              >
-                <div className="mx-auto mb-3.5 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#e2a34f]/20 text-[#f5c26f] shadow-inner ring-1 ring-[#e2a34f]/50 animate-pulse">
-                  <Crosshair size={28} />
-                </div>
-                <h3 className="text-base font-extrabold tracking-tight text-[#f5f4ed] sm:text-lg">
-                  Кликните по экрану для включения обзора мышью (WASD — перемещение, Esc — выход)
-                </h3>
-                <p className="mt-2 text-xs text-[#a3b3ae]">
-                  Плавный обзор от первого лица (высота глаз 1.6 м). Для выхода из режима управления нажмите{' '}
-                  <kbd className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[11px] text-[#f5c26f]">
-                    Esc
-                  </kbd>
-                  .
-                </p>
-                <div className="mt-4 flex items-center justify-center gap-2 text-[11px] font-semibold text-[#f5c26f]">
-                  <span className="rounded-lg border border-[#e2a34f]/40 bg-[#e2a34f]/15 px-3 py-1 font-mono">
-                    W A S D
-                  </span>
-                  <span className="text-[#81908b]">движение</span>
-                  <span className="mx-1 text-[#4a5855]">·</span>
-                  <span className="rounded-lg border border-[#e2a34f]/40 bg-[#e2a34f]/15 px-3 py-1 font-mono">
-                    Мышь
-                  </span>
-                  <span className="text-[#81908b]">обзор</span>
-                </div>
-              </div>
+              <Crosshair size={16} className="shrink-0 text-[#f5c26f]" />
+              <span className="font-semibold">
+                <span className="text-[#f5c26f]">WASD</span> — ходьба ·{' '}
+                <span className="text-[#f5c26f]">Мышь / клик</span> — свободный осмотр ·{' '}
+                <span className="text-[#9caeaa]">Esc — курсор</span>
+              </span>
             </div>
           )}
         </>

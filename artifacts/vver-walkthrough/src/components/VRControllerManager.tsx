@@ -51,7 +51,7 @@ export interface VRControllerManagerProps {
 function LocomotionRig({ viewTarget, floorY, activeViewId }: VRControllerManagerProps) {
   const playerRef = useRef<THREE.Group>(null);
   const { session } = useXR();
-  const [teleportPos, setTeleportPos] = useState<[number, number, number]>([0, 0, 52]);
+  const [teleportPos, setTeleportPos] = useState<[number, number, number]>([0, 0, 42]);
   const [showRing, setShowRing] = useState(false);
 
   // Динамический перенос VR Dolly при смене ракурса в UI без сбивания трекинга головы
@@ -69,11 +69,11 @@ function LocomotionRig({ viewTarget, floorY, activeViewId }: VRControllerManager
     }
   }, [viewTarget, floorY]);
 
-  // Слушатель старта сессии WebXR: переносит игрока на отметку площадки перед сборкой
+  // Слушатель старта сессии WebXR: переносит игрока на отметку площадки выбранной зоны
   useEffect(() => {
     const handleXRStart = (e: Event) => {
       const customEvent = e as CustomEvent<{ spawn?: [number, number, number] }>;
-      const spawn = customEvent.detail?.spawn || [0, 0, 52];
+      const spawn = customEvent.detail?.spawn || [0, 0, 42];
       if (playerRef.current) {
         playerRef.current.position.set(spawn[0], spawn[1], spawn[2]);
         playerRef.current.updateMatrixWorld(true);
@@ -99,7 +99,7 @@ function LocomotionRig({ viewTarget, floorY, activeViewId }: VRControllerManager
     'right',
   );
 
-  // 2. VR player grounding and safe perimeter boundary clamping (radius 90m around assembly pad)
+  // 2. VR player grounding and safe perimeter boundary clamping (radius 130m across VVER-1000 & RITM-200N pad)
   useFrame(() => {
     if (!session || !playerRef.current) return;
     const p = playerRef.current.position;
@@ -110,7 +110,7 @@ function LocomotionRig({ viewTarget, floorY, activeViewId }: VRControllerManager
     }
 
     const r = Math.hypot(p.x, p.z);
-    const maxPadRadius = 90;
+    const maxPadRadius = 130;
     if (r > maxPadRadius) {
       const s = maxPadRadius / r;
       p.x *= s;
@@ -123,7 +123,7 @@ function LocomotionRig({ viewTarget, floorY, activeViewId }: VRControllerManager
       setShowRing(true);
       if (playerRef.current) {
         const isWalk = activeViewId && activeViewId.startsWith('walk');
-        const defaultSpawn: [number, number, number] = [0, 0, 52];
+        const defaultSpawn: [number, number, number] = [0, 0, 42];
         const spawnX = isWalk && viewTarget ? viewTarget[0] : defaultSpawn[0];
         const spawnY = isWalk && floorY !== undefined ? floorY : defaultSpawn[1];
         const spawnZ = isWalk && viewTarget ? viewTarget[2] : defaultSpawn[2];
@@ -141,7 +141,7 @@ function LocomotionRig({ viewTarget, floorY, activeViewId }: VRControllerManager
     <>
       <XROrigin
         ref={playerRef as RefObject<THREE.Group>}
-        position={[0, 0, 52]}
+        position={[0, 0, 42]}
       />
       <VRTeleportRing position={teleportPos} visible={showRing} />
     </>

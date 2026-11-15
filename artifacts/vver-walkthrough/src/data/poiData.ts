@@ -478,9 +478,12 @@ export const POI_LIST: POIInfo[] = [
 
 export type ViewMode = 'orbit' | 'walk' | 'drone';
 
+export type FloorGroup = 'overview' | 'vver' | 'ritm';
+
 export type FloorTarget = {
   id: string;
   label: string;
+  group: FloorGroup;
   floorY: number;
   cameraPos: [number, number, number];
   target?: [number, number, number];
@@ -490,59 +493,102 @@ export type FloorTarget = {
 export const FLOOR_VIEWS: FloorTarget[] = [
   {
     id: 'view-aerial',
-    label: '🗺️ Общий вид сборки (3/4) / Assembly Overview',
+    label: '🗺️ Генплан станции (Общий вид)',
+    group: 'overview',
     floorY: 0,
-    cameraPos: [42, 22, 46],
+    cameraPos: [42, 24, 48],
     target: [0, 4, 0],
     mode: 'orbit',
-  },
-  {
-    id: 'view-front',
-    label: '🏭 Главный фасад (Юг) / Front Elevation',
-    floorY: 0,
-    cameraPos: [0, 14, 52],
-    target: [0, 4, 0],
-    mode: 'orbit',
-  },
-  {
-    id: 'view-east-iso',
-    label: '🧭 Северо-Восточный ракурс / North-East Angle',
-    floorY: 0,
-    cameraPos: [44, 22, -44],
-    target: [0, 4, 0],
-    mode: 'orbit',
-  },
-  {
-    id: 'view-top',
-    label: '📐 Вид сверху (План) / Top Plan View',
-    floorY: 0,
-    cameraPos: [0, 72, 10],
-    target: [0, 2, 0],
-    mode: 'orbit',
-  },
-  {
-    id: 'view-detail',
-    label: '🔬 Крупный план узлов / Close-Up Detail',
-    floorY: 0,
-    cameraPos: [16, 8, 18],
-    target: [0, 3, 0],
-    mode: 'orbit',
-  },
-  {
-    id: 'walk-tour',
-    label: '🚶 VR / Пеший обход (Уровень 0м) / Ground Walk',
-    floorY: 0,
-    cameraPos: [0, 1.6, 36],
-    target: [0, 4, 0],
-    mode: 'walk',
   },
   {
     id: 'view-drone',
-    label: '🛸 Дрон-облёт сборки / Cinematic Drone Fly-By',
+    label: '🛸 Дрон-облёт (Кино-тур)',
+    group: 'overview',
     floorY: 0,
     cameraPos: [-42, 22, 42],
     target: [0, 4, 0],
     mode: 'drone',
+  },
+  {
+    id: 'walk-tour',
+    label: '🚶 Пеший / VR обход (Площадка 0м)',
+    group: 'overview',
+    floorY: 0,
+    cameraPos: [0, 1.6, 42],
+    target: [0, 4, 0],
+    mode: 'walk',
+  },
+  {
+    id: 'view-reactor-hall',
+    label: '⚛️ Центральный зал реактора (ВВЭР)',
+    group: 'vver',
+    floorY: 0,
+    cameraPos: [-20, 10.5, -4],
+    target: [-28, 5.2, -13.4],
+    mode: 'orbit',
+  },
+  {
+    id: 'view-polar-crane',
+    label: '🏗️ Эстакада полярного крана',
+    group: 'vver',
+    floorY: 0,
+    cameraPos: [-16, 12.5, -18],
+    target: [-26, 6.5, -13.4],
+    mode: 'orbit',
+  },
+  {
+    id: 'view-turbine-hall',
+    label: '⚙️ Машинный зал (Турбоагрегат)',
+    group: 'vver',
+    floorY: 0,
+    cameraPos: [18, 8.5, -2],
+    target: [4, 2.0, -13.8],
+    mode: 'orbit',
+  },
+  {
+    id: 'walk-vver-mcr',
+    label: '🖥️ БЩУ ВВЭР-1000 (Пульт +12.2м)',
+    group: 'vver',
+    floorY: 12.2,
+    cameraPos: [-18, 13.8, 13.8],
+    target: [-18, 13.6, 8.0],
+    mode: 'walk',
+  },
+  {
+    id: 'walk-basement',
+    label: '🔌 АСУ ТП / Серверная подвала (-5.0м)',
+    group: 'vver',
+    floorY: -5.0,
+    cameraPos: [0, -3.4, 7.6],
+    target: [0, -3.5, 4.0],
+    mode: 'walk',
+  },
+  {
+    id: 'view-ritm-overview',
+    label: '🧊 АСММ РИТМ-200Н (Общий вид)',
+    group: 'ritm',
+    floorY: 0,
+    cameraPos: [62, 18, 72],
+    target: [76, 6, 34],
+    mode: 'orbit',
+  },
+  {
+    id: 'view-ritm-core',
+    label: '🔬 Реакторный блок РИТМ-200Н',
+    group: 'ritm',
+    floorY: 0,
+    cameraPos: [62, 10, 50],
+    target: [62, 5.5, 34],
+    mode: 'orbit',
+  },
+  {
+    id: 'walk-smr-mcr',
+    label: '🎛️ БЩУ малой АЭС РИТМ-200Н (+3.6м)',
+    group: 'ritm',
+    floorY: 3.6,
+    cameraPos: [62, 5.2, 26.5],
+    target: [62, 4.8, 17.5],
+    mode: 'walk',
   },
 ];
 

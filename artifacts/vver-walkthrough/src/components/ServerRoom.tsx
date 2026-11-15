@@ -359,7 +359,13 @@ export default function ServerRoom() {
   return (
     <group>
       {/* 1. Raised Access Computer Flooring at -5.0m */}
-      <mesh position={[0, floorY - 0.04, 0]} receiveShadow castShadow>
+      <mesh
+        position={[0, floorY - 0.04, 0]}
+        receiveShadow
+        castShadow
+        name="ServerRoom_Floor"
+        userData={{ isFloor: true, isWalkableFloor: true, floorLevel: floorY, floorY }}
+      >
         <boxGeometry args={[roomW, 0.08, roomD]} />
         <primitive object={raisedFloorMat} attach="material" />
       </mesh>

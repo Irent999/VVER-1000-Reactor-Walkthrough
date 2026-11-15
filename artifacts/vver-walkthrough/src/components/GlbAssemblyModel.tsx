@@ -170,47 +170,77 @@ export default function GlbAssemblyModel({
           }
         }
 
-        // 5. Настройка реалистичных материалов АЭС (сохраняем осмысленные CAD-цвета и прозрачность,
-        // а нейтральные/белые/STL-элементы окрашиваем в индустриальную палитру АЭС)
-        const baseConcreteMaterial = new THREE.MeshStandardMaterial({
-          color: 0x9aa3ad,
+        // 5. Назначение реалистичной PBR-палитры современной АЭС (полный уход от зелёного цвета)
+        const baseConcreteMat = new THREE.MeshStandardMaterial({
+          color: 0x9aa3ad, // Архитектурный светло-серый матовый бетон (фундамент, плита, контайнмент)
           roughness: 0.85,
           metalness: 0.05,
           side: THREE.DoubleSide,
         });
 
-        const stainlessSteelMaterial = new THREE.MeshStandardMaterial({
-          color: 0xc4ccd4,
+        const structuralConcreteLightMat = new THREE.MeshStandardMaterial({
+          color: 0xb2bac2, // Светлый архитектурный бетон верхних конструкций и купола
+          roughness: 0.84,
+          metalness: 0.06,
+          side: THREE.DoubleSide,
+        });
+
+        const structuralConcreteDarkMat = new THREE.MeshStandardMaterial({
+          color: 0x7c858f, // Конструкционный железобетон цоколей и опорных стен
+          roughness: 0.86,
+          metalness: 0.06,
+          side: THREE.DoubleSide,
+        });
+
+        const stainlessSteelMat = new THREE.MeshStandardMaterial({
+          color: 0xc4ccd4, // Сатинированная нержавеющая сталь (корпуса оборудования, ПГ, турбоагрегат)
           roughness: 0.35,
           metalness: 0.75,
           side: THREE.DoubleSide,
         });
 
-        const detailMaterials = [
-          new THREE.MeshStandardMaterial({
-            color: 0x3b424c,
-            roughness: 0.42,
-            metalness: 0.7,
-            side: THREE.DoubleSide,
-          }),
-          new THREE.MeshStandardMaterial({
-            color: 0x2b5b84,
-            roughness: 0.38,
-            metalness: 0.52,
-            side: THREE.DoubleSide,
-          }),
-          new THREE.MeshStandardMaterial({
-            color: 0xd49b27,
-            roughness: 0.4,
-            metalness: 0.45,
-            side: THREE.DoubleSide,
-          }),
-        ];
+        const craneYellowMat = new THREE.MeshStandardMaterial({
+          color: 0xf0a500, // Промышленный жёлтый (полярный кран, подкрановые эстакады)
+          roughness: 0.38,
+          metalness: 0.45,
+          side: THREE.DoubleSide,
+        });
+
+        const darkGraphiteMat = new THREE.MeshStandardMaterial({
+          color: 0x3b424c, // Тёмно-графитовый металл (трубопроводы, арматура, рамы)
+          roughness: 0.42,
+          metalness: 0.72,
+          side: THREE.DoubleSide,
+        });
+
+        const techBlueMat = new THREE.MeshStandardMaterial({
+          color: 0x2b5b84, // Технический синий (трубопроводы охлаждения, кожухи, приводы)
+          roughness: 0.38,
+          metalness: 0.55,
+          side: THREE.DoubleSide,
+        });
+
+        const accentOchreMat = new THREE.MeshStandardMaterial({
+          color: 0xd49b27, // Индустриальный охристо-жёлтый акцент (клапаны, обвязка, ограждения)
+          roughness: 0.4,
+          metalness: 0.48,
+          side: THREE.DoubleSide,
+        });
+
+        const glazingCutawayMat = new THREE.MeshStandardMaterial({
+          color: 0xcfdbe6, // Полупрозрачное витражное остекление / срез оболочки
+          roughness: 0.2,
+          metalness: 0.12,
+          transparent: true,
+          opacity: 0.26,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        });
 
         let meshCount = 0;
         let triangleCount = 0;
-        let detailIndex = 0;
-        const hsl = { h: 0, s: 0, l: 0 };
+        let concreteIndex = 0;
+        let pipingIndex = 0;
         const replacedOriginalMaterials = new Set<THREE.Material>();
 
         const trackOriginalMaterial = (mesh: THREE.Mesh) => {
@@ -220,7 +250,8 @@ export default function GlbAssemblyModel({
           }
         };
 
-        for (const mesh of meshes) {
+        for (let idx = 0; idx < meshes.length; idx++) {
+          const mesh = meshes[idx];
           meshCount++;
           mesh.visible = true;
           mesh.frustumCulled = true;
@@ -228,71 +259,80 @@ export default function GlbAssemblyModel({
           mesh.receiveShadow = true;
 
           const geo = mesh.geometry;
+          let vertCount = 0;
           if (geo) {
             if (geo.index) {
               triangleCount += geo.index.count / 3;
             } else if (geo.attributes.position) {
               triangleCount += geo.attributes.position.count / 3;
             }
-          }
-
-          const mSize = meshBoxes.get(mesh) ?? new THREE.Vector3(1, 1, 1);
-
-          // Самый крупный/плоский базовый меш (плита основания) -> матовый архитектурный бетон
-          if (mesh === largestBaseMesh) {
-            trackOriginalMaterial(mesh);
-            mesh.material = baseConcreteMaterial;
-            continue;
+            vertCount = geo.attributes.position ? geo.attributes.position.count : 0;
           }
 
           const origMat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
-          let hasOriginalMeaningfulColor = false;
-          let isOriginalTransparent = false;
-          const origColor = new THREE.Color(0xc4ccd4);
-          let origOpacity = 1.0;
-
-          if (origMat && 'color' in origMat && origMat.color instanceof THREE.Color) {
-            origColor.copy(origMat.color);
-            origColor.getHSL(hsl);
-            origOpacity = 'opacity' in origMat && typeof origMat.opacity === 'number' ? origMat.opacity : 1.0;
-            isOriginalTransparent = Boolean('transparent' in origMat && origMat.transparent && origOpacity < 0.98);
-            hasOriginalMeaningfulColor = hsl.s > 0.14;
-          }
+          const origName = (origMat?.name ?? '').toUpperCase();
+          const origOpacity =
+            origMat && 'opacity' in origMat && typeof origMat.opacity === 'number'
+              ? origMat.opacity
+              : 1.0;
+          const isOriginalTransparent = Boolean(
+            origMat && 'transparent' in origMat && origMat.transparent && origOpacity < 0.98
+          );
 
           trackOriginalMaterial(mesh);
 
+          // 1. Полупрозрачные витражи / разрезы стен
           if (isOriginalTransparent) {
-            // Прозрачные разрезы / остекление оболочек из CAD
-            mesh.material = new THREE.MeshStandardMaterial({
-              color: hasOriginalMeaningfulColor ? origColor : new THREE.Color(0xd0dce5),
-              roughness: 0.25,
-              metalness: 0.1,
-              transparent: true,
-              opacity: Math.max(0.22, Math.min(origOpacity, 0.52)),
-              depthWrite: false,
-              side: THREE.DoubleSide,
-            });
+            mesh.material = glazingCutawayMat;
             mesh.castShadow = false;
-          } else if (hasOriginalMeaningfulColor) {
-            // Сохраняем реальный цветной CAD-материал (убираем пластиковое зануление specular из ImageToStl)
-            mesh.material = new THREE.MeshStandardMaterial({
-              color: origColor,
-              roughness: 0.42,
-              metalness: 0.45,
-              side: THREE.DoubleSide,
-            });
-          } else {
-            // Нейтральный белый/серый материал -> распределяем по индустриальной палитре АЭС
-            const maxMeshDim = Math.max(mSize.x, mSize.y, mSize.z);
-            const isLargeEquipmentOrShell = maxMeshDim >= targetMaxSize * 0.14;
-
-            if (isLargeEquipmentOrShell) {
-              mesh.material = stainlessSteelMaterial;
-            } else {
-              mesh.material = detailMaterials[detailIndex % detailMaterials.length];
-              detailIndex++;
-            }
+            continue;
           }
+
+          // 2. Фундаментная плита основания
+          if (mesh === largestBaseMesh) {
+            mesh.material = baseConcreteMat;
+            continue;
+          }
+
+          const mSize = meshBoxes.get(mesh) ?? new THREE.Vector3(1, 1, 1);
+          const maxMeshDim = Math.max(mSize.x, mSize.y, mSize.z);
+
+          // 3. Мостовой/полярный кран и подкрановые эстакады (в исходном CAD жёлтые FF00FFFF / FF33FFFF / FF00CCCC / FF009999)
+          if (
+            origName.includes('FFFF') ||
+            origName.includes('CCCC') ||
+            origName.includes('009999')
+          ) {
+            mesh.material = craneYellowMat;
+            continue;
+          }
+
+          // 4. Корпуса оборудования, парогенераторы, турбоагрегат и реакторный блок -> сатинированная нержавеющая сталь
+          // Включает бывшие зелёные корпуса M0, M1, M10 (FF006633) и плотную геометрию машзала M7 (>150k вершин)
+          if (origName.includes('006633') || vertCount >= 180000) {
+            mesh.material = stainlessSteelMat;
+            continue;
+          }
+
+          // 5. Синие технологические узлы / кожухи из CAD (FF994C00 / FF663300 / FFFF7F00)
+          if (origName.includes('994C00') || origName.includes('663300') || origName.includes('FF7F00')) {
+            mesh.material = techBlueMat;
+            continue;
+          }
+
+          // 6. Крупные строительные конструкции и защитная оболочка (контайнмент, стены, перекрытия)
+          const isLargeConcreteStructure = maxMeshDim >= targetMaxSize * 0.16 && vertCount < 180000;
+          if (isLargeConcreteStructure) {
+            const concretePalette = [baseConcreteMat, structuralConcreteLightMat, structuralConcreteDarkMat];
+            mesh.material = concretePalette[concreteIndex % concretePalette.length];
+            concreteIndex++;
+            continue;
+          }
+
+          // 7. Мелкие детали, трубопроводы, арматура, клапаны и технологические узлы (включая бывшие салатовые M3/M14/M15)
+          const pipingPalette = [darkGraphiteMat, techBlueMat, accentOchreMat];
+          mesh.material = pipingPalette[pipingIndex % pipingPalette.length];
+          pipingIndex++;
         }
 
         for (const oldMat of replacedOriginalMaterials) {

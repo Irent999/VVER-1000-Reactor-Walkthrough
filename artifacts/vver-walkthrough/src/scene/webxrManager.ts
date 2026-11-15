@@ -30,7 +30,7 @@ export interface WebXRSceneManagerProps {
 }
 
 export default function WebXRSceneManager({
-  activeSpawnPos = [0, 0, 52],
+  activeSpawnPos = [0, 0, 42],
   floorY = 0,
   activeViewId,
 }: WebXRSceneManagerProps) {
@@ -134,7 +134,7 @@ export default function WebXRSceneManager({
       const isWalk = activeViewId && activeViewId.startsWith('walk');
       const spawnX = isWalk && currentSpawnRef.current ? currentSpawnRef.current[0] : 0;
       const spawnY = isWalk && currentFloorYRef.current !== undefined ? currentFloorYRef.current : 0;
-      const spawnZ = isWalk && currentSpawnRef.current ? currentSpawnRef.current[2] : 52;
+      const spawnZ = isWalk && currentSpawnRef.current ? currentSpawnRef.current[2] : 42;
 
       if (xrRigGroupRef.current) {
         xrRigGroupRef.current.position.set(spawnX, spawnY, spawnZ);

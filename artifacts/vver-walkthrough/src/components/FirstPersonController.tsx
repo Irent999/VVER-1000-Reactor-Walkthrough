@@ -56,11 +56,21 @@ export default function FirstPersonController({
   const floorCandidates = useRef<THREE.Mesh[]>([]);
   const lastCandidateRefresh = useRef(0);
 
-  // Sync camera spawn position & initialize target orientation
+  // Smooth transition glide when switching walk zones
+  const walkGlideActive = useRef(false);
+  const walkGlideStart = useRef(0);
+  const walkGlideDuration = 0.85;
+  const walkGlideStartPos = useRef(new THREE.Vector3());
+  const walkGlideEndPos = useRef(new THREE.Vector3());
+  const walkGlideStartYaw = useRef(0);
+  const walkGlideStartPitch = useRef(0);
+  const walkGlideEndYaw = useRef(0);
+  const walkGlideEndPitch = useRef(0);
+
+  // Sync camera spawn position & initialize target orientation with smooth glide
   const targetKey = lookAtTarget ? `${lookAtTarget[0]}:${lookAtTarget[1]}:${lookAtTarget[2]}` : '';
   const spawnKey = `${spawnPosition[0]}:${spawnPosition[1]}:${spawnPosition[2]}:${targetKey}`;
   useEffect(() => {
-    camera.position.set(spawnPosition[0], spawnPosition[1], spawnPosition[2]);
     const eyeHeight = spawnPosition[1] >= 34.0 ? 1.8 : EYE_HEIGHT;
     currentFloorY.current = spawnPosition[1] - eyeHeight;
     velocity.current.set(0, 0, 0);
@@ -80,13 +90,16 @@ export default function FirstPersonController({
       lookAngle = Math.atan2(-spawnPosition[0], -spawnPosition[2]);
     }
 
-    targetYaw.current = lookAngle;
-    currentYaw.current = lookAngle;
-    targetPitch.current = pitchAngle;
-    currentPitch.current = pitchAngle;
-
-    camera.rotation.order = 'YXZ';
-    camera.rotation.set(pitchAngle, lookAngle, 0);
+    const startEuler = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ');
+    walkGlideStartPos.current.copy(camera.position);
+    walkGlideEndPos.current.set(spawnPosition[0], spawnPosition[1], spawnPosition[2]);
+    walkGlideStartYaw.current = startEuler.y;
+    walkGlideStartPitch.current = startEuler.x;
+    walkGlideEndYaw.current = lookAngle;
+    walkGlideEndPitch.current = pitchAngle;
+    walkGlideStart.current = performance.now();
+    walkGlideActive.current = true;
+    invalidate();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [camera, spawnKey]);
 
@@ -311,6 +324,35 @@ export default function FirstPersonController({
   useFrame((_, dt) => {
     const frameDt = Math.min(dt, 0.05);
 
+    // 0. Smooth glide when switching walk zones from navigation menu
+    if (walkGlideActive.current) {
+      const elapsed = (performance.now() - walkGlideStart.current) / 1000;
+      const p = Math.min(1, elapsed / walkGlideDuration);
+      const ease = p * p * (3 - 2 * p);
+
+      camera.position.lerpVectors(walkGlideStartPos.current, walkGlideEndPos.current, ease);
+
+      // Shortest-angle yaw interpolation
+      let deltaYaw = walkGlideEndYaw.current - walkGlideStartYaw.current;
+      while (deltaYaw > Math.PI) deltaYaw -= Math.PI * 2;
+      while (deltaYaw < -Math.PI) deltaYaw += Math.PI * 2;
+      const yaw = walkGlideStartYaw.current + deltaYaw * ease;
+      const pitch = THREE.MathUtils.lerp(walkGlideStartPitch.current, walkGlideEndPitch.current, ease);
+
+      targetYaw.current = yaw;
+      currentYaw.current = yaw;
+      targetPitch.current = pitch;
+      currentPitch.current = pitch;
+      camera.rotation.order = 'YXZ';
+      camera.rotation.set(pitch, yaw, 0);
+      invalidate();
+
+      if (p >= 1) {
+        walkGlideActive.current = false;
+      }
+      return;
+    }
+
     // 1. Smooth camera rotation damping (eliminates mouse stutter & jerking)
     const dampFactor = 28;
     currentYaw.current = THREE.MathUtils.damp(currentYaw.current, targetYaw.current, dampFactor, frameDt);
@@ -374,11 +416,11 @@ export default function FirstPersonController({
         const nextX = camera.position.x + stepX;
         const nextZ = camera.position.z + stepZ;
         const dist = Math.hypot(nextX, nextZ);
-        if (dist <= 90) {
+        if (dist <= 130) {
           camera.position.x = nextX;
           camera.position.z = nextZ;
         } else {
-          const clampScale = 90 / dist;
+          const clampScale = 130 / dist;
           camera.position.x = nextX * clampScale;
           camera.position.z = nextZ * clampScale;
         }

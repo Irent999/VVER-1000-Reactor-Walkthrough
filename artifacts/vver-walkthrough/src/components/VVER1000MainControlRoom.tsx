@@ -37,14 +37,14 @@ const chromeMetalMat = new THREE.MeshStandardMaterial({ color: '#e2e8f0', roughn
 const leatherMat = new THREE.MeshStandardMaterial({ color: '#111827', roughness: 0.5, metalness: 0.1 });
 
 // Полупрозрачное витражное стекло смотровой галереи БЩУ ВВЭР-1000
-const glassViewingMat = new THREE.MeshPhysicalMaterial({
+const glassViewingMat = new THREE.MeshStandardMaterial({
   color: '#cffafe',
-  transmission: 0.88,
   transparent: true,
   opacity: 0.22,
-  roughness: 0.12,
+  roughness: 0.15,
   metalness: 0.1,
   depthWrite: false,
+  side: THREE.DoubleSide,
 });
 
 const structuralConcreteDark = new THREE.MeshStandardMaterial({ color: '#3f4752', roughness: 0.82, metalness: 0.1 });

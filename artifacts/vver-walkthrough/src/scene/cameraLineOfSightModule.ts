@@ -43,35 +43,23 @@ export const INDOOR_ROOM_CONSTRAINTS: Record<string, {
   safeSpawn: [number, number, number];
   preferredTarget: [number, number, number];
 }> = {
-  // 1. БЩУ ВВЭР-1000 (Левое вспомогательное здание РО на отметке +13.20м)
+  // 1. БЩУ ВВЭР-1000 (вспомогательный корпус на отметке +12.20м)
   'walk-vver-mcr': {
-    bounds: { minX: -38.5, maxX: -25.5, minY: 13.5, maxY: 17.5, minZ: -4.2, maxZ: 4.2 },
-    safeSpawn: [-32.0, 14.80, 1.8], // В центре помещения перед консолями
-    preferredTarget: [-32.0, 14.70, -2.5], // Взгляд на операторский стол и видеостену
+    bounds: { minX: -24.5, maxX: -11.5, minY: 12.5, maxY: 16.5, minZ: 7.8, maxZ: 16.2 },
+    safeSpawn: [-18.0, 13.8, 13.8],
+    preferredTarget: [-18.0, 13.6, 8.0],
   },
   // 2. БЩУ РИТМ-200Н (АСММ, отметка +3.60м)
   'walk-smr-mcr': {
-    bounds: { minX: 146.0, maxX: 162.0, minY: 4.0, maxY: 7.5, minZ: 61.0, maxZ: 73.0 },
-    safeSpawn: [154.0, 5.20, 64.0], // В центре комнаты перед консолями
-    preferredTarget: [154.0, 4.80, 69.0], // Взгляд строго на пульт и экраны
+    bounds: { minX: 54.0, maxX: 70.0, minY: 4.0, maxY: 7.5, minZ: 16.5, maxZ: 29.0 },
+    safeSpawn: [62.0, 5.2, 26.5],
+    preferredTarget: [62.0, 4.8, 17.5],
   },
-  // 3. Серверная АСУ ТП / DCS Server Vault (Отметка -5.0м, южный проход между стойками)
+  // 3. Серверная АСУ ТП / DCS Server Vault (Отметка -5.0м)
   'walk-basement': {
-    bounds: { minX: -14.0, maxX: 14.0, minY: -4.5, maxY: -1.0, minZ: 7.0, maxZ: 14.0 },
-    safeSpawn: [-3.5, -3.40, 9.5], // В широком южном проходе между стойками
-    preferredTarget: [0.0, -3.60, 10.5], // Взгляд вдоль прохода на стойки и терминал
-  },
-  // 4. Ловушка расплава УЛР (-10.0м)
-  'walk-core-catcher': {
-    bounds: { minX: -6.0, maxX: 6.0, minY: -9.5, maxY: -6.5, minZ: -8.0, maxZ: -4.0 },
-    safeSpawn: [0.0, -8.40, -6.2],
-    preferredTarget: [0.0, -8.00, 0.0],
-  },
-  // 5. Машинный зал ВВЭР-1000 (+12.0м)
-  'walk-turbine': {
-    bounds: { minX: 28.0, maxX: 125.0, minY: 12.5, maxY: 20.0, minZ: -28.0, maxZ: 4.0 },
-    safeSpawn: [33.0, 13.60, -4.0],
-    preferredTarget: [75.0, 14.50, -12.0],
+    bounds: { minX: -14.0, maxX: 14.0, minY: -4.5, maxY: -1.0, minZ: 5.5, maxZ: 14.0 },
+    safeSpawn: [0.0, -3.4, 7.6],
+    preferredTarget: [0.0, -3.5, 4.0],
   },
 };
 

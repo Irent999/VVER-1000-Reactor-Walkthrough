@@ -8,6 +8,9 @@ import type { OrbitControls as OCImpl } from 'three-stdlib';
 
 import GlbAssemblyModel, { type GlbLoadState } from '@/components/GlbAssemblyModel';
 import LowPolyEnvironment from '@/components/LowPolyEnvironment';
+import ServerRoom from '@/components/ServerRoom';
+import VVER1000MainControlRoom from '@/components/VVER1000MainControlRoom';
+import RITM200NFullComplex from '@/components/RITM200NModel';
 import VRControllerManager from '@/components/VRControllerManager';
 import DroneFlyByController, { type DroneWaymark } from '@/components/DroneFlyByController';
 import FirstPersonController from '@/components/FirstPersonController';
@@ -82,9 +85,12 @@ function SmoothCameraController({
     if (prevKey.current === currentKey) return;
     prevKey.current = currentKey;
 
-    if (mode === 'drone') {
+    if (mode !== 'orbit') {
       isTransitioning.current = false;
       onMovingChange?.(false);
+      if (controlsRef.current) {
+        controlsRef.current.enabled = false;
+      }
       invalidate();
       return;
     }
@@ -120,7 +126,7 @@ function SmoothCameraController({
   }, [camera, cameraPos, lookAt, mode, scene, viewId, currentKey, invalidate, onMovingChange]);
 
   useFrame(() => {
-    if (mode === 'drone') return;
+    if (mode !== 'orbit') return;
 
     if (isTransitioning.current) {
       invalidate();
@@ -186,13 +192,18 @@ function SceneContent({ reloadKey, onStatusChange }: SceneContentProps) {
     <group>
       {/* Облегченное Low-Poly окружение (< 1,500 полигонов, InstancedMesh) */}
       <LowPolyEnvironment groundY={0} />
-      {/* Реальная CAD-модель строго по пути /assembly.glb через GLTFLoader + <primitive /> */}
+      {/* Реальная CAD-модель ВВЭР-1000 строго по пути /assembly.glb через GLTFLoader + <primitive /> */}
       <GlbAssemblyModel
         key={reloadKey}
         targetMaxSize={75}
         groundY={0}
         onStatusChange={onStatusChange}
       />
+      {/* Недостающие ключевые зоны для интерактивного обхода и VR: БЩУ ВВЭР-1000 и АСУ ТП подвала */}
+      <VVER1000MainControlRoom position={[-18, 12.2, 12]} />
+      <ServerRoom />
+      {/* Комплекс малой АЭС РИТМ-200Н на восточной площадке */}
+      <RITM200NFullComplex position={[76, 0, 34]} />
     </group>
   );
 }
@@ -279,7 +290,15 @@ export default function App() {
   const [scrubProgress, setScrubProgress] = useState<number | null>(null);
 
   const activeViewData = FLOOR_VIEWS.find((v) => v.id === activeView) ?? FLOOR_VIEWS[0];
-  const controlMode: ViewMode = activeViewData.mode;
+  const [walkOverride, setWalkOverride] = useState<boolean | null>(null);
+  const controlMode: ViewMode =
+    activeViewData.mode === 'drone'
+      ? 'drone'
+      : walkOverride !== null
+      ? walkOverride
+        ? 'walk'
+        : 'orbit'
+      : activeViewData.mode;
 
   const isContinuousRendering =
     cameraMoving ||
@@ -345,6 +364,7 @@ export default function App() {
   const handleViewChange = useCallback((viewId: string) => {
     const view = FLOOR_VIEWS.find((v) => v.id === viewId);
     if (!view) return;
+    setWalkOverride(null);
     setActiveView(viewId);
     if (view.mode === 'walk') {
       setFloorTarget(view.floorY);
@@ -356,6 +376,13 @@ export default function App() {
       window.dispatchEvent(new CustomEvent('restore-camera-focus'));
     }
   }, []);
+
+  const handleToggleWalkMode = useCallback(() => {
+    setWalkOverride((prev) => {
+      const currentlyWalk = prev !== null ? prev : activeViewData.mode === 'walk';
+      return !currentlyWalk;
+    });
+  }, [activeViewData.mode]);
 
   const handleVRClick = useCallback(() => {
     const btn = document.getElementById('vr-btn');
@@ -371,7 +398,7 @@ export default function App() {
   }, []);
 
   const vrSpawnTarget: [number, number, number] =
-    activeViewData.mode === 'walk' ? activeViewData.cameraPos : [0, 0, 36];
+    activeViewData.mode === 'walk' ? activeViewData.cameraPos : [0, 0, 42];
 
   return (
     <div className="scene-grain w-full h-[100dvh] relative bg-[#182327] overflow-hidden">
@@ -427,14 +454,14 @@ export default function App() {
           <DemandRenderBridge active={isContinuousRendering} />
           <WebXRSceneManager
             activeSpawnPos={vrSpawnTarget}
-            floorY={0}
+            floorY={activeViewData.floorY}
             activeViewId={activeViewData.id}
           />
           <VisualizationModeManager mode={renderMode} />
 
           {/* Согласованный фон неба и линейный туман горизонта */}
           <color attach="background" args={['#bdd0e0']} />
-          <fog attach="fog" args={['#bdd0e0', 160, 520]} />
+          <fog attach="fog" args={['#bdd0e0', 180, 560]} />
 
           {!isVRPresenting && <AdaptiveDpr pixelated />}
 
@@ -465,7 +492,7 @@ export default function App() {
             </TeleportTarget>
             <VRControllerManager
               viewTarget={vrSpawnTarget}
-              floorY={0}
+              floorY={activeViewData.floorY}
               activeViewId={activeViewData.id}
             />
           </XR>
@@ -491,9 +518,13 @@ export default function App() {
               targetFloor={floorTarget}
               onArrived={handleFloorArrived}
               onLockChange={handlePointerLockChange}
-              spawnPosition={activeViewData.cameraPos}
+              spawnPosition={
+                activeViewData.mode === 'walk'
+                  ? activeViewData.cameraPos
+                  : [activeViewData.cameraPos[0], activeViewData.floorY + 1.6, activeViewData.cameraPos[2]]
+              }
               lookAtTarget={activeViewData.target}
-              freeGroundY={0}
+              freeGroundY={activeViewData.floorY}
             />
           ) : null}
         </Canvas>
@@ -603,6 +634,7 @@ export default function App() {
         onRenderModeChange={setRenderMode}
         enableShadows={enableShadows}
         onToggleShadows={() => setEnableShadows((s) => !s)}
+        onToggleWalkMode={handleToggleWalkMode}
       />
     </div>
   );

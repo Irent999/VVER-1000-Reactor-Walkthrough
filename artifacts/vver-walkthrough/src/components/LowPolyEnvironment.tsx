@@ -20,10 +20,10 @@ interface LowPolyEnvironmentProps {
 
 function getLowPolyHillHeight(x: number, z: number): number {
   const dist = Math.hypot(x, z);
-  // Ровная технологическая площадка в радиусе 105 м вокруг центральной сборки
-  if (dist <= 105) return 0;
+  // Ровная технологическая площадка в радиусе 142 м вокруг энергоблоков ВВЭР-1000 и РИТМ-200Н
+  if (dist <= 142) return 0;
 
-  const t = Math.min((dist - 105) / 140, 1.0);
+  const t = Math.min((dist - 142) / 140, 1.0);
   const smooth = t * t * (3 - 2 * t);
   const wave1 = Math.sin(x * 0.015) * Math.cos(z * 0.015) * 14;
   const wave2 = Math.sin((x + z) * 0.008) * 9;
@@ -78,7 +78,7 @@ export default function LowPolyEnvironment({ groundY = 0 }: LowPolyEnvironmentPr
 
   // 1. Облегченная Low-Poly сетка ландшафта (16x16 сегментов = всего 512 треугольников)
   const terrainGeo = useMemo(() => {
-    const geo = new THREE.PlaneGeometry(820, 820, 16, 16);
+    const geo = new THREE.PlaneGeometry(960, 960, 16, 16);
     const pos = geo.attributes.position;
     const colors = new Float32Array(pos.count * 3);
 
@@ -120,10 +120,10 @@ export default function LowPolyEnvironment({ groundY = 0 }: LowPolyEnvironmentPr
       return seed / 233280;
     };
 
-    // 40 Low-Poly деревьев по периметру (R = 115..190 м)
+    // 40 Low-Poly деревьев по периметру (R = 152..225 м)
     for (let i = 0; i < 40; i++) {
       const angle = (i / 40) * Math.PI * 2 + (rnd() - 0.5) * 0.1;
-      const radius = 118 + rnd() * 72;
+      const radius = 152 + rnd() * 72;
       const x = Math.cos(angle) * radius;
       const z = Math.sin(angle) * radius;
       const y = groundY + getLowPolyHillHeight(x, z);
@@ -143,10 +143,10 @@ export default function LowPolyEnvironment({ groundY = 0 }: LowPolyEnvironmentPr
       cMats.push(dummy.matrix.clone());
     }
 
-    // 16 Low-Poly камней на холмах (R = 115..220 м)
+    // 16 Low-Poly камней на холмах (R = 156..245 м)
     for (let i = 0; i < 16; i++) {
       const angle = (i / 16) * Math.PI * 2 + 0.25;
-      const radius = 122 + rnd() * 95;
+      const radius = 156 + rnd() * 90;
       const x = Math.cos(angle) * radius;
       const z = Math.sin(angle) * radius;
       const y = groundY + getLowPolyHillHeight(x, z);
@@ -192,7 +192,7 @@ export default function LowPolyEnvironment({ groundY = 0 }: LowPolyEnvironmentPr
         onUpdate={(self) => self.updateMatrix()}
       />
 
-      {/* 2. Центральная ровная технологическая площадка под GLB-сборку */}
+      {/* 2. Центральная ровная технологическая площадка под ВВЭР-1000 и РИТМ-200Н */}
       <mesh
         rotation={[-Math.PI / 2, 0, 0]}
         position={[0, groundY - 0.015, 0]}
@@ -201,7 +201,7 @@ export default function LowPolyEnvironment({ groundY = 0 }: LowPolyEnvironmentPr
         matrixAutoUpdate={false}
         onUpdate={(self) => self.updateMatrix()}
       >
-        <circleGeometry args={[92, 24]} />
+        <circleGeometry args={[132, 28]} />
       </mesh>
 
       {/* 3. Кольцевой бордюр и объездная Low-Poly дорога */}
@@ -212,7 +212,7 @@ export default function LowPolyEnvironment({ groundY = 0 }: LowPolyEnvironmentPr
         matrixAutoUpdate={false}
         onUpdate={(self) => self.updateMatrix()}
       >
-        <ringGeometry args={[91.5, 93.0, 24]} />
+        <ringGeometry args={[131.5, 133.0, 28]} />
       </mesh>
       <mesh
         rotation={[-Math.PI / 2, 0, 0]}
@@ -221,14 +221,14 @@ export default function LowPolyEnvironment({ groundY = 0 }: LowPolyEnvironmentPr
         matrixAutoUpdate={false}
         onUpdate={(self) => self.updateMatrix()}
       >
-        <ringGeometry args={[93.0, 102.0, 24]} />
+        <ringGeometry args={[133.0, 141.0, 28]} />
       </mesh>
 
       {/* 4. Две ультра-облегченные Low-Poly башни-градирни на дальнем фоне (всего по 10 сегментов) */}
-      {[-165, -165].map((tx, idx) => (
+      {[-195, -195].map((tx, idx) => (
         <mesh
           key={`lowpoly-tower-${idx}`}
-          position={[tx, groundY + 26, idx === 0 ? -85 : 55]}
+          position={[tx, groundY + 26, idx === 0 ? -95 : 65]}
           material={backdropTowerMat}
           matrixAutoUpdate={false}
           onUpdate={(self) => self.updateMatrix()}
