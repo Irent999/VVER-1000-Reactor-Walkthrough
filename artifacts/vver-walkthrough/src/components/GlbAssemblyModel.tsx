@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -20,19 +20,36 @@ interface GlbAssemblyModelProps {
   targetMaxSize?: number;
   /** Отметка уровня земли по оси Y (по умолчанию 0) */
   groundY?: number;
+  /** Коэффициент послойного среза (1.0 = монолит, 0.5 = полусрез, 0.0 = всё внутри) */
+  containmentOpacity?: number;
   /** Коллбэк состояния загрузки для отображения прогресса в HUD */
   onStatusChange?: (state: GlbLoadState) => void;
 }
 
 const MODEL_URL = '/assembly.glb';
 
+function computeCutawayHeight(opacity: number): number {
+  if (opacity >= 0.98) return 30;
+  if (opacity <= 0.5) {
+    return 1.4 + (Math.max(0, opacity) / 0.5) * 3.1;
+  }
+  return 4.5 + ((opacity - 0.5) / 0.48) * 7.5;
+}
+
 export default function GlbAssemblyModel({
   targetMaxSize = 75,
   groundY = 0,
+  containmentOpacity = 1.0,
   onStatusChange,
 }: GlbAssemblyModelProps) {
   const { invalidate } = useThree();
   const [loadedScene, setLoadedScene] = useState<THREE.Object3D | null>(null);
+  const cutawayPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, -1, 0), 30), []);
+
+  useEffect(() => {
+    cutawayPlane.constant = computeCutawayHeight(containmentOpacity);
+    invalidate();
+  }, [containmentOpacity, cutawayPlane, invalidate]);
 
   // Критично для frameloop="demand": вызываем invalidate() ПОСЛЕ монтирования <primitive /> в сцену
   useEffect(() => {
@@ -171,11 +188,22 @@ export default function GlbAssemblyModel({
         }
 
         // 5. Назначение реалистичной PBR-палитры современной АЭС (полный уход от зелёного цвета)
+        // Плита основания не режется плоскостью разреза (cutaway)
         const baseConcreteMat = new THREE.MeshStandardMaterial({
-          color: 0x9aa3ad, // Архитектурный светло-серый матовый бетон (фундамент, плита, контайнмент)
+          color: 0x9aa3ad, // Архитектурный светло-серый матовый бетон (плита площадки)
+          roughness: 0.85,
+          metalness: 0.05,
+          side: THREE.FrontSide,
+        });
+
+        // Строительные конструкции и защитная оболочка режутся плоскостью cutaway для осмотра интерьера
+        const buildingConcreteMat = new THREE.MeshStandardMaterial({
+          color: 0x9aa3ad, // Матовый светло-серый бетон (защитная оболочка и корпуса)
           roughness: 0.85,
           metalness: 0.05,
           side: THREE.DoubleSide,
+          clippingPlanes: [cutawayPlane],
+          clipShadows: true,
         });
 
         const structuralConcreteLightMat = new THREE.MeshStandardMaterial({
@@ -183,6 +211,8 @@ export default function GlbAssemblyModel({
           roughness: 0.84,
           metalness: 0.06,
           side: THREE.DoubleSide,
+          clippingPlanes: [cutawayPlane],
+          clipShadows: true,
         });
 
         const structuralConcreteDarkMat = new THREE.MeshStandardMaterial({
@@ -190,6 +220,8 @@ export default function GlbAssemblyModel({
           roughness: 0.86,
           metalness: 0.06,
           side: THREE.DoubleSide,
+          clippingPlanes: [cutawayPlane],
+          clipShadows: true,
         });
 
         const stainlessSteelMat = new THREE.MeshStandardMaterial({
@@ -221,9 +253,9 @@ export default function GlbAssemblyModel({
         });
 
         const accentOchreMat = new THREE.MeshStandardMaterial({
-          color: 0xd49b27, // Индустриальный охристо-жёлтый акцент (клапаны, обвязка, ограждения)
-          roughness: 0.4,
-          metalness: 0.48,
+          color: 0x8b95a1, // Стальной конструкционный оттенок для мелкой обвязки
+          roughness: 0.42,
+          metalness: 0.65,
           side: THREE.DoubleSide,
         });
 
@@ -232,9 +264,10 @@ export default function GlbAssemblyModel({
           roughness: 0.2,
           metalness: 0.12,
           transparent: true,
-          opacity: 0.26,
+          opacity: 0.24,
           depthWrite: false,
           side: THREE.DoubleSide,
+          clippingPlanes: [cutawayPlane],
         });
 
         let meshCount = 0;
@@ -288,9 +321,11 @@ export default function GlbAssemblyModel({
             continue;
           }
 
-          // 2. Фундаментная плита основания
+          // 2. Фундаментная плита основания (без самозатенения)
           if (mesh === largestBaseMesh) {
             mesh.material = baseConcreteMat;
+            mesh.castShadow = false;
+            mesh.receiveShadow = true;
             continue;
           }
 
@@ -323,13 +358,13 @@ export default function GlbAssemblyModel({
           // 6. Крупные строительные конструкции и защитная оболочка (контайнмент, стены, перекрытия)
           const isLargeConcreteStructure = maxMeshDim >= targetMaxSize * 0.16 && vertCount < 180000;
           if (isLargeConcreteStructure) {
-            const concretePalette = [baseConcreteMat, structuralConcreteLightMat, structuralConcreteDarkMat];
+            const concretePalette = [buildingConcreteMat, structuralConcreteLightMat, structuralConcreteDarkMat];
             mesh.material = concretePalette[concreteIndex % concretePalette.length];
             concreteIndex++;
             continue;
           }
 
-          // 7. Мелкие детали, трубопроводы, арматура, клапаны и технологические узлы (включая бывшие салатовые M3/M14/M15)
+          // 7. Мелкие детали, трубопроводы, арматура и элементы обвязки (графит, синий и стальной оттенки)
           const pipingPalette = [darkGraphiteMat, techBlueMat, accentOchreMat];
           mesh.material = pipingPalette[pipingIndex % pipingPalette.length];
           pipingIndex++;
@@ -425,7 +460,7 @@ export default function GlbAssemblyModel({
       }
       setLoadedScene(null);
     };
-  }, [targetMaxSize, groundY, invalidate, onStatusChange]);
+  }, [targetMaxSize, groundY, cutawayPlane, invalidate, onStatusChange]);
 
   if (!loadedScene) return null;
 

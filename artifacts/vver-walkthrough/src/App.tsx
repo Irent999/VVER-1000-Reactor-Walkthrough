@@ -8,9 +8,7 @@ import type { OrbitControls as OCImpl } from 'three-stdlib';
 
 import GlbAssemblyModel, { type GlbLoadState } from '@/components/GlbAssemblyModel';
 import LowPolyEnvironment from '@/components/LowPolyEnvironment';
-import ServerRoom from '@/components/ServerRoom';
-import VVER1000MainControlRoom from '@/components/VVER1000MainControlRoom';
-import RITM200NFullComplex from '@/components/RITM200NModel';
+import CadInteriorBSHU from '@/components/CadInteriorBSHU';
 import VRControllerManager from '@/components/VRControllerManager';
 import DroneFlyByController, { type DroneWaymark } from '@/components/DroneFlyByController';
 import FirstPersonController from '@/components/FirstPersonController';
@@ -184,26 +182,25 @@ function SmoothCameraController({
 
 interface SceneContentProps {
   reloadKey: number;
+  containmentOpacity: number;
   onStatusChange: (state: GlbLoadState) => void;
 }
 
-function SceneContent({ reloadKey, onStatusChange }: SceneContentProps) {
+function SceneContent({ reloadKey, containmentOpacity, onStatusChange }: SceneContentProps) {
   return (
     <group>
-      {/* Облегченное Low-Poly окружение (< 1,500 полигонов, InstancedMesh) */}
+      {/* Аккуратное компактное основание строго под габариты assembly.glb */}
       <LowPolyEnvironment groundY={0} />
-      {/* Реальная CAD-модель ВВЭР-1000 строго по пути /assembly.glb через GLTFLoader + <primitive /> */}
+      {/* Чистая CAD-модель assembly.glb с индустриальными PBR-материалами и механизмом разрезов (cutaway) */}
       <GlbAssemblyModel
         key={reloadKey}
         targetMaxSize={75}
         groundY={0}
+        containmentOpacity={containmentOpacity}
         onStatusChange={onStatusChange}
       />
-      {/* Недостающие ключевые зоны для интерактивного обхода и VR: БЩУ ВВЭР-1000 и АСУ ТП подвала */}
-      <VVER1000MainControlRoom position={[-18, 12.2, 12]} />
-      <ServerRoom />
-      {/* Комплекс малой АЭС РИТМ-200Н на восточной площадке */}
-      <RITM200NFullComplex position={[76, 0, 34]} />
+      {/* Детализация интерьера (пульт БЩУ, мониторы, стойки АСУ ТП) строго внутри существующего здания сборки */}
+      <CadInteriorBSHU position={[-18.0, 0.14, 12.2]} />
     </group>
   );
 }
@@ -253,7 +250,7 @@ export default function App() {
   const [webglAvailable, setWebglAvailable] = useState(canCreateWebGL2);
   const [pointerLocked, setPointerLocked] = useState(false);
   const [activeView, setActiveView] = useState('view-aerial');
-  const [containmentOpacity, setContainmentOpacity] = useState(0.3);
+  const [containmentOpacity, setContainmentOpacity] = useState(1.0);
   const [renderMode, setRenderMode] = useState<RenderVisualizationMode>('standard');
   const [vrSupported, setVrSupported] = useState<boolean | null>(null);
   const [floorTarget, setFloorTarget] = useState<number | null>(null);
@@ -366,6 +363,9 @@ export default function App() {
     if (!view) return;
     setWalkOverride(null);
     setActiveView(viewId);
+    if (viewId === 'view-cutaway') {
+      setContainmentOpacity((prev) => (prev > 0.65 ? 0.45 : prev));
+    }
     if (view.mode === 'walk') {
       setFloorTarget(view.floorY);
     } else if (view.mode === 'drone') {
@@ -398,7 +398,7 @@ export default function App() {
   }, []);
 
   const vrSpawnTarget: [number, number, number] =
-    activeViewData.mode === 'walk' ? activeViewData.cameraPos : [0, 0, 42];
+    activeViewData.mode === 'walk' ? activeViewData.cameraPos : [0, 0.14, 34];
 
   return (
     <div className="scene-grain w-full h-[100dvh] relative bg-[#182327] overflow-hidden">
@@ -426,6 +426,7 @@ export default function App() {
             const bgColor = new THREE.Color('#bdd0e0');
             scene.background = bgColor;
             gl.setClearColor(bgColor, 1.0);
+            gl.localClippingEnabled = true;
             gl.setPixelRatio(Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, 1.25));
             gl.domElement.tabIndex = 0;
             gl.domElement.style.outline = 'none';
@@ -466,27 +467,29 @@ export default function App() {
           {!isVRPresenting && <AdaptiveDpr pixelated />}
 
           {/* Мягкое освещение + 3-источниковая схема для читаемости CAD-материалов и высокого FPS в VR */}
-          <ambientLight intensity={0.55} color="#ffffff" />
-          <hemisphereLight args={['#eef6ff', '#8b7e68', 1.15]} />
+          <ambientLight intensity={0.62} color="#ffffff" />
+          <hemisphereLight args={['#eef6ff', '#9aa3ad', 1.1]} />
           <directionalLight
             position={[45, 65, 40]}
-            intensity={2.2}
+            intensity={2.1}
             color="#fff7eb"
             castShadow={enableShadows && !isVRPresenting}
-            shadow-mapSize={[512, 512]}
-            shadow-camera-left={-50}
-            shadow-camera-right={50}
-            shadow-camera-top={50}
-            shadow-camera-bottom={-50}
+            shadow-mapSize={[1024, 1024]}
+            shadow-camera-left={-45}
+            shadow-camera-right={45}
+            shadow-camera-top={45}
+            shadow-camera-bottom={-45}
             shadow-camera-far={200}
-            shadow-bias={-0.0002}
+            shadow-bias={-0.0005}
+            shadow-normalBias={0.04}
           />
-          <directionalLight position={[-55, 45, -60]} intensity={0.55} color="#b7d2ff" />
+          <directionalLight position={[-55, 45, -60]} intensity={0.65} color="#b7d2ff" />
 
           <XR store={xrStore}>
             <TeleportTarget>
               <SceneContent
                 reloadKey={reloadKey}
+                containmentOpacity={containmentOpacity}
                 onStatusChange={handleGlbStatusChange}
               />
             </TeleportTarget>
@@ -521,7 +524,11 @@ export default function App() {
               spawnPosition={
                 activeViewData.mode === 'walk'
                   ? activeViewData.cameraPos
-                  : [activeViewData.cameraPos[0], activeViewData.floorY + 1.6, activeViewData.cameraPos[2]]
+                  : [
+                      THREE.MathUtils.clamp(activeViewData.cameraPos[0], -38.5, 38.5),
+                      activeViewData.floorY + 1.6,
+                      THREE.MathUtils.clamp(activeViewData.cameraPos[2], -38.5, 38.5),
+                    ]
               }
               lookAtTarget={activeViewData.target}
               freeGroundY={activeViewData.floorY}

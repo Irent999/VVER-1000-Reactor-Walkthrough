@@ -30,8 +30,8 @@ export interface WebXRSceneManagerProps {
 }
 
 export default function WebXRSceneManager({
-  activeSpawnPos = [0, 0, 42],
-  floorY = 0,
+  activeSpawnPos = [0, 0.14, 34],
+  floorY = 0.14,
   activeViewId,
 }: WebXRSceneManagerProps) {
   const { gl, scene, camera, invalidate } = useThree();
@@ -130,11 +130,11 @@ export default function WebXRSceneManager({
         }
       }
 
-      // Стартовая позиция в VR на отметке площадки Y=0 перед центральной сборкой
+      // Стартовая позиция в VR на отметке площадки перед центральной сборкой
       const isWalk = activeViewId && activeViewId.startsWith('walk');
       const spawnX = isWalk && currentSpawnRef.current ? currentSpawnRef.current[0] : 0;
-      const spawnY = isWalk && currentFloorYRef.current !== undefined ? currentFloorYRef.current : 0;
-      const spawnZ = isWalk && currentSpawnRef.current ? currentSpawnRef.current[2] : 42;
+      const spawnY = isWalk && currentFloorYRef.current !== undefined ? currentFloorYRef.current : 0.14;
+      const spawnZ = isWalk && currentSpawnRef.current ? currentSpawnRef.current[2] : 34;
 
       if (xrRigGroupRef.current) {
         xrRigGroupRef.current.position.set(spawnX, spawnY, spawnZ);

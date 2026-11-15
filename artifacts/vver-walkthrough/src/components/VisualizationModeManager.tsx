@@ -95,6 +95,8 @@ export default function VisualizationModeManager({ mode }: VisualizationModeMana
             thermalHex = THERMAL_COLORS.ground;
           }
 
+          const origMat = Array.isArray(obj.material) ? obj.material[0] : obj.material;
+
           // Создаем легковесный светящийся тепловизионный материал
           const thermalMat = new THREE.MeshStandardMaterial({
             color: thermalHex,
@@ -103,6 +105,7 @@ export default function VisualizationModeManager({ mode }: VisualizationModeMana
             roughness: 0.5,
             metalness: 0.1,
             wireframe: false,
+            clippingPlanes: origMat?.clippingPlanes ?? null,
           });
 
           obj.material = thermalMat;
@@ -123,6 +126,7 @@ export default function VisualizationModeManager({ mode }: VisualizationModeMana
             originalMaterials.current.set(obj, obj.material);
           }
 
+          const origMat = Array.isArray(obj.material) ? obj.material[0] : obj.material;
           const name = (obj.name || obj.parent?.name || '').toLowerCase();
           let wireColor = '#00f0ff'; // neon cyan
           if (name.includes('containment') || name.includes('wall')) {
@@ -138,6 +142,7 @@ export default function VisualizationModeManager({ mode }: VisualizationModeMana
             wireframe: true,
             transparent: true,
             opacity: 0.65,
+            clippingPlanes: origMat?.clippingPlanes ?? null,
           });
 
           obj.material = wireMat;

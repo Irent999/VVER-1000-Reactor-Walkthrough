@@ -413,17 +413,10 @@ export default function FirstPersonController({
 
     if (Math.abs(stepX) > 0.0001 || Math.abs(stepZ) > 0.0001) {
       if (freeGroundY !== undefined) {
-        const nextX = camera.position.x + stepX;
-        const nextZ = camera.position.z + stepZ;
-        const dist = Math.hypot(nextX, nextZ);
-        if (dist <= 130) {
-          camera.position.x = nextX;
-          camera.position.z = nextZ;
-        } else {
-          const clampScale = 130 / dist;
-          camera.position.x = nextX * clampScale;
-          camera.position.z = nextZ * clampScale;
-        }
+        const nextX = THREE.MathUtils.clamp(camera.position.x + stepX, -39.5, 39.5);
+        const nextZ = THREE.MathUtils.clamp(camera.position.z + stepZ, -39.5, 39.5);
+        camera.position.x = nextX;
+        camera.position.z = nextZ;
       } else {
         // Step Cannon-es rigid physics simulation to resolve physical collisions against walls, steam generators, MCPs, and primary circuit pipes
         const resolved = globalPhysicsWorld.step(

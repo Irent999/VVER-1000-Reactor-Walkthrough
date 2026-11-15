@@ -43,23 +43,11 @@ export const INDOOR_ROOM_CONSTRAINTS: Record<string, {
   safeSpawn: [number, number, number];
   preferredTarget: [number, number, number];
 }> = {
-  // 1. БЩУ ВВЭР-1000 (вспомогательный корпус на отметке +12.20м)
-  'walk-vver-mcr': {
-    bounds: { minX: -24.5, maxX: -11.5, minY: 12.5, maxY: 16.5, minZ: 7.8, maxZ: 16.2 },
-    safeSpawn: [-18.0, 13.8, 13.8],
-    preferredTarget: [-18.0, 13.6, 8.0],
-  },
-  // 2. БЩУ РИТМ-200Н (АСММ, отметка +3.60м)
-  'walk-smr-mcr': {
-    bounds: { minX: 54.0, maxX: 70.0, minY: 4.0, maxY: 7.5, minZ: 16.5, maxZ: 29.0 },
-    safeSpawn: [62.0, 5.2, 26.5],
-    preferredTarget: [62.0, 4.8, 17.5],
-  },
-  // 3. Серверная АСУ ТП / DCS Server Vault (Отметка -5.0м)
-  'walk-basement': {
-    bounds: { minX: -14.0, maxX: 14.0, minY: -4.5, maxY: -1.0, minZ: 5.5, maxZ: 14.0 },
-    safeSpawn: [0.0, -3.4, 7.6],
-    preferredTarget: [0.0, -3.5, 4.0],
+  // Внутренний зал БЩУ и серверных стоек внутри корпуса CAD-сборки assembly.glb
+  'walk-bshu-interior': {
+    bounds: { minX: -24.2, maxX: -11.8, minY: 0.2, maxY: 4.2, minZ: 9.5, maxZ: 15.0 },
+    safeSpawn: [-18.0, 1.74, 14.3],
+    preferredTarget: [-18.0, 1.45, 10.8],
   },
 };
 

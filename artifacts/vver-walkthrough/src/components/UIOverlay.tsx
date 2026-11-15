@@ -169,10 +169,9 @@ interface ViewpointsListProps {
   onViewChange: (viewId: string) => void;
 }
 
-const GROUP_HEADERS: Array<{ key: 'overview' | 'vver' | 'ritm'; label: string }> = [
-  { key: 'overview', label: 'Генплан и навигация' },
-  { key: 'vver', label: 'Энергоблок ВВЭР-1000' },
-  { key: 'ritm', label: 'АСММ РИТМ-200Н' },
+const GROUP_HEADERS: Array<{ key: 'overview' | 'vver'; label: string }> = [
+  { key: 'overview', label: 'Обзор, разрез и обход' },
+  { key: 'vver', label: 'Узлы сборки и БЩУ' },
 ];
 
 const MemoizedViewpointsList = memo(function ViewpointsList({
@@ -672,10 +671,10 @@ export default function UIOverlay({
               </div>
               <div>
                 <p className="text-[10px] font-extrabold uppercase tracking-[.15em] text-[#edf0e8]">
-                  Навигация по объектам
+                  Навигация по модели
                 </p>
                 <p className="mono text-[8px] uppercase tracking-[.12em] text-[#81918d]">
-                  ВВЭР-1000 · РИТМ-200Н · VR
+                  CAD Сборка · БЩУ · VR
                 </p>
               </div>
             </div>
