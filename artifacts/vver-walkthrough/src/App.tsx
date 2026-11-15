@@ -12,6 +12,7 @@ import CoreCatcher from '@/components/CoreCatcher';
 import TurbineHall from '@/components/TurbineHall';
 import DeaeratorBuilding from '@/components/DeaeratorBuilding';
 import ExteriorScene from '@/components/ExteriorScene';
+import AssemblyComponent from '@/components/AssemblyComponent';
 import {
   VVERUnit2,
   InterUnitOverheadPipeBridge,
@@ -245,25 +246,10 @@ interface SceneContentProps {
 function SceneContent({ containmentOpacity, onPOISelect, pois = POI_LIST }: SceneContentProps) {
   return (
     <group>
-      {/* Unit 1 Full Interactive Interior & Exterior (Строго position.y = 0, scale = [1, 1, 1]) */}
-      <group name="VVERUnit1_MasterGroup" position={[0, 0, 0]} scale={[1, 1, 1]}>
-        <ReactorBuilding
-          containmentOpacity={containmentOpacity}
-          position={[0, 0, 0]}
-          scale={[1, 1, 1]}
-        />
-        <CoreCatcher />
-        <SteamGeneratorDeck />
-        <ServerRoom />
-        <DeaeratorBuilding />
-        <TurbineHall cutaway={1 - containmentOpacity} />
-        {/* Левый вспомогательный корпус (обстройка РО / пульт управления) с БЩУ на отметке +13.20м */}
-        <VVER1000AuxiliaryBuilding>
-          <VVER1000MainControlRoom position={[-32.0, 13.20, 0.0]} />
-        </VVER1000AuxiliaryBuilding>
-      </group>
+      {/* Заменено на вашу новую детальную 3D модель из GLB файла */}
+      <AssemblyComponent position={[0, 0, 0]} scale={[1, 1, 1]} />
 
-      {/* Full Combined NPP Site Master Plan Infrastructure */}
+      {/* Full Combined NPP Site Master Plan Infrastructure (оставляем окружение Low-Poly для VR) */}
       {/* Unit 2: Строго на одной горизонтальной оси (position.y = 0), масштаб [1, 1, 1], смещение ΔZ = +70 */}
       <VVERUnit2 position={[0, 0, 70]} scale={[1, 1, 1]} />
       <InterUnitOverheadPipeBridge />
