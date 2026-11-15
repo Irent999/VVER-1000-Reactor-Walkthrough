@@ -27,14 +27,14 @@ interface GlbAssemblyModelProps {
 const MODEL_URL = '/assembly.glb';
 
 export default function GlbAssemblyModel({
-  targetMaxSize = 30,
+  targetMaxSize = 75,
   groundY = 0,
   onStatusChange,
 }: GlbAssemblyModelProps) {
   const { invalidate } = useThree();
   const [loadedScene, setLoadedScene] = useState<THREE.Object3D | null>(null);
 
-  // Критично для frameloop="demand": вызываем invalidate() ПОСЛЕ того, как React смонтирует <primitive /> в сцену
+  // Критично для frameloop="demand": вызываем invalidate() ПОСЛЕ монтирования <primitive /> в сцену
   useEffect(() => {
     if (!loadedScene) return;
     invalidate();
@@ -57,7 +57,7 @@ export default function GlbAssemblyModel({
       status: 'loading',
       progressPercent: 0,
       loadedMB: 0,
-      totalMB: 55,
+      totalMB: 55.05,
       meshCount: 0,
       triangleCount: 0,
       parseTimeMs: 0,
@@ -94,100 +94,218 @@ export default function GlbAssemblyModel({
         const model = gltf.scene;
         model.name = 'MainGLBAssembly';
 
-        // Отладочный вывод загруженной сцены в консоль
-        console.log('GLTF loaded:', model);
-
-        // 1. Сброс трансформаций корня перед расчётом Box3
+        // 1. Сброс корневых трансформаций и исправление ориентации (Z-up CAD -> Y-up Three.js)
+        // В assembly.glb узел Node0 содержит матрицу -90° по X, из-за чего плита основания стоит вертикально.
+        // Поворот контейнера на +Math.PI / 2 по X кладёт плиту горизонтально вниз, а оборудование направляет строго вверх (+Y).
         model.position.set(0, 0, 0);
-        model.rotation.set(0, 0, 0);
+        model.rotation.set(Math.PI / 2, 0, 0);
         model.scale.set(1, 1, 1);
         model.updateMatrixWorld(true);
 
-        // 2. Расчёт исходного Bounding Box
-        const box = new THREE.Box3().setFromObject(model);
-        console.log('Bounding Box:', box);
+        // 2. Расчёт Bounding Box ПОСЛЕ поворота и нормализация масштаба под площадку
+        const rotatedBox = new THREE.Box3().setFromObject(model);
+        const rotatedSize = new THREE.Vector3();
+        rotatedBox.getSize(rotatedSize);
 
-        const size = new THREE.Vector3();
-        const rawCenter = new THREE.Vector3();
-        box.getSize(size);
-        box.getCenter(rawCenter);
-
-        console.log('[GLB Debug] Исходные габариты:', {
-          min: box.min.toArray(),
-          max: box.max.toArray(),
-          size: size.toArray(),
-          center: rawCenter.toArray(),
-        });
-
-        // 3. Принудительная нормализация масштаба до targetMaxSize (30 м)
-        const maxDim = Math.max(size.x, size.y, size.z);
+        const maxDim = Math.max(rotatedSize.x, rotatedSize.y, rotatedSize.z);
         const scale = Number.isFinite(maxDim) && maxDim > 0.0001 ? targetMaxSize / maxDim : 1;
-        console.log('[GLB Debug] Нормализация масштаба:', { maxDim, targetMaxSize, scale });
 
         model.scale.setScalar(scale);
         model.updateMatrixWorld(true);
 
-        // 4. Пересчёт Box3, центрирование строго в X=0, Z=0 и посадка min.y на Y=0
+        // 3. Центрирование в X = 0, Z = 0 и точная привязка основания min.y = groundY (0) ПОСЛЕ поворота и масштабирования
         const scaledBox = new THREE.Box3().setFromObject(model);
-        const center = new THREE.Vector3();
-        scaledBox.getCenter(center);
+        const scaledCenter = new THREE.Vector3();
+        scaledBox.getCenter(scaledCenter);
 
         model.position.set(
-          -center.x,
+          -scaledCenter.x,
           groundY - scaledBox.min.y,
-          -center.z
+          -scaledCenter.z
         );
         model.updateMatrixWorld(true);
 
         const finalBox = new THREE.Box3().setFromObject(model);
+        const finalSize = new THREE.Vector3();
         const finalCenter = new THREE.Vector3();
+        finalBox.getSize(finalSize);
         finalBox.getCenter(finalCenter);
-        console.log('[GLB Debug] Итоговый Bounding Box (X=0, Z=0, min.y=0):', {
-          min: finalBox.min.toArray(),
-          max: finalBox.max.toArray(),
-          center: finalCenter.toArray(),
-          position: model.position.toArray(),
-        });
 
-        // 5. Временный ярко-зелёный тестовый материал (0x00ff00) + расчёт нормалей (если отсутствуют в STL/GLB)
-        const debugGreenMaterial = new THREE.MeshStandardMaterial({
-          color: 0x00ff00,
-          roughness: 0.45,
-          metalness: 0.1,
-          side: THREE.DoubleSide,
-        });
+        console.info(
+          `[GLB Loader] 📐 Ориентация (+90° X), масштаб и посадка: size=[${finalSize.x.toFixed(2)}, ${finalSize.y.toFixed(2)}, ${finalSize.z.toFixed(2)}], min.y=${finalBox.min.y.toFixed(3)}, center=[${finalCenter.x.toFixed(2)}, ${finalCenter.y.toFixed(2)}, ${finalCenter.z.toFixed(2)}]`
+        );
 
-        let meshCount = 0;
-        let triangleCount = 0;
+        // 4. Сбор мешей и анализ их мировых габаритов для точного назначения индустриальных материалов АЭС
+        const meshes: THREE.Mesh[] = [];
+        const meshBoxes = new Map<THREE.Mesh, THREE.Vector3>();
+        let largestBaseMesh: THREE.Mesh | null = null;
+        let maxFootprintArea = 0;
 
         model.traverse((child) => {
           if (child instanceof THREE.Mesh) {
-            meshCount++;
-            child.visible = true;
-            child.frustumCulled = false;
-            child.castShadow = true;
-            child.receiveShadow = true;
-
-            const geo = child.geometry;
-            if (geo) {
-              if (!geo.attributes.normal) {
-                geo.computeVertexNormals();
-              }
-              geo.computeBoundingBox();
-              geo.computeBoundingSphere();
-              if (geo.index) {
-                triangleCount += geo.index.count / 3;
-              } else if (geo.attributes.position) {
-                triangleCount += geo.attributes.position.count / 3;
-              }
-            }
-
-            child.material = debugGreenMaterial;
+            meshes.push(child);
           }
         });
 
+        for (const mesh of meshes) {
+          const geo = mesh.geometry;
+          if (geo) {
+            if (!geo.attributes.normal) {
+              geo.computeVertexNormals();
+            }
+            geo.computeBoundingBox();
+            geo.computeBoundingSphere();
+          }
+
+          const mBox = new THREE.Box3().setFromObject(mesh);
+          const mSize = new THREE.Vector3();
+          mBox.getSize(mSize);
+          meshBoxes.set(mesh, mSize);
+
+          const footprint = mSize.x * mSize.z;
+          const isFlatSlab = mSize.y < Math.max(mSize.x, mSize.z) * 0.08;
+          if (isFlatSlab && footprint > maxFootprintArea) {
+            maxFootprintArea = footprint;
+            largestBaseMesh = mesh;
+          }
+        }
+
+        // 5. Настройка реалистичных материалов АЭС (сохраняем осмысленные CAD-цвета и прозрачность,
+        // а нейтральные/белые/STL-элементы окрашиваем в индустриальную палитру АЭС)
+        const baseConcreteMaterial = new THREE.MeshStandardMaterial({
+          color: 0x9aa3ad,
+          roughness: 0.85,
+          metalness: 0.05,
+          side: THREE.DoubleSide,
+        });
+
+        const stainlessSteelMaterial = new THREE.MeshStandardMaterial({
+          color: 0xc4ccd4,
+          roughness: 0.35,
+          metalness: 0.75,
+          side: THREE.DoubleSide,
+        });
+
+        const detailMaterials = [
+          new THREE.MeshStandardMaterial({
+            color: 0x3b424c,
+            roughness: 0.42,
+            metalness: 0.7,
+            side: THREE.DoubleSide,
+          }),
+          new THREE.MeshStandardMaterial({
+            color: 0x2b5b84,
+            roughness: 0.38,
+            metalness: 0.52,
+            side: THREE.DoubleSide,
+          }),
+          new THREE.MeshStandardMaterial({
+            color: 0xd49b27,
+            roughness: 0.4,
+            metalness: 0.45,
+            side: THREE.DoubleSide,
+          }),
+        ];
+
+        let meshCount = 0;
+        let triangleCount = 0;
+        let detailIndex = 0;
+        const hsl = { h: 0, s: 0, l: 0 };
+        const replacedOriginalMaterials = new Set<THREE.Material>();
+
+        const trackOriginalMaterial = (mesh: THREE.Mesh) => {
+          const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+          for (const mat of mats) {
+            if (mat) replacedOriginalMaterials.add(mat);
+          }
+        };
+
+        for (const mesh of meshes) {
+          meshCount++;
+          mesh.visible = true;
+          mesh.frustumCulled = true;
+          mesh.castShadow = true;
+          mesh.receiveShadow = true;
+
+          const geo = mesh.geometry;
+          if (geo) {
+            if (geo.index) {
+              triangleCount += geo.index.count / 3;
+            } else if (geo.attributes.position) {
+              triangleCount += geo.attributes.position.count / 3;
+            }
+          }
+
+          const mSize = meshBoxes.get(mesh) ?? new THREE.Vector3(1, 1, 1);
+
+          // Самый крупный/плоский базовый меш (плита основания) -> матовый архитектурный бетон
+          if (mesh === largestBaseMesh) {
+            trackOriginalMaterial(mesh);
+            mesh.material = baseConcreteMaterial;
+            continue;
+          }
+
+          const origMat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+          let hasOriginalMeaningfulColor = false;
+          let isOriginalTransparent = false;
+          const origColor = new THREE.Color(0xc4ccd4);
+          let origOpacity = 1.0;
+
+          if (origMat && 'color' in origMat && origMat.color instanceof THREE.Color) {
+            origColor.copy(origMat.color);
+            origColor.getHSL(hsl);
+            origOpacity = 'opacity' in origMat && typeof origMat.opacity === 'number' ? origMat.opacity : 1.0;
+            isOriginalTransparent = Boolean('transparent' in origMat && origMat.transparent && origOpacity < 0.98);
+            hasOriginalMeaningfulColor = hsl.s > 0.14;
+          }
+
+          trackOriginalMaterial(mesh);
+
+          if (isOriginalTransparent) {
+            // Прозрачные разрезы / остекление оболочек из CAD
+            mesh.material = new THREE.MeshStandardMaterial({
+              color: hasOriginalMeaningfulColor ? origColor : new THREE.Color(0xd0dce5),
+              roughness: 0.25,
+              metalness: 0.1,
+              transparent: true,
+              opacity: Math.max(0.22, Math.min(origOpacity, 0.52)),
+              depthWrite: false,
+              side: THREE.DoubleSide,
+            });
+            mesh.castShadow = false;
+          } else if (hasOriginalMeaningfulColor) {
+            // Сохраняем реальный цветной CAD-материал (убираем пластиковое зануление specular из ImageToStl)
+            mesh.material = new THREE.MeshStandardMaterial({
+              color: origColor,
+              roughness: 0.42,
+              metalness: 0.45,
+              side: THREE.DoubleSide,
+            });
+          } else {
+            // Нейтральный белый/серый материал -> распределяем по индустриальной палитре АЭС
+            const maxMeshDim = Math.max(mSize.x, mSize.y, mSize.z);
+            const isLargeEquipmentOrShell = maxMeshDim >= targetMaxSize * 0.14;
+
+            if (isLargeEquipmentOrShell) {
+              mesh.material = stainlessSteelMaterial;
+            } else {
+              mesh.material = detailMaterials[detailIndex % detailMaterials.length];
+              detailIndex++;
+            }
+          }
+        }
+
+        for (const oldMat of replacedOriginalMaterials) {
+          for (const val of Object.values(oldMat)) {
+            if (val && typeof val === 'object' && 'isTexture' in val) {
+              (val as THREE.Texture).dispose();
+            }
+          }
+          oldMat.dispose();
+        }
+
         console.info(
-          `[GLB Loader] ✅ Модель размещена (X=0, Z=0, min.y=${groundY}): scale=${scale.toFixed(4)}, pos=[${model.position.x.toFixed(2)}, ${model.position.y.toFixed(2)}, ${model.position.z.toFixed(2)}]. Мешей: ${meshCount}, треугольников: ${Math.round(triangleCount).toLocaleString()}`
+          `[GLB Loader] ✅ Модель выровнена и окрашена (мешей: ${meshCount}, треугольников: ${Math.round(triangleCount).toLocaleString()}).`
         );
 
         loadedRoot = model;

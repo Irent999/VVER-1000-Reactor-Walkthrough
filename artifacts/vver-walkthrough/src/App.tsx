@@ -189,7 +189,7 @@ function SceneContent({ reloadKey, onStatusChange }: SceneContentProps) {
       {/* Реальная CAD-модель строго по пути /assembly.glb через GLTFLoader + <primitive /> */}
       <GlbAssemblyModel
         key={reloadKey}
-        targetMaxSize={30}
+        targetMaxSize={75}
         groundY={0}
         onStatusChange={onStatusChange}
       />
@@ -371,7 +371,7 @@ export default function App() {
   }, []);
 
   const vrSpawnTarget: [number, number, number] =
-    activeViewData.mode === 'walk' ? activeViewData.cameraPos : [0, 0, 24];
+    activeViewData.mode === 'walk' ? activeViewData.cameraPos : [0, 0, 36];
 
   return (
     <div className="scene-grain w-full h-[100dvh] relative bg-[#182327] overflow-hidden">
@@ -384,7 +384,7 @@ export default function App() {
         <Canvas
           frameloop="demand"
           shadows={enableShadows && !isVRPresenting}
-          camera={{ position: [26, 16, 28], fov: 50, near: 0.1, far: 900 }}
+          camera={{ position: [42, 22, 46], fov: 50, near: 0.1, far: 900 }}
           gl={{
             antialias: false,
             alpha: false,
@@ -442,16 +442,16 @@ export default function App() {
           <ambientLight intensity={0.55} color="#ffffff" />
           <hemisphereLight args={['#eef6ff', '#8b7e68', 1.15]} />
           <directionalLight
-            position={[35, 55, 30]}
+            position={[45, 65, 40]}
             intensity={2.2}
             color="#fff7eb"
             castShadow={enableShadows && !isVRPresenting}
             shadow-mapSize={[512, 512]}
-            shadow-camera-left={-35}
-            shadow-camera-right={35}
-            shadow-camera-top={35}
-            shadow-camera-bottom={-35}
-            shadow-camera-far={160}
+            shadow-camera-left={-50}
+            shadow-camera-right={50}
+            shadow-camera-top={50}
+            shadow-camera-bottom={-50}
+            shadow-camera-far={200}
             shadow-bias={-0.0002}
           />
           <directionalLight position={[-55, 45, -60]} intensity={0.55} color="#b7d2ff" />

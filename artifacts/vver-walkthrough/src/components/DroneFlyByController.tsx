@@ -92,21 +92,21 @@ export default function DroneFlyByController({
   // Closed cinematic camera flight path around the centered GLB assembly
   const { cameraPath, targetPath } = useMemo(() => {
     const camPoints = [
-      new THREE.Vector3(-26, 16, 26),
-      new THREE.Vector3(0, 12, 32),
-      new THREE.Vector3(28, 15, 20),
-      new THREE.Vector3(28, 18, -22),
-      new THREE.Vector3(0, 22, -32),
-      new THREE.Vector3(-28, 15, -18),
+      new THREE.Vector3(-42, 22, 42),
+      new THREE.Vector3(0, 16, 52),
+      new THREE.Vector3(44, 20, 32),
+      new THREE.Vector3(44, 24, -36),
+      new THREE.Vector3(0, 28, -50),
+      new THREE.Vector3(-44, 20, -28),
     ];
 
     const tgtPoints = [
-      new THREE.Vector3(0, 5, 0),
+      new THREE.Vector3(0, 4, 0),
+      new THREE.Vector3(0, 3, 0),
+      new THREE.Vector3(0, 4, 0),
       new THREE.Vector3(0, 4, 0),
       new THREE.Vector3(0, 5, 0),
-      new THREE.Vector3(0, 5, 0),
-      new THREE.Vector3(0, 6, 0),
-      new THREE.Vector3(0, 4, 0),
+      new THREE.Vector3(0, 3, 0),
     ];
 
     const cPath = new THREE.CatmullRomCurve3(camPoints, true, 'centripetal');
