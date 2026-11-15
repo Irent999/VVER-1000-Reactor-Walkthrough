@@ -1,88 +1,32 @@
-import { useState, useRef, useEffect, Suspense, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
-import { OrbitControls, Sky, Stars, Environment, AdaptiveDpr, ContactShadows } from '@react-three/drei';
+import { OrbitControls, AdaptiveDpr } from '@react-three/drei';
 import { XR, createXRStore, VRButton, TeleportTarget } from '@react-three/xr';
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { OrbitControls as OCImpl } from 'three-stdlib';
 
-import ReactorBuilding from '@/components/ReactorBuilding';
-import SteamGeneratorDeck from '@/components/SteamGeneratorDeck';
-import ServerRoom from '@/components/ServerRoom';
-import CoreCatcher from '@/components/CoreCatcher';
-import TurbineHall from '@/components/TurbineHall';
-import DeaeratorBuilding from '@/components/DeaeratorBuilding';
-import ExteriorScene from '@/components/ExteriorScene';
-import AssemblyComponent from '@/components/AssemblyComponent';
-import {
-  VVERUnit2,
-  InterUnitOverheadPipeBridge,
-  RITM200NComplex,
-  CylindricalWaterStorageTanks,
-} from '@/components/MasterSiteAssets';
-import POIMarkers from '@/components/POIMarkers';
+import GlbAssemblyModel, { type GlbLoadState } from '@/components/GlbAssemblyModel';
+import LowPolyEnvironment from '@/components/LowPolyEnvironment';
 import VRControllerManager from '@/components/VRControllerManager';
 import DroneFlyByController, { type DroneWaymark } from '@/components/DroneFlyByController';
 import FirstPersonController from '@/components/FirstPersonController';
 import UIOverlay from '@/components/UIOverlay';
-import VVER1000AuxiliaryBuilding from '@/components/VVER1000AuxiliaryBuilding';
-import VVER1000MainControlRoom from '@/components/VVER1000MainControlRoom';
-import SiteEngineeringInfrastructure from '@/components/SiteEngineeringInfrastructure';
 import VisualizationModeManager, { type RenderVisualizationMode } from '@/components/VisualizationModeManager';
 import WebXRSceneManager from '@/scene/webxrManager';
-import { POI_LIST, FLOOR_VIEWS, type POIInfo, type ViewMode } from '@/data/poiData';
-import {
-  configureNPPRenderer,
-  applySceneOptimizations,
-  fixBuildingOverlap,
-} from '@/scene/nppOptimizationModule';
-import { syncRITMViewpoints } from '@/scene/dynamicViewpointManager';
-import { validateAndAdjustCameraLineOfSight, auditAndCleanAllFloorViews } from '@/scene/cameraLineOfSightModule';
+import { FLOOR_VIEWS, type ViewMode } from '@/data/poiData';
+import { validateAndAdjustCameraLineOfSight } from '@/scene/cameraLineOfSightModule';
 
 const xrStore = createXRStore({
   controller: { teleportPointer: true, rayPointer: true },
   offerSession: true,
 });
 
-interface ScenePerformanceOptimizerProps {
-  onSyncRITM?: (pois: POIInfo[], views: typeof FLOOR_VIEWS) => void;
-}
-
-/** Автоматический оптимизатор сцены: включает Frustum Culling, предрасчет BoundingBox/Sphere, устраняет наложения и динамически связывает точки обзора */
-function ScenePerformanceOptimizer({ onSyncRITM }: ScenePerformanceOptimizerProps) {
-  const { scene, gl } = useThree();
-
-  useEffect(() => {
-    configureNPPRenderer(gl, {
-      maxPixelRatio: 1.5,
-      enableSoftShadows: false,
-    });
-    applySceneOptimizations(scene, {
-      disableSmallShadowCasters: true,
-    });
-    // Автоматическая проверка пересечений, разнесение зданий и устранение Z-fighting
-    fixBuildingOverlap(scene, {
-      requiredClearance: 8.0,
-      removeDuplicateRoofs: true,
-    });
-
-    // Динамический сдвиг ракурсов (Viewpoints / POI) вслед за моделью РИТМ-200Н
-    const ritmGroup = scene.getObjectByName('RITM200N_SMR_FullComplex') ||
-      scene.getObjectByName('RITM200N_Complex');
-    if (ritmGroup && onSyncRITM) {
-      const { updatedPOIs, updatedViews } = syncRITMViewpoints(ritmGroup, POI_LIST, FLOOR_VIEWS);
-      const cleanedViews = auditAndCleanAllFloorViews(updatedViews, scene);
-      onSyncRITM(updatedPOIs, cleanedViews);
-    }
-  }, [scene, gl, onSyncRITM]);
-
-  return null;
-}
-
 /**
  * Высокопроизводительный контроллер камеры:
  * 1. Интеграция в анимационный цикл useFrame (исключает лаги от ре-рендеров React)
  * 2. Плавное сглаживание движений OrbitControls (enableDamping = true, dampingFactor = 0.05)
- * 3. Бесшовные кинематографические перелеты между ракурсами с контролем препятствий
+ * 3. Бесшовные кинематографические перелеты между ракурсами
  */
 interface SmoothCameraControllerProps {
   cameraPos: [number, number, number];
@@ -93,7 +37,7 @@ interface SmoothCameraControllerProps {
   onMovingChange?: (moving: boolean) => void;
 }
 
-/** Менеджер рендеринга по требованию (frameloop="demand"): гарантирует рендеринг при движениях камеры/дрона/ходьбе и 0% нагрузки в покое */
+/** Менеджер рендеринга по требованию (frameloop="demand"): рендер только при действиях пользователя/дрона/VR */
 function DemandRenderBridge({ active }: { active: boolean }) {
   const { invalidate } = useThree();
 
@@ -121,10 +65,9 @@ function SmoothCameraController({
   const { camera, scene, invalidate } = useThree();
   const controlsRef = useRef<OCImpl | null>(null);
 
-  // Параметры перехода хранятся в refs и обрабатываются строго в цикле useFrame
   const isTransitioning = useRef(false);
   const transitionStart = useRef(0);
-  const transitionDuration = 1.35; // секунды
+  const transitionDuration = 1.25;
 
   const startPos = useRef(new THREE.Vector3());
   const targetPos = useRef(new THREE.Vector3(...cameraPos));
@@ -146,7 +89,6 @@ function SmoothCameraController({
       return;
     }
 
-    // Проверка прямой видимости THREE.Raycaster и автоматическая коррекция спавна
     const los = validateAndAdjustCameraLineOfSight(
       cameraPos,
       lookAt,
@@ -172,7 +114,6 @@ function SmoothCameraController({
     onMovingChange?.(true);
     invalidate();
 
-    // Временно отключаем ручное вращение OrbitControls во время плавного перелета камеры
     if (controlsRef.current) {
       controlsRef.current.enabled = false;
     }
@@ -185,7 +126,6 @@ function SmoothCameraController({
       invalidate();
       const elapsed = (performance.now() - transitionStart.current) / 1000;
       const progress = Math.min(1.0, elapsed / transitionDuration);
-      // Плавная кубическая кривая smoothstep: t * t * (3 - 2 * t)
       const t = progress * progress * (3 - 2 * progress);
 
       camera.position.lerpVectors(startPos.current, targetPos.current, t);
@@ -215,7 +155,6 @@ function SmoothCameraController({
       return;
     }
 
-    // В обычном режиме орбиты - непрерывное плавное сглаживание в цикле анимации useFrame
     if (mode === 'orbit' && controlsRef.current && controlsRef.current.enabled) {
       controlsRef.current.update();
     }
@@ -228,9 +167,9 @@ function SmoothCameraController({
       ref={controlsRef}
       enableDamping={true}
       dampingFactor={0.05}
-      minDistance={6}
-      maxDistance={420}
-      maxPolarAngle={Math.PI * 0.88}
+      minDistance={2}
+      maxDistance={220}
+      maxPolarAngle={Math.PI * 0.495}
       makeDefault
       onChange={() => invalidate()}
     />
@@ -238,25 +177,22 @@ function SmoothCameraController({
 }
 
 interface SceneContentProps {
-  containmentOpacity: number;
-  onPOISelect: (poi: POIInfo) => void;
-  pois?: POIInfo[];
+  reloadKey: number;
+  onStatusChange: (state: GlbLoadState) => void;
 }
 
-function SceneContent({ containmentOpacity, onPOISelect, pois = POI_LIST }: SceneContentProps) {
+function SceneContent({ reloadKey, onStatusChange }: SceneContentProps) {
   return (
     <group>
-      {/* Оставляем исключительно вашу новую детальную модель */}
-      <AssemblyComponent position={[0, 0, 0]} scale={[1, 1, 1]} />
-
-      {/* Внешняя инфраструктура, второй блок и окружение */}
-      <VVERUnit2 position={[0, 0, 70]} scale={[1, 1, 1]} />
-      <InterUnitOverheadPipeBridge />
-      <RITM200NComplex position={[168, 0, 80]} />
-      <CylindricalWaterStorageTanks position={[64, 0, 86]} />
-      <ExteriorScene />
-      <SiteEngineeringInfrastructure />
-      <POIMarkers pois={pois} onSelect={onPOISelect} />
+      {/* Облегченное Low-Poly окружение (< 1,500 полигонов, InstancedMesh) */}
+      <LowPolyEnvironment groundY={0} />
+      {/* Реальная CAD-модель строго по пути /assembly.glb через GLTFLoader + <primitive /> */}
+      <GlbAssemblyModel
+        key={reloadKey}
+        targetMaxSize={30}
+        groundY={0}
+        onStatusChange={onStatusChange}
+      />
     </group>
   );
 }
@@ -309,16 +245,26 @@ export default function App() {
   const [containmentOpacity, setContainmentOpacity] = useState(0.3);
   const [renderMode, setRenderMode] = useState<RenderVisualizationMode>('standard');
   const [vrSupported, setVrSupported] = useState<boolean | null>(null);
-  const [selectedPOI, setSelectedPOI] = useState<POIInfo | null>(null);
   const [floorTarget, setFloorTarget] = useState<number | null>(null);
   const [isVRPresenting, setIsVRPresenting] = useState(false);
 
+  // Тени включены на десктопе и автоматически отключаются в VR-гарнитуре для 72-90 FPS
   const [enableShadows, setEnableShadows] = useState(true);
   const [cameraMoving, setCameraMoving] = useState(false);
 
-  // Динамические POI и Viewpoints (синхронизируются с глобальной матрицей РИТМ-200Н)
-  const [dynamicPOIs, setDynamicPOIs] = useState<POIInfo[]>(POI_LIST);
-  const [dynamicViews, setDynamicViews] = useState(FLOOR_VIEWS);
+  // Состояние загрузки основной CAD-модели /assembly.glb
+  const [reloadKey, setReloadKey] = useState(0);
+  const [glbStatus, setGlbStatus] = useState<GlbLoadState>({
+    status: 'loading',
+    progressPercent: 0,
+    loadedMB: 0,
+    totalMB: 56,
+    meshCount: 0,
+    triangleCount: 0,
+    parseTimeMs: 0,
+  });
+  const [hudDismissed, setHudDismissed] = useState(false);
+  const envRenderTargetRef = useRef<THREE.WebGLRenderTarget | null>(null);
 
   // Drone Fly-By state
   const [droneSpeed, setDroneSpeed] = useState(1.0);
@@ -332,19 +278,13 @@ export default function App() {
   } | null>(null);
   const [scrubProgress, setScrubProgress] = useState<number | null>(null);
 
-  const activeViewData = dynamicViews.find((v) => v.id === activeView) ?? dynamicViews[0];
+  const activeViewData = FLOOR_VIEWS.find((v) => v.id === activeView) ?? FLOOR_VIEWS[0];
   const controlMode: ViewMode = activeViewData.mode;
 
-  // Непрерывный рендеринг активируется только при активных движениях (дрон, перелет камеры, VR)
   const isContinuousRendering =
     cameraMoving ||
     controlMode === 'drone' ||
     isVRPresenting;
-
-  const handleSyncRITM = useCallback((pois: POIInfo[], views: typeof FLOOR_VIEWS) => {
-    setDynamicPOIs([...pois]);
-    setDynamicViews([...views]);
-  }, []);
 
   useEffect(() => {
     const check = async () => {
@@ -352,8 +292,12 @@ export default function App() {
         try {
           const ok = await navigator.xr.isSessionSupported('immersive-vr');
           setVrSupported(ok);
-        } catch { setVrSupported(false); }
-      } else { setVrSupported(false); }
+        } catch {
+          setVrSupported(false);
+        }
+      } else {
+        setVrSupported(false);
+      }
     };
     check();
   }, []);
@@ -369,8 +313,37 @@ export default function App() {
     };
   }, []);
 
+  // Автоматическое скрытие баннера успешной загрузки через 6 секунд
+  useEffect(() => {
+    if (glbStatus.status === 'loading') {
+      setHudDismissed(false);
+    } else if (glbStatus.status === 'loaded') {
+      const timer = window.setTimeout(() => setHudDismissed(true), 6000);
+      return () => window.clearTimeout(timer);
+    }
+    return undefined;
+  }, [glbStatus.status]);
+
+  // Освобождение PMREM текстуры при размонтировании
+  useEffect(() => {
+    return () => {
+      if (envRenderTargetRef.current) {
+        envRenderTargetRef.current.dispose();
+      }
+    };
+  }, []);
+
+  const handleGlbStatusChange = useCallback((next: GlbLoadState) => {
+    setGlbStatus(next);
+  }, []);
+
+  const handleRetryModelLoad = useCallback(() => {
+    setHudDismissed(false);
+    setReloadKey((k) => k + 1);
+  }, []);
+
   const handleViewChange = useCallback((viewId: string) => {
-    const view = dynamicViews.find((v) => v.id === viewId) ?? FLOOR_VIEWS.find((v) => v.id === viewId);
+    const view = FLOOR_VIEWS.find((v) => v.id === viewId);
     if (!view) return;
     setActiveView(viewId);
     if (view.mode === 'walk') {
@@ -382,10 +355,6 @@ export default function App() {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('restore-camera-focus'));
     }
-  }, [dynamicViews]);
-
-  const handlePOISelect = useCallback((poi: POIInfo) => {
-    setSelectedPOI(poi);
   }, []);
 
   const handleVRClick = useCallback(() => {
@@ -396,12 +365,16 @@ export default function App() {
   const handleFloorArrived = useCallback(() => {
     setFloorTarget(null);
   }, []);
+
   const handlePointerLockChange = useCallback((locked: boolean) => {
     setPointerLocked(locked);
   }, []);
 
+  const vrSpawnTarget: [number, number, number] =
+    activeViewData.mode === 'walk' ? activeViewData.cameraPos : [0, 0, 24];
+
   return (
-      <div className="scene-grain w-full h-[100dvh] relative bg-[#182327] overflow-hidden">
+    <div className="scene-grain w-full h-[100dvh] relative bg-[#182327] overflow-hidden">
       {/* WebXR VR Button trigger */}
       <div className="absolute top-0 right-0 pointer-events-none opacity-0">
         <VRButton store={xrStore} id="vr-btn" />
@@ -410,135 +383,202 @@ export default function App() {
       {webglAvailable ? (
         <Canvas
           frameloop="demand"
-          shadows={enableShadows}
-          camera={{ position: [50, 30, 60], fov: 60, near: 0.1, far: 1000 }}
+          shadows={enableShadows && !isVRPresenting}
+          camera={{ position: [26, 16, 28], fov: 50, near: 0.1, far: 900 }}
           gl={{
             antialias: false,
             alpha: false,
             stencil: false,
             depth: true,
             toneMapping: THREE.ACESFilmicToneMapping,
-            toneMappingExposure: 1.08,
+            toneMappingExposure: 1.0,
             powerPreference: 'high-performance',
           }}
-          dpr={[1, Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, 1.5)]}
+          dpr={isVRPresenting ? 1 : [1, 1.25]}
           onCreated={({ gl, scene, camera }) => {
-            const bgColor = new THREE.Color('#d4c5a9');
+            const bgColor = new THREE.Color('#bdd0e0');
             scene.background = bgColor;
             gl.setClearColor(bgColor, 1.0);
-            gl.setPixelRatio(Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, 1.5));
+            gl.setPixelRatio(Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, 1.25));
             gl.domElement.tabIndex = 0;
             gl.domElement.style.outline = 'none';
-            camera.near = 0.1;
-            camera.far = 1000;
+            camera.near = 0.15;
+            camera.far = 900;
             camera.updateProjectionMatrix();
+
+            // Однократный процедурный IBL (Environment) чтобы PBR-материалы не выглядели чёрными
+            try {
+              const pmrem = new THREE.PMREMGenerator(gl);
+              pmrem.compileEquirectangularShader();
+              const roomEnv = new RoomEnvironment();
+              const envRT = pmrem.fromScene(roomEnv, 0.04);
+              if (envRenderTargetRef.current) {
+                envRenderTargetRef.current.dispose();
+              }
+              envRenderTargetRef.current = envRT;
+              scene.environment = envRT.texture;
+              roomEnv.dispose();
+              pmrem.dispose();
+            } catch (err) {
+              console.warn('[VR Lighting] RoomEnvironment IBL skipped:', err);
+            }
           }}
         >
-        <DemandRenderBridge active={isContinuousRendering} />
-        <WebXRSceneManager
-          activeSpawnPos={activeViewData.cameraPos}
-          floorY={activeViewData.floorY}
-          activeViewId={activeViewData.id}
-        />
-        <ScenePerformanceOptimizer onSyncRITM={handleSyncRITM} />
-        {/* Менеджер режимов отображения: Стандарт, Тепловизор, Рентген / Каркас */}
-        <VisualizationModeManager mode={renderMode} />
-        {/* Реалистичный природный фон и легкий естественный степной туман по ТЗ */}
-        <color attach="background" args={['#d4c5a9']} />
-        <fogExp2 attach="fog" args={['#d4c5a9', 0.001]} />
-
-        {/* Глобальное базовое освещение для предотвращения темноты/черного экрана в VR */}
-        <ambientLight intensity={1.4} color="#fffcf5" />
-
-        <Suspense fallback={null}>
-          <Sky
-            sunPosition={[95, 110, 85]}
-            turbidity={2.4}
-            rayleigh={0.95}
-            mieCoefficient={0.004}
-            mieDirectionalG={0.82}
-          />
-          <Stars radius={450} depth={80} count={1200} factor={4} fade />
-          <Environment preset="warehouse" environmentIntensity={0.25} />
-        </Suspense>
-        <AdaptiveDpr pixelated />
-
-        {/* Теплое солнечное дневное освещение степи */}
-        <hemisphereLight args={['#f5ebd8', '#998363', 0.88]} />
-        <directionalLight
-          position={[95, 110, 85]}
-          intensity={2.8}
-          color="#fff3dc"
-          castShadow={enableShadows}
-          shadow-mapSize-width={512}
-          shadow-mapSize-height={512}
-          shadow-camera-left={-130}
-          shadow-camera-right={130}
-          shadow-camera-top={130}
-          shadow-camera-bottom={-130}
-          shadow-camera-far={320}
-          shadow-bias={-0.00015}
-        />
-        <directionalLight position={[-55, 35, -65]} intensity={0.45} color="#88aaff" />
-
-        {/* Smooth ambient occlusion contact shadows on +15m deck - baked once */}
-        {enableShadows && (
-          <ContactShadows
-            position={[0, 15.01, 0]}
-            opacity={0.35}
-            scale={40}
-            blur={1.5}
-            far={6}
-            resolution={256}
-            color="#0c1417"
-            frames={1}
-          />
-        )}
-
-        <XR store={xrStore}>
-          <TeleportTarget>
-            <SceneContent
-              containmentOpacity={containmentOpacity}
-              onPOISelect={handlePOISelect}
-              pois={dynamicPOIs}
-            />
-          </TeleportTarget>
-          <VRControllerManager
-            viewTarget={activeViewData.target ?? activeViewData.cameraPos}
-            floorY={activeViewData.floorY}
+          <DemandRenderBridge active={isContinuousRendering} />
+          <WebXRSceneManager
+            activeSpawnPos={vrSpawnTarget}
+            floorY={0}
             activeViewId={activeViewData.id}
           />
-        </XR>
+          <VisualizationModeManager mode={renderMode} />
 
-        {/* Unified camera controller with damping = 0.05 & useFrame animation loop */}
-        <SmoothCameraController
-          cameraPos={activeViewData.cameraPos}
-          lookAt={activeViewData.target ?? [0, activeViewData.floorY, 0]}
-          mode={controlMode}
-          viewId={activeViewData.id}
-          onMovingChange={setCameraMoving}
-        />
+          {/* Согласованный фон неба и линейный туман горизонта */}
+          <color attach="background" args={['#bdd0e0']} />
+          <fog attach="fog" args={['#bdd0e0', 160, 520]} />
 
-        {controlMode === 'drone' ? (
-          <DroneFlyByController
-            active={activeView === 'view-drone'}
-            speedMultiplier={droneSpeed}
-            paused={dronePaused}
-            scrubProgress={scrubProgress}
-            onTelemetryUpdate={setDroneTelemetry}
+          {!isVRPresenting && <AdaptiveDpr pixelated />}
+
+          {/* Мягкое освещение + 3-источниковая схема для читаемости CAD-материалов и высокого FPS в VR */}
+          <ambientLight intensity={0.55} color="#ffffff" />
+          <hemisphereLight args={['#eef6ff', '#8b7e68', 1.15]} />
+          <directionalLight
+            position={[35, 55, 30]}
+            intensity={2.2}
+            color="#fff7eb"
+            castShadow={enableShadows && !isVRPresenting}
+            shadow-mapSize={[512, 512]}
+            shadow-camera-left={-35}
+            shadow-camera-right={35}
+            shadow-camera-top={35}
+            shadow-camera-bottom={-35}
+            shadow-camera-far={160}
+            shadow-bias={-0.0002}
           />
-        ) : controlMode === 'walk' ? (
-          <FirstPersonController
-            targetFloor={floorTarget}
-            onArrived={handleFloorArrived}
-            onLockChange={handlePointerLockChange}
-            spawnPosition={activeViewData.cameraPos}
-            lookAtTarget={activeViewData.target}
+          <directionalLight position={[-55, 45, -60]} intensity={0.55} color="#b7d2ff" />
+
+          <XR store={xrStore}>
+            <TeleportTarget>
+              <SceneContent
+                reloadKey={reloadKey}
+                onStatusChange={handleGlbStatusChange}
+              />
+            </TeleportTarget>
+            <VRControllerManager
+              viewTarget={vrSpawnTarget}
+              floorY={0}
+              activeViewId={activeViewData.id}
+            />
+          </XR>
+
+          <SmoothCameraController
+            cameraPos={activeViewData.cameraPos}
+            lookAt={activeViewData.target ?? [0, activeViewData.floorY, 0]}
+            mode={controlMode}
+            viewId={activeViewData.id}
+            onMovingChange={setCameraMoving}
           />
-        ) : null}
+
+          {controlMode === 'drone' ? (
+            <DroneFlyByController
+              active={activeView === 'view-drone'}
+              speedMultiplier={droneSpeed}
+              paused={dronePaused}
+              scrubProgress={scrubProgress}
+              onTelemetryUpdate={setDroneTelemetry}
+            />
+          ) : controlMode === 'walk' ? (
+            <FirstPersonController
+              targetFloor={floorTarget}
+              onArrived={handleFloorArrived}
+              onLockChange={handlePointerLockChange}
+              spawnPosition={activeViewData.cameraPos}
+              lookAtTarget={activeViewData.target}
+              freeGroundY={0}
+            />
+          ) : null}
         </Canvas>
       ) : (
         <SceneUnavailable onRetry={() => setWebglAvailable(canCreateWebGL2())} />
+      )}
+
+      {/* Компактный HUD статуса загрузки assembly.glb */}
+      {!isVRPresenting && !hudDismissed && (
+        <div
+          data-testid="glb-load-status"
+          className="pointer-events-auto fixed bottom-4 left-1/2 z-40 w-[min(480px,calc(100vw-32px))] -translate-x-1/2 rounded-xl border border-[#c9d1c6]/20 bg-[#121c20]/95 px-4 py-3 text-xs text-[#e6ece7] shadow-2xl"
+        >
+          {glbStatus.status === 'loading' && (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-semibold text-[#f5c26f]">
+                  Загрузка 3D-модели: assembly.glb
+                </span>
+                <span className="font-mono text-[11px] text-[#b4c5be]">
+                  {glbStatus.progressPercent}% ({glbStatus.loadedMB.toFixed(1)} / {glbStatus.totalMB.toFixed(1)} МБ)
+                </span>
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full bg-[#f5c26f] transition-[width] duration-150"
+                  style={{ width: `${Math.max(4, glbStatus.progressPercent)}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {glbStatus.status === 'loaded' && (
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-[#65d6a4]">
+                  Модель assembly.glb загружена и выровнена (Y = 0)
+                </p>
+                <p className="font-mono text-[10px] text-[#9caeaa]">
+                  Мешей: {glbStatus.meshCount} · Полигонов: {glbStatus.triangleCount.toLocaleString()} · Парсинг: {(glbStatus.parseTimeMs / 1000).toFixed(2)} с
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHudDismissed(true)}
+                className="shrink-0 rounded-md px-2 py-1 text-[11px] text-[#9caeaa] hover:bg-white/10 hover:text-white cursor-pointer"
+                aria-label="Скрыть уведомление"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          {glbStatus.status === 'error' && (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-semibold text-[#f5c26f]">
+                    Ошибка загрузки /assembly.glb
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-[#9caeaa]">
+                    {glbStatus.errorMessage || 'Проверьте наличие public/assembly.glb и повторите попытку.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setHudDismissed(true)}
+                  className="shrink-0 rounded-md px-1.5 py-0.5 text-[11px] text-[#9caeaa] hover:bg-white/10 hover:text-white cursor-pointer"
+                  aria-label="Закрыть предупреждение"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleRetryModelLoad}
+                  className="rounded-lg border border-[#f5c26f]/45 bg-[#f5c26f]/15 px-3 py-1 text-[11px] font-semibold text-[#f5c26f] hover:bg-[#f5c26f]/25 cursor-pointer"
+                >
+                  Повторить загрузку
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       <UIOverlay
@@ -564,67 +604,6 @@ export default function App() {
         enableShadows={enableShadows}
         onToggleShadows={() => setEnableShadows((s) => !s)}
       />
-
-      {selectedPOI && !isVRPresenting && (
-        <div
-          className="fixed inset-0 z-50"
-          onClick={() => {
-            setSelectedPOI(null);
-            if (typeof window !== 'undefined') {
-              window.dispatchEvent(new CustomEvent('restore-camera-focus'));
-            }
-          }}
-        >
-          <POIModal
-            poi={selectedPOI}
-            onClose={() => {
-              setSelectedPOI(null);
-              if (typeof window !== 'undefined') {
-                window.dispatchEvent(new CustomEvent('restore-camera-focus'));
-              }
-            }}
-          />
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** Inline POI modal — avoids prop drilling into UIOverlay */
-function POIModal({ poi, onClose }: { poi: POIInfo; onClose: () => void }) {
-  const [lang, setLang] = useState<'en' | 'ru'>('en');
-  return (
-    <div className="flex items-center justify-center p-4 h-full" onClick={(e) => e.stopPropagation()}>
-      <div
-        className="max-w-lg w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
-        style={{ borderColor: poi.color + '80', boxShadow: `0 0 40px ${poi.color}30` }}
-      >
-        <div className="relative px-6 py-4 border-b border-slate-700" style={{ background: `linear-gradient(135deg, ${poi.color}25, transparent)` }}>
-          <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-white transition">✕</button>
-          <span className="px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide inline-block mb-1" style={{ background: poi.color + '30', color: poi.color }}>
-            {lang === 'en' ? poi.categoryEn : poi.categoryRu}
-          </span>
-          <h2 className="text-xl font-bold text-white">{lang === 'en' ? poi.titleEn : poi.titleRu}</h2>
-        </div>
-        <div className="flex gap-1 px-6 pt-3">
-          {(['en', 'ru'] as const).map((l) => (
-            <button key={l} onClick={() => setLang(l)} className={`px-3 py-1 text-xs rounded-md font-medium transition ${lang === l ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>
-              {l === 'en' ? 'English' : 'Русский'}
-            </button>
-          ))}
-        </div>
-        <div className="px-6 py-3 grid grid-cols-2 gap-2">
-          {poi.specs.map((spec, i) => (
-            <div key={i} className="px-3 py-2 rounded-lg bg-slate-800/60 border border-slate-700/50">
-              <div className="text-[10px] text-slate-400 uppercase tracking-wider">{lang === 'en' ? spec.labelEn : spec.labelRu}</div>
-              <div className="text-sm font-mono font-semibold" style={{ color: poi.color }}>{spec.value}</div>
-            </div>
-          ))}
-        </div>
-        <div className="px-6 pb-6">
-          <p className="text-sm text-slate-300 leading-relaxed">{lang === 'en' ? poi.descriptionEn : poi.descriptionRu}</p>
-        </div>
-      </div>
     </div>
   );
 }

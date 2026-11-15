@@ -89,26 +89,24 @@ export default function DroneFlyByController({
   const isInitialized = useRef(false);
   const lastTelemetryTime = useRef(0);
 
-  // Closed cinematic camera flight path around Containment Building & Turbine Hall
+  // Closed cinematic camera flight path around the centered GLB assembly
   const { cameraPath, targetPath } = useMemo(() => {
-    // 6 strategic flight waypoints framing the reactor dome (X=0, Z=0) and turbine hall (X=77, Z=-12)
     const camPoints = [
-      new THREE.Vector3(-60, 56, 78),   // SW elevated approach
-      new THREE.Vector3(22, 34, 66),    // S low sweep along turbine hall
-      new THREE.Vector3(138, 44, 32),   // SE switchyard & generator bay
-      new THREE.Vector3(136, 68, -65),  // NE overview of steam pipe bridge
-      new THREE.Vector3(42, 74, -92),   // N high diagonal looking down at dome
-      new THREE.Vector3(-72, 54, -36),  // W sweep framing cooling tower & dome
+      new THREE.Vector3(-26, 16, 26),
+      new THREE.Vector3(0, 12, 32),
+      new THREE.Vector3(28, 15, 20),
+      new THREE.Vector3(28, 18, -22),
+      new THREE.Vector3(0, 22, -32),
+      new THREE.Vector3(-28, 15, -18),
     ];
 
-    // Look-at focal points following the industrial complex center of mass
     const tgtPoints = [
-      new THREE.Vector3(38, 22, -8),    // Center between dome and turbine
-      new THREE.Vector3(68, 18, -10),   // Turbine shaft center
-      new THREE.Vector3(88, 20, -12),   // Generator end
-      new THREE.Vector3(55, 24, -14),   // Steam piping bridge
-      new THREE.Vector3(12, 28, -4),    // Reactor dome apex
-      new THREE.Vector3(18, 24, 0),     // Containment entrance
+      new THREE.Vector3(0, 5, 0),
+      new THREE.Vector3(0, 4, 0),
+      new THREE.Vector3(0, 5, 0),
+      new THREE.Vector3(0, 5, 0),
+      new THREE.Vector3(0, 6, 0),
+      new THREE.Vector3(0, 4, 0),
     ];
 
     const cPath = new THREE.CatmullRomCurve3(camPoints, true, 'centripetal');

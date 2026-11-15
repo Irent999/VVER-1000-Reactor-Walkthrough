@@ -11,6 +11,7 @@ interface FirstPersonControllerProps {
   onLockChange: (locked: boolean) => void;
   spawnPosition: [number, number, number];
   lookAtTarget?: [number, number, number];
+  freeGroundY?: number;
 }
 
 const _dir = new THREE.Vector3();
@@ -26,6 +27,7 @@ export default function FirstPersonController({
   onLockChange,
   spawnPosition,
   lookAtTarget,
+  freeGroundY,
 }: FirstPersonControllerProps) {
   const { camera, gl, scene, invalidate } = useThree();
 
@@ -368,15 +370,29 @@ export default function FirstPersonController({
     const stepZ = velocity.current.z * frameDt;
 
     if (Math.abs(stepX) > 0.0001 || Math.abs(stepZ) > 0.0001) {
-      // Step Cannon-es rigid physics simulation to resolve physical collisions against walls, steam generators, MCPs, and primary circuit pipes
-      const resolved = globalPhysicsWorld.step(
-        velocity.current.x,
-        velocity.current.z,
-        frameDt,
-        currentFloorY.current
-      );
-      camera.position.x = resolved.x;
-      camera.position.z = resolved.z;
+      if (freeGroundY !== undefined) {
+        const nextX = camera.position.x + stepX;
+        const nextZ = camera.position.z + stepZ;
+        const dist = Math.hypot(nextX, nextZ);
+        if (dist <= 90) {
+          camera.position.x = nextX;
+          camera.position.z = nextZ;
+        } else {
+          const clampScale = 90 / dist;
+          camera.position.x = nextX * clampScale;
+          camera.position.z = nextZ * clampScale;
+        }
+      } else {
+        // Step Cannon-es rigid physics simulation to resolve physical collisions against walls, steam generators, MCPs, and primary circuit pipes
+        const resolved = globalPhysicsWorld.step(
+          velocity.current.x,
+          velocity.current.z,
+          frameDt,
+          currentFloorY.current
+        );
+        camera.position.x = resolved.x;
+        camera.position.z = resolved.z;
+      }
     }
 
     // Invalidate frame if moving, turning or damping
@@ -393,7 +409,19 @@ export default function FirstPersonController({
       invalidate();
     }
 
-    // 4. Raycasting Floor Detection: Support 1.8m eye level on Polar Crane Deck (+36m)
+    // 4. Floor Height Detection
+    if (freeGroundY !== undefined) {
+      const targetEyeY = freeGroundY + EYE_HEIGHT;
+      const dy = targetEyeY - camera.position.y;
+      if (Math.abs(dy) > 0.005) {
+        camera.position.y = THREE.MathUtils.damp(camera.position.y, targetEyeY, 22, frameDt);
+      } else {
+        camera.position.y = targetEyeY;
+      }
+      currentFloorY.current = freeGroundY;
+      return;
+    }
+
     const now = performance.now();
     if (now - lastCandidateRefresh.current > 2000 || floorCandidates.current.length === 0) {
       refreshFloorCandidates();

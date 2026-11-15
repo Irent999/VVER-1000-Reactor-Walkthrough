@@ -32,7 +32,7 @@ const THERMAL_COLORS: Record<string, string> = {
  * 3. Wireframe / X-Ray (Инженерный каркас / чертежный рентген конструкций)
  */
 export default function VisualizationModeManager({ mode }: VisualizationModeManagerProps) {
-  const { scene, gl } = useThree();
+  const { scene, gl, invalidate } = useThree();
   const prevMode = useRef<RenderVisualizationMode>('standard');
   const originalMaterials = useRef<Map<THREE.Mesh, THREE.Material | THREE.Material[]>>(new Map());
   const thermalCoreMeshes = useRef<THREE.Mesh[]>([]);
@@ -57,8 +57,8 @@ export default function VisualizationModeManager({ mode }: VisualizationModeMana
           }
         }
       });
-      scene.background = new THREE.Color('#d4c5a9');
-      gl.setClearColor('#d4c5a9', 1.0);
+      scene.background = new THREE.Color('#bdd0e0');
+      gl.setClearColor('#bdd0e0', 1.0);
     } else if (mode === 'thermal') {
       // Переводим материалы в режим тепловизора (FLIR Ironbow)
       scene.background = new THREE.Color('#030712');
@@ -146,7 +146,8 @@ export default function VisualizationModeManager({ mode }: VisualizationModeMana
     }
 
     prevMode.current = mode;
-  }, [mode, scene, gl]);
+    invalidate();
+  }, [mode, scene, gl, invalidate]);
 
   // Непрерывный мониторинг температур оборудования для тепловизора без обхода всей сцены
   useFrame((state) => {
