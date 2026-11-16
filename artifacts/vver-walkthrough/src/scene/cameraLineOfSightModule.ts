@@ -42,19 +42,7 @@ export const INDOOR_ROOM_CONSTRAINTS: Record<string, {
   bounds: { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number };
   safeSpawn: [number, number, number];
   preferredTarget: [number, number, number];
-}> = {
-  // Внутренний зал БЩУ и серверных стоек внутри закрытого помещения восточного крыла assembly.glb (масштаб 1:1)
-  'walk-bshu-interior': {
-    bounds: { minX: 25.0, maxX: 47.0, minY: 0.65, maxY: 15.5, minZ: -92.0, maxZ: -49.0 },
-    safeSpawn: [36.15, 2.22, -67.8],
-    preferredTarget: [36.15, 1.9, -76.5],
-  },
-  'walk-server-room': {
-    bounds: { minX: 25.0, maxX: 47.0, minY: 0.65, maxY: 15.5, minZ: -92.0, maxZ: -49.0 },
-    safeSpawn: [36.15, 2.22, -71.5],
-    preferredTarget: [33.5, 1.85, -73.5],
-  },
-};
+}> = {};
 
 /**
  * Проверяет, является ли объект физической преградой (стена, контайнмент, перекрытие),

@@ -58,10 +58,12 @@ export default function WebXRSceneManager({
       }
     }
 
-    // Чистый дневной фон, согласованный с дымкой горизонта
-    const bgColor = new THREE.Color('#bdd0e0');
-    scene.background = bgColor;
-    gl.setClearColor(bgColor, 1.0);
+    // Сохраняем текущую тему сцены (инициализируем фон, только если он не задан)
+    if (!scene.background) {
+      const bgColor = new THREE.Color('#131c24');
+      scene.background = bgColor;
+      gl.setClearColor(bgColor, 1.0);
+    }
 
     // Плоскости отсечения камеры для VR без Z-fighting и обрезки дальних корпусов
     camera.near = 0.15;

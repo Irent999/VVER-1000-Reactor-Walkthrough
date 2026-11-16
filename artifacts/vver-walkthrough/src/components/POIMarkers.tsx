@@ -36,7 +36,7 @@ function POIMarker({ poi, onSelect }: POIMarkerProps) {
     onSelect(poi);
   };
 
-  const isSpecialMCR = poi.id === 'vverMCR';
+  const isSpecialMCR = poi.id === 'rpv';
 
   return (
     <group position={poi.position}>

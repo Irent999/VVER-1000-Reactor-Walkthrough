@@ -7,12 +7,10 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import type { OrbitControls as OCImpl } from 'three-stdlib';
 
 import GlbAssemblyModel, { type GlbLoadState } from '@/components/GlbAssemblyModel';
-import CadInteriorBSHU from '@/components/CadInteriorBSHU';
 import VRControllerManager from '@/components/VRControllerManager';
 import DroneFlyByController, { type DroneWaymark } from '@/components/DroneFlyByController';
 import FirstPersonController from '@/components/FirstPersonController';
-import UIOverlay from '@/components/UIOverlay';
-import VisualizationModeManager, { type RenderVisualizationMode } from '@/components/VisualizationModeManager';
+import UIOverlay, { type ThemeMode } from '@/components/UIOverlay';
 import WebXRSceneManager from '@/scene/webxrManager';
 import { FLOOR_VIEWS, type ViewMode } from '@/data/poiData';
 import { validateAndAdjustCameraLineOfSight } from '@/scene/cameraLineOfSightModule';
@@ -22,12 +20,6 @@ const xrStore = createXRStore({
   offerSession: true,
 });
 
-/**
- * Высокопроизводительный контроллер камеры:
- * 1. Интеграция в анимационный цикл useFrame (исключает лаги от ре-рендеров React)
- * 2. Плавное сглаживание движений OrbitControls (enableDamping = true, dampingFactor = 0.05)
- * 3. Бесшовные кинематографические перелеты между ракурсами
- */
 interface SmoothCameraControllerProps {
   cameraPos: [number, number, number];
   lookAt: [number, number, number];
@@ -37,7 +29,6 @@ interface SmoothCameraControllerProps {
   onMovingChange?: (moving: boolean) => void;
 }
 
-/** Менеджер рендеринга по требованию (frameloop="demand"): рендер только при действиях пользователя/дрона/VR */
 function DemandRenderBridge({ active }: { active: boolean }) {
   const { invalidate } = useThree();
 
@@ -50,6 +41,21 @@ function DemandRenderBridge({ active }: { active: boolean }) {
       invalidate();
     }
   });
+
+  return null;
+}
+
+function SceneAtmosphere({ theme }: { theme: ThemeMode }) {
+  const { gl, scene, invalidate } = useThree();
+
+  useEffect(() => {
+    const colorHex = theme === 'dark' ? '#131c24' : '#d6e2ec';
+    const bgColor = new THREE.Color(colorHex);
+    scene.background = bgColor;
+    scene.fog = new THREE.Fog(colorHex, 280, 920);
+    gl.setClearColor(bgColor, 1.0);
+    invalidate();
+  }, [theme, gl, scene, invalidate]);
 
   return null;
 }
@@ -67,7 +73,7 @@ function SmoothCameraController({
 
   const isTransitioning = useRef(false);
   const transitionStart = useRef(0);
-  const transitionDuration = 1.25;
+  const transitionDuration = 1.15;
 
   const startPos = useRef(new THREE.Vector3());
   const targetPos = useRef(new THREE.Vector3(...cameraPos));
@@ -194,7 +200,7 @@ function SceneContent({
 }: SceneContentProps) {
   return (
     <group>
-      {/* Чистая CAD-модель assembly.glb в натуральном масштабе 1:1 (225 м) с PBR-материалами, разрезом и X-Ray оболочкой */}
+      {/* Исключительно чистая CAD-модель assembly.glb в масштабе 1:1 (225 м) на компактном основании */}
       <GlbAssemblyModel
         key={reloadKey}
         targetMaxSize={225}
@@ -203,8 +209,6 @@ function SceneContent({
         shellTransparent={shellTransparent}
         onStatusChange={onStatusChange}
       />
-      {/* Детализация интерьера (пульт БЩУ, мониторы, стойки АСУ ТП) в масштабе 1:1 внутри помещения восточного крыла */}
-      <CadInteriorBSHU position={[36.15, 0.65, -73.5]} />
     </group>
   );
 }
@@ -226,24 +230,27 @@ function SceneUnavailable({ onRetry }: { onRetry: () => void }) {
   return (
     <div
       data-testid="status-webgl-unavailable"
-      className="absolute inset-0 grid place-items-center overflow-hidden bg-[#182327] px-6 pb-24 pt-24 text-center"
+      className="absolute inset-0 grid place-items-center overflow-hidden bg-slate-100 dark:bg-slate-950 px-6 text-center transition-colors duration-200"
       role="status"
       aria-live="polite"
     >
-      <div className="pointer-events-none absolute inset-0 opacity-40 [background-image:linear-gradient(rgba(205,180,130,.08)_1px,transparent_1px),linear-gradient(90deg,rgba(205,180,130,.08)_1px,transparent_1px)] [background-size:48px_48px]" />
-      <div className="relative max-w-md rounded-2xl border border-white/10 bg-[#0d181b]/90 p-7 shadow-2xl backdrop-blur-xl">
-        <p className="mono text-[10px] uppercase tracking-[.2em] text-[#e2a34f]">Graphics unavailable</p>
-        <h1 className="mt-3 text-xl font-bold text-[#f1f0e5]">This browser could not start the 3D view</h1>
-        <p className="mt-3 text-sm leading-6 text-[#aab8b1]">
-          The walkthrough needs WebGL 2. Turn on hardware acceleration or open it in a browser that supports WebGL to explore the plant.
+      <div className="relative max-w-md rounded-2xl border border-slate-900/10 dark:border-white/10 bg-white/85 dark:bg-slate-900/85 p-7 shadow-xl backdrop-blur-xl">
+        <p className="mono text-xs uppercase tracking-widest text-amber-600 dark:text-amber-400">
+          Graphics unavailable
+        </p>
+        <h1 className="mt-3 text-xl font-semibold text-slate-900 dark:text-slate-100">
+          Не удалось инициализировать WebGL 2
+        </h1>
+        <p className="mt-2.5 text-sm leading-6 text-slate-600 dark:text-slate-400">
+          Включите аппаратное ускорение в настройках браузера или обновите окно для просмотра 3D-модели.
         </p>
         <button
           type="button"
           data-testid="button-retry-webgl"
           onClick={onRetry}
-          className="mt-5 rounded-lg border border-[#d69a43]/45 bg-[#d69a43]/10 px-4 py-2 text-xs font-bold text-[#f3bd69] transition hover:bg-[#d69a43]/20"
+          className="mt-5 rounded-xl bg-slate-900 dark:bg-white px-4 py-2 text-xs font-semibold text-white dark:text-slate-950 transition hover:opacity-90"
         >
-          Retry 3D view
+          Повторить запуск
         </button>
       </div>
     </div>
@@ -251,27 +258,23 @@ function SceneUnavailable({ onRetry }: { onRetry: () => void }) {
 }
 
 export default function App() {
+  const [theme, setTheme] = useState<ThemeMode>('dark');
   const [webglAvailable, setWebglAvailable] = useState(canCreateWebGL2);
   const [pointerLocked, setPointerLocked] = useState(false);
   const [activeView, setActiveView] = useState('walk-tour');
   const [containmentOpacity, setContainmentOpacity] = useState(1.0);
   const [shellTransparent, setShellTransparent] = useState(false);
-  const [renderMode, setRenderMode] = useState<RenderVisualizationMode>('standard');
   const [vrSupported, setVrSupported] = useState<boolean | null>(null);
   const [floorTarget, setFloorTarget] = useState<number | null>(null);
   const [isVRPresenting, setIsVRPresenting] = useState(false);
-
-  // Тени включены на десктопе и автоматически отключаются в VR-гарнитуре для 72-90 FPS
-  const [enableShadows, setEnableShadows] = useState(true);
   const [cameraMoving, setCameraMoving] = useState(false);
 
-  // Состояние загрузки основной CAD-модели /assembly.glb
   const [reloadKey, setReloadKey] = useState(0);
   const [glbStatus, setGlbStatus] = useState<GlbLoadState>({
     status: 'loading',
     progressPercent: 0,
     loadedMB: 0,
-    totalMB: 56,
+    totalMB: 55.05,
     meshCount: 0,
     triangleCount: 0,
     parseTimeMs: 0,
@@ -302,10 +305,17 @@ export default function App() {
         : 'orbit'
       : activeViewData.mode;
 
-  const isContinuousRendering =
-    cameraMoving ||
-    controlMode === 'drone' ||
-    isVRPresenting;
+  const isContinuousRendering = cameraMoving || controlMode === 'drone' || isVRPresenting;
+
+  // Синхронизация класса .dark на корневом элементе <html>
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+  }, [theme]);
 
   useEffect(() => {
     const check = async () => {
@@ -334,18 +344,16 @@ export default function App() {
     };
   }, []);
 
-  // Автоматическое скрытие баннера успешной загрузки через 6 секунд
   useEffect(() => {
     if (glbStatus.status === 'loading') {
       setHudDismissed(false);
     } else if (glbStatus.status === 'loaded') {
-      const timer = window.setTimeout(() => setHudDismissed(true), 6000);
+      const timer = window.setTimeout(() => setHudDismissed(true), 4500);
       return () => window.clearTimeout(timer);
     }
     return undefined;
   }, [glbStatus.status]);
 
-  // Освобождение PMREM текстуры при размонтировании
   useEffect(() => {
     return () => {
       if (envRenderTargetRef.current) {
@@ -421,16 +429,15 @@ export default function App() {
   })();
 
   return (
-    <div className="scene-grain w-full h-[100dvh] relative bg-[#182327] overflow-hidden">
-      {/* WebXR VR Button trigger */}
-      <div className="absolute top-0 right-0 pointer-events-none opacity-0">
+    <div className="relative h-[100dvh] w-full overflow-hidden bg-[#d6e2ec] dark:bg-[#131c24] transition-colors duration-200">
+      <div className="pointer-events-none absolute right-0 top-0 opacity-0">
         <VRButton store={xrStore} id="vr-btn" />
       </div>
 
       {webglAvailable ? (
         <Canvas
           frameloop="demand"
-          shadows={enableShadows && !isVRPresenting}
+          shadows={!isVRPresenting}
           camera={{ position: [64, 2.0, -18], fov: 55, near: 0.15, far: 1400 }}
           gl={{
             antialias: false,
@@ -443,7 +450,7 @@ export default function App() {
           }}
           dpr={isVRPresenting ? 1 : [1, 1.25]}
           onCreated={({ gl, scene, camera }) => {
-            const bgColor = new THREE.Color('#bdd0e0');
+            const bgColor = new THREE.Color(theme === 'dark' ? '#131c24' : '#d6e2ec');
             scene.background = bgColor;
             gl.setClearColor(bgColor, 1.0);
             gl.localClippingEnabled = true;
@@ -454,7 +461,13 @@ export default function App() {
             camera.far = 1400;
             camera.updateProjectionMatrix();
 
-            // Однократный процедурный IBL (Environment) чтобы PBR-материалы не выглядели чёрными
+            gl.domElement.addEventListener('webglcontextlost', (e) => {
+              e.preventDefault();
+            });
+            gl.domElement.addEventListener('webglcontextrestored', () => {
+              setWebglAvailable(true);
+            });
+
             try {
               const pmrem = new THREE.PMREMGenerator(gl);
               pmrem.compileEquirectangularShader();
@@ -473,27 +486,22 @@ export default function App() {
           }}
         >
           <DemandRenderBridge active={isContinuousRendering} />
+          <SceneAtmosphere theme={theme} />
           <WebXRSceneManager
             activeSpawnPos={vrSpawnTarget}
             floorY={activeViewData.floorY}
             activeViewId={activeViewData.id}
           />
-          <VisualizationModeManager mode={renderMode} />
-
-          {/* Согласованный фон неба и линейный туман горизонта (225м площадка 1:1) */}
-          <color attach="background" args={['#bdd0e0']} />
-          <fog attach="fog" args={['#bdd0e0', 260, 880]} />
 
           {!isVRPresenting && <AdaptiveDpr pixelated />}
 
-          {/* Мягкое освещение + 3-источниковая схема для читаемости CAD-материалов и высокого FPS в VR */}
-          <ambientLight intensity={0.62} color="#ffffff" />
-          <hemisphereLight args={['#eef6ff', '#9aa3ad', 1.1]} />
+          <ambientLight intensity={theme === 'dark' ? 0.56 : 0.65} color="#ffffff" />
+          <hemisphereLight args={['#eef6ff', '#8f99a3', theme === 'dark' ? 0.95 : 1.15]} />
           <directionalLight
             position={[110, 145, 95]}
-            intensity={2.1}
+            intensity={theme === 'dark' ? 1.95 : 2.15}
             color="#fff7eb"
-            castShadow={enableShadows && !isVRPresenting}
+            castShadow={!isVRPresenting}
             shadow-mapSize={[1024, 1024]}
             shadow-camera-left={-125}
             shadow-camera-right={125}
@@ -503,7 +511,7 @@ export default function App() {
             shadow-bias={-0.0005}
             shadow-normalBias={0.04}
           />
-          <directionalLight position={[-125, 105, -135]} intensity={0.65} color="#b7d2ff" />
+          <directionalLight position={[-125, 105, -135]} intensity={0.62} color="#b7d2ff" />
 
           <XR store={xrStore}>
             <TeleportTarget>
@@ -556,25 +564,23 @@ export default function App() {
         <SceneUnavailable onRetry={() => setWebglAvailable(canCreateWebGL2())} />
       )}
 
-      {/* Компактный HUD статуса загрузки assembly.glb */}
+      {/* Компактный стеклянный индикатор загрузки assembly.glb */}
       {!isVRPresenting && !hudDismissed && (
         <div
           data-testid="glb-load-status"
-          className="pointer-events-auto fixed bottom-4 left-1/2 z-40 w-[min(480px,calc(100vw-32px))] -translate-x-1/2 rounded-xl border border-[#c9d1c6]/20 bg-[#121c20]/95 px-4 py-3 text-xs text-[#e6ece7] shadow-2xl"
+          className="pointer-events-auto fixed bottom-24 left-1/2 z-40 w-[min(400px,calc(100vw-32px))] -translate-x-1/2 rounded-2xl border border-slate-900/10 dark:border-white/10 bg-white/80 dark:bg-slate-950/75 px-4 py-3 text-xs text-slate-900 dark:text-slate-100 shadow-lg backdrop-blur-xl transition-colors duration-200"
         >
           {glbStatus.status === 'loading' && (
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between gap-3">
-                <span className="font-semibold text-[#f5c26f]">
-                  Загрузка 3D-модели: assembly.glb
-                </span>
-                <span className="font-mono text-[11px] text-[#b4c5be]">
-                  {glbStatus.progressPercent}% ({glbStatus.loadedMB.toFixed(1)} / {glbStatus.totalMB.toFixed(1)} МБ)
+                <span className="font-medium">Загрузка CAD-сборки</span>
+                <span className="mono text-[11px] text-slate-600 dark:text-slate-400">
+                  {glbStatus.progressPercent}% · {glbStatus.loadedMB.toFixed(1)} МБ
                 </span>
               </div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+              <div className="h-1 w-full overflow-hidden rounded-full bg-slate-900/10 dark:bg-white/10">
                 <div
-                  className="h-full bg-[#f5c26f] transition-[width] duration-150"
+                  className="h-full bg-sky-500 transition-[width] duration-150"
                   style={{ width: `${Math.max(4, glbStatus.progressPercent)}%` }}
                 />
               </div>
@@ -584,17 +590,15 @@ export default function App() {
           {glbStatus.status === 'loaded' && (
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="truncate font-semibold text-[#65d6a4]">
-                  Модель assembly.glb загружена и выровнена (Y = 0)
-                </p>
-                <p className="font-mono text-[10px] text-[#9caeaa]">
-                  Мешей: {glbStatus.meshCount} · Полигонов: {glbStatus.triangleCount.toLocaleString()} · Парсинг: {(glbStatus.parseTimeMs / 1000).toFixed(2)} с
+                <p className="truncate font-medium">Модель assembly.glb готова</p>
+                <p className="mono mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                  {glbStatus.meshCount} узлов · {glbStatus.triangleCount.toLocaleString()} полигонов
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setHudDismissed(true)}
-                className="shrink-0 rounded-md px-2 py-1 text-[11px] text-[#9caeaa] hover:bg-white/10 hover:text-white cursor-pointer"
+                className="shrink-0 rounded-lg px-2 py-1 text-slate-500 hover:bg-slate-900/5 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-white"
                 aria-label="Скрыть уведомление"
               >
                 ✕
@@ -603,34 +607,22 @@ export default function App() {
           )}
 
           {glbStatus.status === 'error' && (
-            <div className="flex flex-col gap-2">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="font-semibold text-[#f5c26f]">
-                    Ошибка загрузки /assembly.glb
-                  </p>
-                  <p className="mt-0.5 text-[11px] text-[#9caeaa]">
-                    {glbStatus.errorMessage || 'Проверьте наличие public/assembly.glb и повторите попытку.'}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setHudDismissed(true)}
-                  className="shrink-0 rounded-md px-1.5 py-0.5 text-[11px] text-[#9caeaa] hover:bg-white/10 hover:text-white cursor-pointer"
-                  aria-label="Закрыть предупреждение"
-                >
-                  ✕
-                </button>
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-medium text-amber-600 dark:text-amber-400">
+                  Ошибка загрузки assembly.glb
+                </p>
+                <p className="mt-0.5 truncate text-[11px] text-slate-600 dark:text-slate-400">
+                  {glbStatus.errorMessage || 'Проверьте файл public/assembly.glb'}
+                </p>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleRetryModelLoad}
-                  className="rounded-lg border border-[#f5c26f]/45 bg-[#f5c26f]/15 px-3 py-1 text-[11px] font-semibold text-[#f5c26f] hover:bg-[#f5c26f]/25 cursor-pointer"
-                >
-                  Повторить загрузку
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={handleRetryModelLoad}
+                className="shrink-0 rounded-lg bg-slate-900 dark:bg-white px-3 py-1.5 text-[11px] font-medium text-white dark:text-slate-950"
+              >
+                Повтор
+              </button>
             </div>
           )}
         </div>
@@ -639,7 +631,6 @@ export default function App() {
       <UIOverlay
         activeView={activeView}
         onViewChange={handleViewChange}
-        sceneAvailable={webglAvailable}
         pointerLocked={pointerLocked}
         containmentOpacity={containmentOpacity}
         onContainmentOpacityChange={setContainmentOpacity}
@@ -656,11 +647,9 @@ export default function App() {
         onDroneScrub={(t) => {
           setScrubProgress(t);
         }}
-        renderMode={renderMode}
-        onRenderModeChange={setRenderMode}
-        enableShadows={enableShadows}
-        onToggleShadows={() => setEnableShadows((s) => !s)}
         onToggleWalkMode={handleToggleWalkMode}
+        theme={theme}
+        onToggleTheme={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
       />
     </div>
   );
