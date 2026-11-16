@@ -1,7 +1,13 @@
 import { useRef, useState, useEffect, type RefObject } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import { useXRControllerLocomotion, XROrigin, useXR } from '@react-three/xr';
 import * as THREE from 'three';
+import {
+  collectCadWalkData,
+  resolveCadHorizontalStep,
+  sampleCadFloorHeight,
+  type CadWalkCollisionData,
+} from '@/scene/cadWalkPhysics';
 
 /** Animated glowing teleportation ring indicator for WebXR controller targeting */
 function VRTeleportRing({ position, visible }: { position: [number, number, number]; visible: boolean }) {
@@ -50,9 +56,20 @@ export interface VRControllerManagerProps {
 
 function LocomotionRig({ viewTarget, floorY, activeViewId }: VRControllerManagerProps) {
   const playerRef = useRef<THREE.Group>(null);
+  const { scene } = useThree();
   const { session } = useXR();
   const [teleportPos, setTeleportPos] = useState<[number, number, number]>([64, 0.4, -18]);
   const [showRing, setShowRing] = useState(false);
+
+  const cadDataRef = useRef<CadWalkCollisionData>({
+    rootFound: false,
+    floorMeshes: [],
+    wallMeshes: [],
+    heavyBoxes: [],
+  });
+  const lastCadRefresh = useRef(0);
+  const prevVrPos = useRef(new THREE.Vector3(64, 0.4, -18));
+  const currentVrFloorY = useRef(floorY !== undefined ? floorY : 0.4);
 
   // Динамический перенос VR Dolly при смене ракурса в UI без сбивания трекинга головы
   const lastTargetKey = useRef<string>('');
@@ -62,7 +79,9 @@ function LocomotionRig({ viewTarget, floorY, activeViewId }: VRControllerManager
       if (key !== lastTargetKey.current) {
         lastTargetKey.current = key;
         const targetY = floorY !== undefined ? floorY : 0.4;
+        currentVrFloorY.current = targetY;
         playerRef.current.position.set(viewTarget[0], targetY, viewTarget[2]);
+        prevVrPos.current.set(viewTarget[0], targetY, viewTarget[2]);
         playerRef.current.updateMatrixWorld(true);
         setTeleportPos([viewTarget[0], targetY, viewTarget[2]]);
       }
@@ -75,7 +94,9 @@ function LocomotionRig({ viewTarget, floorY, activeViewId }: VRControllerManager
       const customEvent = e as CustomEvent<{ spawn?: [number, number, number] }>;
       const spawn = customEvent.detail?.spawn || [64, 0.4, -18];
       if (playerRef.current) {
+        currentVrFloorY.current = spawn[1];
         playerRef.current.position.set(spawn[0], spawn[1], spawn[2]);
+        prevVrPos.current.set(spawn[0], spawn[1], spawn[2]);
         playerRef.current.updateMatrixWorld(true);
         setTeleportPos([spawn[0], spawn[1], spawn[2]]);
       }
@@ -87,7 +108,7 @@ function LocomotionRig({ viewTarget, floorY, activeViewId }: VRControllerManager
   // 1. Controller Thumbstick locomotion + 45° Snap Turn
   useXRControllerLocomotion(
     playerRef as RefObject<THREE.Object3D | null>,
-    { speed: 5.0 },
+    { speed: 4.8 },
     { type: 'snap', degrees: 45 },
     'left',
   );
@@ -99,22 +120,49 @@ function LocomotionRig({ viewTarget, floorY, activeViewId }: VRControllerManager
     'right',
   );
 
-  // 2. VR player grounding and 225x225m plant boundary clamping (1:1 human scale)
-  useFrame(() => {
+  // 2. Реальное перемещение по платформам/мостикам CAD и скольжение вдоль стен в масштабе 1:1
+  useFrame((_, dt) => {
     if (!session || !playerRef.current) return;
+
+    const now = performance.now();
+    if (!cadDataRef.current.rootFound && now - lastCadRefresh.current > 800) {
+      lastCadRefresh.current = now;
+      cadDataRef.current = collectCadWalkData(scene);
+    }
+
     const p = playerRef.current.position;
+    const dx = p.x - prevVrPos.current.x;
+    const dz = p.z - prevVrPos.current.z;
 
-    const targetY = floorY !== undefined ? floorY : 0.4;
-    if (Math.abs(p.y - targetY) > 0.02) {
-      p.y = THREE.MathUtils.lerp(p.y, targetY, 0.25);
+    const resolved = resolveCadHorizontalStep(
+      prevVrPos.current.x,
+      prevVrPos.current.z,
+      currentVrFloorY.current,
+      dx,
+      dz,
+      cadDataRef.current
+    );
+    p.x = resolved.x;
+    p.z = resolved.z;
+
+    const fallbackY = floorY !== undefined ? floorY : 0.4;
+    const detectedFloorY = sampleCadFloorHeight(
+      p.x,
+      p.z,
+      currentVrFloorY.current,
+      fallbackY,
+      cadDataRef.current
+    );
+    currentVrFloorY.current = detectedFloorY;
+
+    const frameDt = Math.min(dt, 0.05);
+    if (Math.abs(p.y - detectedFloorY) > 0.01) {
+      p.y = THREE.MathUtils.damp(p.y, detectedFloorY, 16, frameDt);
+    } else {
+      p.y = detectedFloorY;
     }
 
-    p.x = THREE.MathUtils.clamp(p.x, -108, 108);
-    p.z = THREE.MathUtils.clamp(p.z, -108, 108);
-    if (p.x > 20 && p.z > 12) {
-      if (p.x - 20 < p.z - 12) p.x = 20;
-      else p.z = 12;
-    }
+    prevVrPos.current.copy(p);
   });
 
   useEffect(() => {
@@ -127,7 +175,9 @@ function LocomotionRig({ viewTarget, floorY, activeViewId }: VRControllerManager
         const spawnY = isWalk && floorY !== undefined ? floorY : defaultSpawn[1];
         const spawnZ = isWalk && viewTarget ? viewTarget[2] : defaultSpawn[2];
 
+        currentVrFloorY.current = spawnY;
         playerRef.current.position.set(spawnX, spawnY, spawnZ);
+        prevVrPos.current.set(spawnX, spawnY, spawnZ);
         playerRef.current.updateMatrixWorld(true);
         setTeleportPos([spawnX, spawnY, spawnZ]);
       }

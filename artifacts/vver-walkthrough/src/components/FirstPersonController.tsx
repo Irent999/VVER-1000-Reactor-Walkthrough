@@ -5,6 +5,13 @@ import { EYE_HEIGHT } from '@/scene/constants';
 import { getFloorHeightAt } from '@/scene/floorDetection';
 import { globalPhysicsWorld } from '@/scene/physicsWorld';
 
+import {
+  collectCadWalkData,
+  resolveCadHorizontalStep,
+  sampleCadFloorHeight,
+  type CadWalkCollisionData,
+} from '@/scene/cadWalkPhysics';
+
 interface FirstPersonControllerProps {
   targetFloor: number | null;
   onArrived: () => void;
@@ -18,8 +25,6 @@ const _dir = new THREE.Vector3();
 const _right = new THREE.Vector3();
 const _up = new THREE.Vector3(0, 1, 0);
 const _targetMove = new THREE.Vector3();
-const _origin = new THREE.Vector3();
-const _down = new THREE.Vector3(0, -1, 0);
 
 export default function FirstPersonController({
   targetFloor,
@@ -51,10 +56,14 @@ export default function FirstPersonController({
   const transitionStart = useRef(0);
   const transitionDuration = 1.4;
 
-  // Reusable raycaster for floor height detection
-  const raycaster = useRef(new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, -1, 0), 0.05, 12));
-  const floorCandidates = useRef<THREE.Mesh[]>([]);
-  const lastCandidateRefresh = useRef(0);
+  // Кэш поверхностей CAD-сборки для рейкаста полов, мостиков обслуживания и стен
+  const cadDataRef = useRef<CadWalkCollisionData>({
+    rootFound: false,
+    floorMeshes: [],
+    wallMeshes: [],
+    heavyBoxes: [],
+  });
+  const lastCadRefresh = useRef(0);
 
   // Smooth transition glide when switching walk zones
   const walkGlideActive = useRef(false);
@@ -71,8 +80,7 @@ export default function FirstPersonController({
   const targetKey = lookAtTarget ? `${lookAtTarget[0]}:${lookAtTarget[1]}:${lookAtTarget[2]}` : '';
   const spawnKey = `${spawnPosition[0]}:${spawnPosition[1]}:${spawnPosition[2]}:${targetKey}`;
   useEffect(() => {
-    const eyeHeight = spawnPosition[1] >= 34.0 ? 1.8 : EYE_HEIGHT;
-    currentFloorY.current = spawnPosition[1] - eyeHeight;
+    currentFloorY.current = freeGroundY !== undefined ? freeGroundY : spawnPosition[1] - EYE_HEIGHT;
     velocity.current.set(0, 0, 0);
     globalPhysicsWorld.teleportPlayer(spawnPosition[0], currentFloorY.current, spawnPosition[2]);
 
@@ -289,36 +297,13 @@ export default function FirstPersonController({
     }
   }, [targetFloor]);
 
-  // Collect candidate floor meshes periodically for raycast performance
-  const refreshFloorCandidates = useCallback(() => {
-    const list: THREE.Mesh[] = [];
-    scene.traverse((obj) => {
-      if ((obj as THREE.Mesh).isMesh && (obj.visible || obj.name.includes('Floor') || obj.name.includes('Deck'))) {
-        const mesh = obj as THREE.Mesh;
-        if (
-          mesh.userData?.isFloor ||
-          mesh.name === 'PolarCraneDeck' ||
-          mesh.name === 'Level33Floor' ||
-          mesh.name === 'PolarCraneDeckCollider' ||
-          mesh.name.includes('Floor') ||
-          mesh.name.includes('Deck')
-        ) {
-          list.unshift(mesh);
-        } else if (
-          mesh.receiveShadow ||
-          mesh.geometry?.type?.includes('Extrude') ||
-          mesh.geometry?.type?.includes('Plane') ||
-          mesh.geometry?.type?.includes('Ring')
-        ) {
-          const pName = (mesh.parent?.name ?? '').toLowerCase();
-          const mName = mesh.name.toLowerCase();
-          if (!pName.includes('crane') && !mName.includes('rail') && !mName.includes('post') && !mName.includes('stiff')) {
-            list.push(mesh);
-          }
-        }
-      }
-    });
-    floorCandidates.current = list;
+  // Сбор и кэширование мешей CAD-модели (выполняется однократно после загрузки GLB)
+  const ensureCadWalkData = useCallback(() => {
+    const now = performance.now();
+    if (!cadDataRef.current.rootFound && now - lastCadRefresh.current > 800) {
+      lastCadRefresh.current = now;
+      cadDataRef.current = collectCadWalkData(scene);
+    }
   }, [scene]);
 
   useFrame((_, dt) => {
@@ -411,22 +396,23 @@ export default function FirstPersonController({
     const stepX = velocity.current.x * frameDt;
     const stepZ = velocity.current.z * frameDt;
 
+    if (freeGroundY !== undefined) {
+      ensureCadWalkData();
+    }
+
     if (Math.abs(stepX) > 0.0001 || Math.abs(stepZ) > 0.0001) {
       if (freeGroundY !== undefined) {
-        let nextX = THREE.MathUtils.clamp(camera.position.x + stepX, -108, 108);
-        let nextZ = THREE.MathUtils.clamp(camera.position.z + stepZ, -108, 108);
-        // Защита от выхода за вырез юго-восточного двора (X > 20 && Z > 12)
-        if (nextX > 20 && nextZ > 12) {
-          if (camera.position.x <= 20) {
-            nextX = 20;
-          } else {
-            nextZ = 12;
-          }
-        }
-        camera.position.x = nextX;
-        camera.position.z = nextZ;
+        const nextPos = resolveCadHorizontalStep(
+          camera.position.x,
+          camera.position.z,
+          currentFloorY.current,
+          stepX,
+          stepZ,
+          cadDataRef.current
+        );
+        camera.position.x = nextPos.x;
+        camera.position.z = nextPos.z;
       } else {
-        // Step Cannon-es rigid physics simulation to resolve physical collisions against walls, steam generators, MCPs, and primary circuit pipes
         const resolved = globalPhysicsWorld.step(
           velocity.current.x,
           velocity.current.z,
@@ -452,63 +438,35 @@ export default function FirstPersonController({
       invalidate();
     }
 
-    // 4. Floor Height Detection
+    // 4. Определение отметки пола/платформы/мостика и фиксация глаз инженера (Y = +1.65 м от пола)
+    let detectedFloorY: number;
     if (freeGroundY !== undefined) {
-      const targetEyeY = freeGroundY + EYE_HEIGHT;
-      const dy = targetEyeY - camera.position.y;
-      if (Math.abs(dy) > 0.005) {
-        camera.position.y = THREE.MathUtils.damp(camera.position.y, targetEyeY, 22, frameDt);
-      } else {
-        camera.position.y = targetEyeY;
-      }
-      currentFloorY.current = freeGroundY;
-      return;
+      detectedFloorY = sampleCadFloorHeight(
+        camera.position.x,
+        camera.position.z,
+        currentFloorY.current,
+        freeGroundY,
+        cadDataRef.current
+      );
+    } else {
+      detectedFloorY = getFloorHeightAt(camera.position.x, camera.position.z, camera.position.y);
     }
 
-    const now = performance.now();
-    if (now - lastCandidateRefresh.current > 2000 || floorCandidates.current.length === 0) {
-      refreshFloorCandidates();
-      lastCandidateRefresh.current = now;
-    }
-
-    let detectedFloorY = getFloorHeightAt(camera.position.x, camera.position.z, camera.position.y);
-
-    // Cast downward ray from player position
-    _origin.set(camera.position.x, camera.position.y + 0.3, camera.position.z);
-    raycaster.current.set(_origin, _down);
-
-    if (floorCandidates.current.length > 0) {
-      const hits = raycaster.current.intersectObjects(floorCandidates.current, false);
-      for (const hit of hits) {
-        // Find valid floor hit below player eyes with horizontal surface normal
-        if (hit.point.y <= camera.position.y + 0.1 && hit.distance > 0.05) {
-          if (hit.face && hit.face.normal && hit.face.normal.y > 0.55) {
-            if (Math.abs(hit.point.y - currentFloorY.current) < 2.5) {
-              detectedFloorY = hit.point.y;
-              break;
-            }
-          }
-        }
-      }
-    }
-
-    // Dynamic eye altitude: 1.8m on Polar Crane Deck (+36m level), 1.6m on other floors
-    const eyeHeight = detectedFloorY >= 34.0 ? 1.8 : EYE_HEIGHT;
-    const targetEyeY = detectedFloorY + eyeHeight;
+    const targetEyeY = detectedFloorY + EYE_HEIGHT;
     const dy = targetEyeY - camera.position.y;
 
     if (Math.abs(dy) > 0.005) {
-      camera.position.y = THREE.MathUtils.damp(camera.position.y, targetEyeY, 22, frameDt);
+      camera.position.y = THREE.MathUtils.damp(camera.position.y, targetEyeY, 18, frameDt);
+      invalidate();
     } else {
       camera.position.y = targetEyeY;
     }
-    currentFloorY.current = camera.position.y - eyeHeight;
+    currentFloorY.current = detectedFloorY;
 
-    // 5. Ground Raycasting & Teleport Reset:
-    // If player Y drops below -12.0m, automatically reset camera to active level spawn point
+    // 5. Защита от провала ниже базовой плиты
     if (camera.position.y < -12.0) {
       camera.position.set(spawnPosition[0], spawnPosition[1], spawnPosition[2]);
-      currentFloorY.current = spawnPosition[1] - EYE_HEIGHT;
+      currentFloorY.current = freeGroundY !== undefined ? freeGroundY : spawnPosition[1] - EYE_HEIGHT;
       velocity.current.set(0, 0, 0);
       globalPhysicsWorld.teleportPlayer(spawnPosition[0], currentFloorY.current, spawnPosition[2]);
     }

@@ -7,7 +7,7 @@ export const FLOOR_LEVELS = {
   upper: 36.0,
 } as const;
 
-export const EYE_HEIGHT = 1.6;
+export const EYE_HEIGHT = 1.65;
 
 export const CONTAINMENT = {
   outerRadius: 23.2,

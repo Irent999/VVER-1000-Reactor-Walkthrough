@@ -423,9 +423,9 @@ export default function App() {
     const cx = THREE.MathUtils.clamp(activeViewData.cameraPos[0], -106, 106);
     const cz = THREE.MathUtils.clamp(activeViewData.cameraPos[2], -106, 106);
     if (cx > 18 && cz > 12) {
-      return [64, activeViewData.floorY + 1.6, -18];
+      return [64, activeViewData.floorY + 1.65, -18];
     }
-    return [cx, activeViewData.floorY + 1.6, cz];
+    return [cx, activeViewData.floorY + 1.65, cz];
   })();
 
   return (
@@ -438,7 +438,7 @@ export default function App() {
         <Canvas
           frameloop="demand"
           shadows={!isVRPresenting}
-          camera={{ position: [64, 2.0, -18], fov: 55, near: 0.15, far: 1400 }}
+          camera={{ position: [64, 2.05, -18], fov: 55, near: 0.15, far: 1400 }}
           gl={{
             antialias: false,
             alpha: false,
