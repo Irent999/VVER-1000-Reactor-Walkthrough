@@ -97,7 +97,7 @@ export const POI_LIST: POIInfo[] = [
   },
   {
     id: 'vverMCR',
-    position: [-18.0, 1.4, 12.0],
+    position: [12.05, 1.5, -25.4],
     titleEn: 'Main Control Room (БЩУ)',
     titleRu: 'БЩУ (Блочный щит управления)',
     categoryEn: 'Internal Building Room · Control Console',
@@ -109,13 +109,13 @@ export const POI_LIST: POIInfo[] = [
       { labelEn: 'Display Wall', labelRu: 'Видеостена', value: 'Панорамная мнемосхема' },
     ],
     descriptionEn:
-      'Detailed operator console, panoramic reactor display wall, and interactive AZ-5 / RCP controls placed inside the existing control building of assembly.glb.',
+      'Detailed operator console, panoramic reactor display wall, and interactive AZ-5 / RCP controls placed inside the enclosed East Wing room of assembly.glb.',
     descriptionRu:
-      'Интерьер Блочного щита управления (БЩУ), встроенный внутрь существующего корпуса CAD-модели assembly.glb: П-образный пульт, мониторы и панорамная видеостена.',
+      'Интерьер Блочного щита управления (БЩУ), встроенный внутрь существующего закрытого помещения восточного крыла assembly.glb: П-образный пульт, мониторы и панорамная видеостена.',
   },
   {
     id: 'serverRoom',
-    position: [-23.3, 1.4, 12.2],
+    position: [9.5, 1.4, -24.5],
     titleEn: 'I&C Computer & Server Racks (АСУ ТП)',
     titleRu: 'Компьютерные стойки АСУ ТП',
     categoryEn: 'Internal Room · Digital Control Racks',
@@ -133,7 +133,7 @@ export const POI_LIST: POIInfo[] = [
   },
   {
     id: 'containmentCutaway',
-    position: [-16.0, 5.5, -5.0],
+    position: [12.05, 4.2, -24.5],
     titleEn: 'Architectural Cutaway Mode (Разрез)',
     titleRu: 'Механизм разрезов (Cutaway)',
     categoryEn: 'Section Analysis · Concrete Envelope',
@@ -179,9 +179,9 @@ export const FLOOR_VIEWS: FloorTarget[] = [
     id: 'view-cutaway',
     label: '✂️ Разрез зданий (Изучить внутри)',
     group: 'overview',
-    floorY: 0.14,
-    cameraPos: [-34, 20, 28],
-    target: [-16, 2.0, -2],
+    floorY: 0.22,
+    cameraPos: [21.5, 13.5, -11.5],
+    target: [10.0, 1.6, -23.5],
     mode: 'orbit',
   },
   {
@@ -198,8 +198,8 @@ export const FLOOR_VIEWS: FloorTarget[] = [
     label: '🚶 Пеший / VR обход площадки',
     group: 'overview',
     floorY: 0.14,
-    cameraPos: [0, 1.74, 34],
-    target: [-12, 4.5, -10],
+    cameraPos: [0, 1.74, 32],
+    target: [-8, 4.0, -10],
     mode: 'walk',
   },
   {
@@ -233,9 +233,9 @@ export const FLOOR_VIEWS: FloorTarget[] = [
     id: 'walk-bshu-interior',
     label: '🖥️ БЩУ и стойки АСУ ТП (Внутри)',
     group: 'vver',
-    floorY: 0.14,
-    cameraPos: [-18.0, 1.74, 14.3],
-    target: [-18.0, 1.45, 10.8],
+    floorY: 0.22,
+    cameraPos: [12.05, 1.82, -21.3],
+    target: [12.05, 1.48, -26.5],
     mode: 'walk',
   },
 ];

@@ -186,130 +186,130 @@ export interface CadInteriorBSHUProps {
  * Не добавляет никаких внешних зданий, крыш или стен.
  */
 export default function CadInteriorBSHU({
-  position = [-18.0, 0.14, 12.2],
+  position = [12.05, 0.22, -24.5],
 }: CadInteriorBSHUProps) {
   return (
     <group position={position} name="CAD_Internal_BSHU_And_Racks">
       {/* Мягкое внутреннее освещение помещения БЩУ */}
-      <pointLight position={[0, 3.1, 0]} intensity={2.0} distance={18} decay={1.6} color="#e8f3ff" />
+      <pointLight position={[0, 3.0, 0]} intensity={2.2} distance={16} decay={1.5} color="#eef6ff" />
 
-      {/* Локальный антистатический ковёр/зона под пультами (без перекрытия пола сборки) */}
+      {/* Компактный антистатический пол зоны БЩУ (6.4 x 7.4 м, строго внутри стен 8.1 x 15.3 м) */}
       <mesh position={[0, 0.015, 0]} material={floorMatMat} receiveShadow>
-        <boxGeometry args={[12.4, 0.03, 5.0]} />
+        <boxGeometry args={[6.4, 0.03, 7.4]} />
       </mesh>
 
-      {/* 1. ПАНОРАМНАЯ ВИДЕОСТЕНА И МОНИТОРЫ ОПЕРАТОРОВ (внутри помещения у северной стены зала) */}
-      <group position={[0, 0, -2.0]}>
-        {/* Несущая рама видеостены */}
-        <mesh position={[0, 1.55, -0.14]} material={consoleBodyMat}>
-          <boxGeometry args={[7.4, 2.7, 0.18]} />
+      {/* 1. ПАНОРАМНАЯ ВИДЕОСТЕНА И МОНИТОРЫ ОПЕРАТОРОВ (северная сторона зала) */}
+      <group position={[0, 0, -2.85]}>
+        {/* Несущая рама видеостены (высота 2.75 м — полностью под потолком 5.55 м и ниже линии среза) */}
+        <mesh position={[0, 1.38, -0.14]} material={consoleBodyMat}>
+          <boxGeometry args={[4.8, 2.45, 0.16]} />
         </mesh>
-        <mesh position={[0, 2.94, -0.14]} material={stainlessTrimMat}>
-          <boxGeometry args={[7.5, 0.06, 0.22]} />
+        <mesh position={[0, 2.63, -0.14]} material={stainlessTrimMat}>
+          <boxGeometry args={[4.9, 0.06, 0.2]} />
         </mesh>
 
         {/* Главный панорамный экран мнемосхемы ВВЭР */}
         <DynamicCanvasMonitorMesh
-          width={3.6}
-          height={1.45}
+          width={2.35}
+          height={1.15}
           reactorId="vver1000"
-          position={[0, 1.82, 0]}
+          position={[0, 1.62, 0]}
         />
 
         {/* Левый и правый боковые дисплеи АСУ ТП */}
         <DynamicCanvasMonitorMesh
-          width={1.55}
-          height={1.15}
+          width={1.08}
+          height={0.86}
           reactorId="vver1000"
-          position={[-2.75, 1.75, 0.12]}
+          position={[-1.78, 1.56, 0.1]}
           rotation={[0, 0.22, 0]}
         />
         <DynamicCanvasMonitorMesh
-          width={1.55}
-          height={1.15}
+          width={1.08}
+          height={0.86}
           reactorId="vver1000"
-          position={[2.75, 1.75, 0.12]}
+          position={[1.78, 1.56, 0.1]}
           rotation={[0, -0.22, 0]}
         />
       </group>
 
       {/* 2. ЦЕНТРАЛЬНЫЙ ПУЛЬТ БЩУ (ВИУР + ВИУТ) */}
-      <group position={[0, 0, -0.2]}>
+      <group position={[0, 0, -0.85]}>
         {/* Центральная секция пульта */}
         <mesh position={[0, 0.44, 0]} material={consoleBodyMat}>
-          <boxGeometry args={[3.4, 0.88, 1.05]} />
+          <boxGeometry args={[2.3, 0.88, 0.95]} />
         </mesh>
         <mesh position={[0, 0.91, 0.04]} rotation={[0.2, 0, 0]} material={consoleTopMat}>
-          <boxGeometry args={[3.44, 0.08, 1.08]} />
+          <boxGeometry args={[2.34, 0.08, 0.98]} />
         </mesh>
 
         {/* Левое и правое крыло П-образного пульта */}
-        <group position={[-2.35, 0, 0.45]} rotation={[0, 0.42, 0]}>
+        <group position={[-1.55, 0, 0.34]} rotation={[0, 0.44, 0]}>
           <mesh position={[0, 0.44, 0]} material={consoleBodyMat}>
-            <boxGeometry args={[1.9, 0.88, 1.02]} />
+            <boxGeometry args={[1.25, 0.88, 0.92]} />
           </mesh>
           <mesh position={[0, 0.91, 0.04]} rotation={[0.2, 0, 0]} material={consoleTopMat}>
-            <boxGeometry args={[1.94, 0.08, 1.05]} />
+            <boxGeometry args={[1.28, 0.08, 0.95]} />
           </mesh>
           <DynamicCanvasMonitorMesh
-            width={0.72}
-            height={0.42}
+            width={0.52}
+            height={0.34}
             reactorId="vver1000"
-            position={[-0.38, 1.24, -0.28]}
+            position={[-0.28, 1.2, -0.24]}
             rotation={[-0.12, 0, 0]}
           />
           <DynamicCanvasMonitorMesh
-            width={0.72}
-            height={0.42}
+            width={0.52}
+            height={0.34}
             reactorId="vver1000"
-            position={[0.42, 1.24, -0.28]}
+            position={[0.28, 1.2, -0.24]}
             rotation={[-0.12, 0, 0]}
           />
         </group>
 
-        <group position={[2.35, 0, 0.45]} rotation={[0, -0.42, 0]}>
+        <group position={[1.55, 0, 0.34]} rotation={[0, -0.44, 0]}>
           <mesh position={[0, 0.44, 0]} material={consoleBodyMat}>
-            <boxGeometry args={[1.9, 0.88, 1.02]} />
+            <boxGeometry args={[1.25, 0.88, 0.92]} />
           </mesh>
           <mesh position={[0, 0.91, 0.04]} rotation={[0.2, 0, 0]} material={consoleTopMat}>
-            <boxGeometry args={[1.94, 0.08, 1.05]} />
+            <boxGeometry args={[1.28, 0.08, 0.95]} />
           </mesh>
           <DynamicCanvasMonitorMesh
-            width={0.72}
-            height={0.42}
+            width={0.52}
+            height={0.34}
             reactorId="vver1000"
-            position={[-0.42, 1.24, -0.28]}
+            position={[-0.28, 1.2, -0.24]}
             rotation={[-0.12, 0, 0]}
           />
           <DynamicCanvasMonitorMesh
-            width={0.72}
-            height={0.42}
+            width={0.52}
+            height={0.34}
             reactorId="vver1000"
-            position={[0.38, 1.24, -0.28]}
+            position={[0.28, 1.2, -0.24]}
             rotation={[-0.12, 0, 0]}
           />
         </group>
 
         {/* Настольные мониторы на центральной консоли */}
         <DynamicCanvasMonitorMesh
-          width={0.82}
-          height={0.46}
+          width={0.62}
+          height={0.38}
           reactorId="vver1000"
-          position={[-0.95, 1.24, -0.28]}
+          position={[-0.72, 1.2, -0.24]}
           rotation={[-0.12, 0.08, 0]}
         />
         <DynamicCanvasMonitorMesh
-          width={0.82}
-          height={0.46}
+          width={0.62}
+          height={0.38}
           reactorId="vver1000"
-          position={[0.0, 1.24, -0.3]}
+          position={[0.0, 1.2, -0.26]}
           rotation={[-0.12, 0, 0]}
         />
         <DynamicCanvasMonitorMesh
-          width={0.82}
-          height={0.46}
+          width={0.62}
+          height={0.38}
           reactorId="vver1000"
-          position={[0.95, 1.24, -0.28]}
+          position={[0.72, 1.2, -0.24]}
           rotation={[-0.12, -0.08, 0]}
         />
 
@@ -319,14 +319,14 @@ export default function CadInteriorBSHU({
           isScram
           reactorId="vver1000"
           action="SCRAM_TRIP"
-          position={[0, 0.97, 0.25]}
+          position={[0, 0.97, 0.22]}
           rotation={[0.2, 0, 0]}
-          scale={1.1}
+          scale={1.0}
         />
         <InteractiveSwitchKey
           label="СУЗ"
           reactorId="vver1000"
-          position={[-0.55, 0.97, 0.24]}
+          position={[-0.44, 0.97, 0.21]}
           rotation={[0.2, 0, 0]}
         />
         <InteractiveMCRButton
@@ -334,7 +334,7 @@ export default function CadInteriorBSHU({
           color="#22d3ee"
           reactorId="vver1000"
           action="TOGGLE_ALL_MCPS"
-          position={[0.55, 0.97, 0.24]}
+          position={[0.44, 0.97, 0.21]}
           rotation={[0.2, 0, 0]}
         />
         <InteractiveMCRButton
@@ -342,56 +342,54 @@ export default function CadInteriorBSHU({
           color="#34d399"
           reactorId="vver1000"
           action="RESET_SCRAM"
-          position={[-1.1, 0.97, 0.24]}
+          position={[-0.88, 0.97, 0.21]}
           rotation={[0.2, 0, 0]}
         />
 
         {/* Кресла операторов перед пультом */}
-        <OperatorChair position={[-1.4, 0, 1.05]} />
-        <OperatorChair position={[0, 0, 1.0]} />
-        <OperatorChair position={[1.4, 0, 1.05]} />
+        <OperatorChair position={[-1.05, 0, 0.98]} />
+        <OperatorChair position={[0, 0, 0.95]} />
+        <OperatorChair position={[1.05, 0, 0.98]} />
       </group>
 
-      {/* 3. КОМПЬЮТЕРНЫЕ И СЕРВЕРНЫЕ СТОЙКИ АСУ ТП (по левому и правому краям зала) */}
+      {/* 3. КОМПЬЮТЕРНЫЕ И СЕРВЕРНЫЕ СТОЙКИ АСУ ТП (вдоль левой и правой стен помещения) */}
       <group name="CAD_BSHU_ServerRacks_Left">
-        {[-1.5, -0.5, 0.5, 1.5].map((rz, i) => (
+        {[-1.55, -0.45, 0.65, 1.75].map((rz, i) => (
           <ServerRackUnit
             key={`rack-l-${rz}`}
-            position={[-5.3, 0.02, rz]}
+            position={[-2.62, 0.02, rz]}
             rotation={[0, Math.PI / 2, 0]}
             phaseOffset={i * 0.7}
           />
         ))}
-        {/* Кабельный лоток над левым рядом стоек */}
-        <mesh position={[-5.3, 2.34, 0]} material={cableTrayMat}>
-          <boxGeometry args={[0.5, 0.08, 4.1]} />
+        <mesh position={[-2.62, 2.32, 0.1]} material={cableTrayMat}>
+          <boxGeometry args={[0.46, 0.08, 4.3]} />
         </mesh>
-        <mesh position={[-5.2, 2.39, 0]} material={blueCableMat}>
-          <boxGeometry args={[0.14, 0.05, 4.05]} />
+        <mesh position={[-2.52, 2.37, 0.1]} material={blueCableMat}>
+          <boxGeometry args={[0.12, 0.05, 4.25]} />
         </mesh>
-        <mesh position={[-5.4, 2.39, 0]} material={yellowCableMat}>
-          <boxGeometry args={[0.1, 0.05, 4.05]} />
+        <mesh position={[-2.72, 2.37, 0.1]} material={yellowCableMat}>
+          <boxGeometry args={[0.1, 0.05, 4.25]} />
         </mesh>
       </group>
 
       <group name="CAD_BSHU_ServerRacks_Right">
-        {[-1.5, -0.5, 0.5, 1.5].map((rz, i) => (
+        {[-1.55, -0.45, 0.65, 1.75].map((rz, i) => (
           <ServerRackUnit
             key={`rack-r-${rz}`}
-            position={[5.3, 0.02, rz]}
+            position={[2.62, 0.02, rz]}
             rotation={[0, -Math.PI / 2, 0]}
             phaseOffset={i * 0.9 + 2.0}
           />
         ))}
-        {/* Кабельный лоток над правым рядом стоек */}
-        <mesh position={[5.3, 2.34, 0]} material={cableTrayMat}>
-          <boxGeometry args={[0.5, 0.08, 4.1]} />
+        <mesh position={[2.62, 2.32, 0.1]} material={cableTrayMat}>
+          <boxGeometry args={[0.46, 0.08, 4.3]} />
         </mesh>
-        <mesh position={[5.2, 2.39, 0]} material={blueCableMat}>
-          <boxGeometry args={[0.14, 0.05, 4.05]} />
+        <mesh position={[2.52, 2.37, 0.1]} material={blueCableMat}>
+          <boxGeometry args={[0.12, 0.05, 4.25]} />
         </mesh>
-        <mesh position={[5.4, 2.39, 0]} material={yellowCableMat}>
-          <boxGeometry args={[0.1, 0.05, 4.05]} />
+        <mesh position={[2.72, 2.37, 0.1]} material={yellowCableMat}>
+          <boxGeometry args={[0.1, 0.05, 4.25]} />
         </mesh>
       </group>
     </group>

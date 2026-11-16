@@ -43,11 +43,11 @@ export const INDOOR_ROOM_CONSTRAINTS: Record<string, {
   safeSpawn: [number, number, number];
   preferredTarget: [number, number, number];
 }> = {
-  // Внутренний зал БЩУ и серверных стоек внутри корпуса CAD-сборки assembly.glb
+  // Внутренний зал БЩУ и серверных стоек внутри закрытого помещения восточного крыла assembly.glb
   'walk-bshu-interior': {
-    bounds: { minX: -24.2, maxX: -11.8, minY: 0.2, maxY: 4.2, minZ: 9.5, maxZ: 15.0 },
-    safeSpawn: [-18.0, 1.74, 14.3],
-    preferredTarget: [-18.0, 1.45, 10.8],
+    bounds: { minX: 8.4, maxX: 15.7, minY: 0.25, maxY: 4.5, minZ: -30.5, maxZ: -16.5 },
+    safeSpawn: [12.05, 1.82, -21.3],
+    preferredTarget: [12.05, 1.48, -26.5],
   },
 };
 

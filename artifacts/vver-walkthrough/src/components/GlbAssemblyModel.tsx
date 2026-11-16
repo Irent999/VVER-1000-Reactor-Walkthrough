@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -20,8 +20,10 @@ interface GlbAssemblyModelProps {
   targetMaxSize?: number;
   /** Отметка уровня земли по оси Y (по умолчанию 0) */
   groundY?: number;
-  /** Коэффициент послойного среза (1.0 = монолит, 0.5 = полусрез, 0.0 = всё внутри) */
+  /** Коэффициент послойного среза (1.0 = монолит, 0.5 = полусрез, 0.0 = глубокий срез) */
   containmentOpacity?: number;
+  /** Полупрозрачный режим наружных стен и крыши оболочки (X-Ray стены) */
+  shellTransparent?: boolean;
   /** Коллбэк состояния загрузки для отображения прогресса в HUD */
   onStatusChange?: (state: GlbLoadState) => void;
 }
@@ -31,25 +33,45 @@ const MODEL_URL = '/assembly.glb';
 function computeCutawayHeight(opacity: number): number {
   if (opacity >= 0.98) return 30;
   if (opacity <= 0.5) {
-    return 1.4 + (Math.max(0, opacity) / 0.5) * 3.1;
+    return 1.5 + (Math.max(0, opacity) / 0.5) * 1.9;
   }
-  return 4.5 + ((opacity - 0.5) / 0.48) * 7.5;
+  return 3.4 + ((opacity - 0.5) / 0.48) * 8.6;
 }
 
 export default function GlbAssemblyModel({
   targetMaxSize = 75,
   groundY = 0,
   containmentOpacity = 1.0,
+  shellTransparent = false,
   onStatusChange,
 }: GlbAssemblyModelProps) {
   const { invalidate } = useThree();
   const [loadedScene, setLoadedScene] = useState<THREE.Object3D | null>(null);
   const cutawayPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, -1, 0), 30), []);
+  const shellMaterialsRef = useRef<THREE.MeshStandardMaterial[]>([]);
+  const shellTransparentRef = useRef(shellTransparent);
+  shellTransparentRef.current = shellTransparent;
 
   useEffect(() => {
     cutawayPlane.constant = computeCutawayHeight(containmentOpacity);
     invalidate();
   }, [containmentOpacity, cutawayPlane, invalidate]);
+
+  useEffect(() => {
+    for (const mat of shellMaterialsRef.current) {
+      if (shellTransparent) {
+        mat.transparent = true;
+        mat.opacity = 0.16;
+        mat.depthWrite = false;
+      } else {
+        mat.transparent = false;
+        mat.opacity = 1.0;
+        mat.depthWrite = true;
+      }
+      mat.needsUpdate = true;
+    }
+    invalidate();
+  }, [shellTransparent, invalidate]);
 
   // Критично для frameloop="demand": вызываем invalidate() ПОСЛЕ монтирования <primitive /> в сцену
   useEffect(() => {
@@ -196,12 +218,17 @@ export default function GlbAssemblyModel({
           side: THREE.FrontSide,
         });
 
-        // Строительные конструкции и защитная оболочка режутся плоскостью cutaway для осмотра интерьера
+        const isXray = shellTransparentRef.current;
+
+        // Строительные конструкции и защитная оболочка режутся плоскостью cutaway и могут становиться полупрозрачными
         const buildingConcreteMat = new THREE.MeshStandardMaterial({
           color: 0x9aa3ad, // Матовый светло-серый бетон (защитная оболочка и корпуса)
           roughness: 0.85,
           metalness: 0.05,
           side: THREE.DoubleSide,
+          transparent: isXray,
+          opacity: isXray ? 0.16 : 1.0,
+          depthWrite: !isXray,
           clippingPlanes: [cutawayPlane],
           clipShadows: true,
         });
@@ -211,6 +238,9 @@ export default function GlbAssemblyModel({
           roughness: 0.84,
           metalness: 0.06,
           side: THREE.DoubleSide,
+          transparent: isXray,
+          opacity: isXray ? 0.16 : 1.0,
+          depthWrite: !isXray,
           clippingPlanes: [cutawayPlane],
           clipShadows: true,
         });
@@ -220,9 +250,28 @@ export default function GlbAssemblyModel({
           roughness: 0.86,
           metalness: 0.06,
           side: THREE.DoubleSide,
+          transparent: isXray,
+          opacity: isXray ? 0.16 : 1.0,
+          depthWrite: !isXray,
           clippingPlanes: [cutawayPlane],
           clipShadows: true,
         });
+
+        // Бетон перекрытия первого уровня (M23): режется по высоте, но остаётся плотным в режиме прозрачных стен
+        const structuralPlinthMat = new THREE.MeshStandardMaterial({
+          color: 0x87909a,
+          roughness: 0.86,
+          metalness: 0.05,
+          side: THREE.DoubleSide,
+          clippingPlanes: [cutawayPlane],
+          clipShadows: true,
+        });
+
+        shellMaterialsRef.current = [
+          buildingConcreteMat,
+          structuralConcreteLightMat,
+          structuralConcreteDarkMat,
+        ];
 
         const stainlessSteelMat = new THREE.MeshStandardMaterial({
           color: 0xc4ccd4, // Сатинированная нержавеющая сталь (корпуса оборудования, ПГ, турбоагрегат)
@@ -349,14 +398,30 @@ export default function GlbAssemblyModel({
             continue;
           }
 
-          // 5. Синие технологические узлы / кожухи из CAD (FF994C00 / FF663300 / FFFF7F00)
-          if (origName.includes('994C00') || origName.includes('663300') || origName.includes('FF7F00')) {
+          // 5. Компактные синие технологические узлы / приводы (M19, M38)
+          if ((origName.includes('994C00') || origName.includes('FF7F00')) && maxMeshDim < targetMaxSize * 0.16) {
             mesh.material = techBlueMat;
             continue;
           }
 
-          // 6. Крупные строительные конструкции и защитная оболочка (контайнмент, стены, перекрытия)
+          // 6. Полы/цоколь перекрытия (M23, FF484848) — режется плоскостью cutaway, не исчезает при X-Ray
+          if (origName.includes('484848')) {
+            mesh.material = structuralPlinthMat;
+            continue;
+          }
+
+          // 7. Кровля, верхние панели и строительные конструкции оболочки (включая M6, M20, M34, M36)
+          const isRoofOrShellPanel =
+            origName.includes('000066') ||
+            origName.includes('000099') ||
+            (origName.includes('FFFFFF') && maxMeshDim >= 5.0);
           const isLargeConcreteStructure = maxMeshDim >= targetMaxSize * 0.16 && vertCount < 180000;
+
+          if (isRoofOrShellPanel) {
+            mesh.material = structuralConcreteLightMat;
+            continue;
+          }
+
           if (isLargeConcreteStructure) {
             const concretePalette = [buildingConcreteMat, structuralConcreteLightMat, structuralConcreteDarkMat];
             mesh.material = concretePalette[concreteIndex % concretePalette.length];

@@ -7,7 +7,6 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import type { OrbitControls as OCImpl } from 'three-stdlib';
 
 import GlbAssemblyModel, { type GlbLoadState } from '@/components/GlbAssemblyModel';
-import LowPolyEnvironment from '@/components/LowPolyEnvironment';
 import CadInteriorBSHU from '@/components/CadInteriorBSHU';
 import VRControllerManager from '@/components/VRControllerManager';
 import DroneFlyByController, { type DroneWaymark } from '@/components/DroneFlyByController';
@@ -183,24 +182,29 @@ function SmoothCameraController({
 interface SceneContentProps {
   reloadKey: number;
   containmentOpacity: number;
+  shellTransparent: boolean;
   onStatusChange: (state: GlbLoadState) => void;
 }
 
-function SceneContent({ reloadKey, containmentOpacity, onStatusChange }: SceneContentProps) {
+function SceneContent({
+  reloadKey,
+  containmentOpacity,
+  shellTransparent,
+  onStatusChange,
+}: SceneContentProps) {
   return (
     <group>
-      {/* Аккуратное компактное основание строго под габариты assembly.glb */}
-      <LowPolyEnvironment groundY={0} />
-      {/* Чистая CAD-модель assembly.glb с индустриальными PBR-материалами и механизмом разрезов (cutaway) */}
+      {/* Чистая CAD-модель assembly.glb с индустриальными PBR-материалами, плоскостью сечения и X-Ray оболочкой */}
       <GlbAssemblyModel
         key={reloadKey}
         targetMaxSize={75}
         groundY={0}
         containmentOpacity={containmentOpacity}
+        shellTransparent={shellTransparent}
         onStatusChange={onStatusChange}
       />
-      {/* Детализация интерьера (пульт БЩУ, мониторы, стойки АСУ ТП) строго внутри существующего здания сборки */}
-      <CadInteriorBSHU position={[-18.0, 0.14, 12.2]} />
+      {/* Детализация интерьера (пульт БЩУ, мониторы, стойки АСУ ТП) строго внутри помещения восточного крыла assembly.glb */}
+      <CadInteriorBSHU position={[12.05, 0.22, -24.5]} />
     </group>
   );
 }
@@ -251,6 +255,7 @@ export default function App() {
   const [pointerLocked, setPointerLocked] = useState(false);
   const [activeView, setActiveView] = useState('view-aerial');
   const [containmentOpacity, setContainmentOpacity] = useState(1.0);
+  const [shellTransparent, setShellTransparent] = useState(false);
   const [renderMode, setRenderMode] = useState<RenderVisualizationMode>('standard');
   const [vrSupported, setVrSupported] = useState<boolean | null>(null);
   const [floorTarget, setFloorTarget] = useState<number | null>(null);
@@ -364,7 +369,7 @@ export default function App() {
     setWalkOverride(null);
     setActiveView(viewId);
     if (viewId === 'view-cutaway') {
-      setContainmentOpacity((prev) => (prev > 0.65 ? 0.45 : prev));
+      setContainmentOpacity((prev) => (prev > 0.65 ? 0.48 : prev));
     }
     if (view.mode === 'walk') {
       setFloorTarget(view.floorY);
@@ -398,7 +403,7 @@ export default function App() {
   }, []);
 
   const vrSpawnTarget: [number, number, number] =
-    activeViewData.mode === 'walk' ? activeViewData.cameraPos : [0, 0.14, 34];
+    activeViewData.mode === 'walk' ? activeViewData.cameraPos : [0, 0.14, 32];
 
   return (
     <div className="scene-grain w-full h-[100dvh] relative bg-[#182327] overflow-hidden">
@@ -490,6 +495,7 @@ export default function App() {
               <SceneContent
                 reloadKey={reloadKey}
                 containmentOpacity={containmentOpacity}
+                shellTransparent={shellTransparent}
                 onStatusChange={handleGlbStatusChange}
               />
             </TeleportTarget>
@@ -525,9 +531,9 @@ export default function App() {
                 activeViewData.mode === 'walk'
                   ? activeViewData.cameraPos
                   : [
-                      THREE.MathUtils.clamp(activeViewData.cameraPos[0], -38.5, 38.5),
+                      THREE.MathUtils.clamp(activeViewData.cameraPos[0], -36.5, 36.5),
                       activeViewData.floorY + 1.6,
-                      THREE.MathUtils.clamp(activeViewData.cameraPos[2], -38.5, 38.5),
+                      THREE.MathUtils.clamp(activeViewData.cameraPos[2], -36.5, 36.5),
                     ]
               }
               lookAtTarget={activeViewData.target}
@@ -626,6 +632,8 @@ export default function App() {
         pointerLocked={pointerLocked}
         containmentOpacity={containmentOpacity}
         onContainmentOpacityChange={setContainmentOpacity}
+        shellTransparent={shellTransparent}
+        onToggleShellTransparent={() => setShellTransparent((v) => !v)}
         controlMode={controlMode}
         onVRClick={handleVRClick}
         vrSupported={vrSupported}

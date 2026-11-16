@@ -51,7 +51,7 @@ export interface VRControllerManagerProps {
 function LocomotionRig({ viewTarget, floorY, activeViewId }: VRControllerManagerProps) {
   const playerRef = useRef<THREE.Group>(null);
   const { session } = useXR();
-  const [teleportPos, setTeleportPos] = useState<[number, number, number]>([0, 0.14, 34]);
+  const [teleportPos, setTeleportPos] = useState<[number, number, number]>([0, 0.14, 32]);
   const [showRing, setShowRing] = useState(false);
 
   // Динамический перенос VR Dolly при смене ракурса в UI без сбивания трекинга головы
@@ -73,7 +73,7 @@ function LocomotionRig({ viewTarget, floorY, activeViewId }: VRControllerManager
   useEffect(() => {
     const handleXRStart = (e: Event) => {
       const customEvent = e as CustomEvent<{ spawn?: [number, number, number] }>;
-      const spawn = customEvent.detail?.spawn || [0, 0.14, 34];
+      const spawn = customEvent.detail?.spawn || [0, 0.14, 32];
       if (playerRef.current) {
         playerRef.current.position.set(spawn[0], spawn[1], spawn[2]);
         playerRef.current.updateMatrixWorld(true);
@@ -109,8 +109,8 @@ function LocomotionRig({ viewTarget, floorY, activeViewId }: VRControllerManager
       p.y = THREE.MathUtils.lerp(p.y, targetY, 0.25);
     }
 
-    p.x = THREE.MathUtils.clamp(p.x, -39.5, 39.5);
-    p.z = THREE.MathUtils.clamp(p.z, -39.5, 39.5);
+    p.x = THREE.MathUtils.clamp(p.x, -36.5, 36.5);
+    p.z = THREE.MathUtils.clamp(p.z, -36.5, 36.5);
   });
 
   useEffect(() => {
@@ -118,7 +118,7 @@ function LocomotionRig({ viewTarget, floorY, activeViewId }: VRControllerManager
       setShowRing(true);
       if (playerRef.current) {
         const isWalk = activeViewId && activeViewId.startsWith('walk');
-        const defaultSpawn: [number, number, number] = [0, 0.14, 34];
+        const defaultSpawn: [number, number, number] = [0, 0.14, 32];
         const spawnX = isWalk && viewTarget ? viewTarget[0] : defaultSpawn[0];
         const spawnY = isWalk && floorY !== undefined ? floorY : defaultSpawn[1];
         const spawnZ = isWalk && viewTarget ? viewTarget[2] : defaultSpawn[2];
@@ -136,7 +136,7 @@ function LocomotionRig({ viewTarget, floorY, activeViewId }: VRControllerManager
     <>
       <XROrigin
         ref={playerRef as RefObject<THREE.Group>}
-        position={[0, 0.14, 34]}
+        position={[0, 0.14, 32]}
       />
       <VRTeleportRing position={teleportPos} visible={showRing} />
     </>

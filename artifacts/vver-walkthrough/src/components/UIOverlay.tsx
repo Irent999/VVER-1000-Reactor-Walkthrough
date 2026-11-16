@@ -18,6 +18,8 @@ interface UIOverlayProps {
   pointerLocked: boolean;
   containmentOpacity: number;
   onContainmentOpacityChange: (v: number) => void;
+  shellTransparent?: boolean;
+  onToggleShellTransparent?: () => void;
   controlMode: ViewMode;
   onVRClick: () => void;
   vrSupported: boolean | null;
@@ -251,6 +253,8 @@ export default function UIOverlay({
   pointerLocked,
   containmentOpacity,
   onContainmentOpacityChange,
+  shellTransparent = false,
+  onToggleShellTransparent,
   controlMode,
   onVRClick,
   vrSupported,
@@ -563,6 +567,23 @@ export default function UIOverlay({
           <span>🛑</span>
           <span>{scramActive ? 'АЗ-5 АКТИВНА' : 'АЗ-5'}</span>
         </button>
+        {/* Quick Cutaway Shell Toggle */}
+        <button
+          data-testid="button-toggle-cutaway-shell"
+          onClick={() => onContainmentOpacityChange(containmentOpacity < 0.9 ? 1.0 : 0.48)}
+          title="Разрезать наружные стены и кровлю (THREE.ClippingPlane) для осмотра БЩУ и цехов"
+          className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition shadow-lg cursor-pointer ${
+            containmentOpacity < 0.9
+              ? 'border-[#f5c26f] bg-[#2a2110]/95 text-[#f5c26f] shadow-[0_0_18px_rgba(245,194,111,0.3)]'
+              : 'border-white/15 bg-[#142024]/95 text-[#c5d4cd] hover:border-[#f5c26f]/50 hover:text-[#f5c26f]'
+          }`}
+        >
+          <span>✂️</span>
+          <span className="hidden xl:inline">
+            {containmentOpacity < 0.9 ? 'Восстановить стены' : 'Разрез оболочки'}
+          </span>
+        </button>
+
         {/* Walk / Orbit Mode Toggle */}
         {onToggleWalkMode && controlMode !== 'drone' && (
           <button
@@ -726,12 +747,12 @@ export default function UIOverlay({
                 Монолит
               </button>
               <button
-                onClick={() => onContainmentOpacityChange(0.5)}
+                onClick={() => onContainmentOpacityChange(0.48)}
                 className={`flex-1 py-1 px-1 rounded text-[9px] font-semibold transition cursor-pointer ${
                   containmentOpacity < 0.95 && containmentOpacity > 0.1 ? 'bg-[#d69a43]/30 text-[#f5c26f] font-bold' : 'bg-white/5 text-[#81918d] hover:text-white'
                 }`}
               >
-                Полусрез
+                Срез 3.4м
               </button>
               <button
                 onClick={() => onContainmentOpacityChange(0.0)}
@@ -739,9 +760,24 @@ export default function UIOverlay({
                   containmentOpacity <= 0.1 ? 'bg-[#d69a43]/30 text-[#f5c26f] font-bold' : 'bg-white/5 text-[#81918d] hover:text-white'
                 }`}
               >
-                Все внутри
+                Срез 1.5м
               </button>
             </div>
+            {onToggleShellTransparent && (
+              <button
+                type="button"
+                data-testid="button-toggle-shell-xray"
+                onClick={onToggleShellTransparent}
+                className={`mt-1.5 w-full py-1.5 px-2 rounded-lg text-[10px] font-semibold border transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                  shellTransparent
+                    ? 'border-[#38bdf8]/60 bg-[#38bdf8]/20 text-[#7dd3fc]'
+                    : 'border-white/10 bg-white/5 text-[#9caeaa] hover:border-white/25 hover:text-white'
+                }`}
+              >
+                <Layers size={12} />
+                <span>{shellTransparent ? 'Прозрачные стены: ВКЛ' : 'Прозрачные стены (X-Ray)'}</span>
+              </button>
+            )}
           </div>
 
           {/* 2. Интерактивная аварийная защита (Кнопка АЗ-5) */}

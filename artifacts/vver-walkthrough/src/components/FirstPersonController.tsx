@@ -413,8 +413,8 @@ export default function FirstPersonController({
 
     if (Math.abs(stepX) > 0.0001 || Math.abs(stepZ) > 0.0001) {
       if (freeGroundY !== undefined) {
-        const nextX = THREE.MathUtils.clamp(camera.position.x + stepX, -39.5, 39.5);
-        const nextZ = THREE.MathUtils.clamp(camera.position.z + stepZ, -39.5, 39.5);
+        const nextX = THREE.MathUtils.clamp(camera.position.x + stepX, -36.5, 36.5);
+        const nextZ = THREE.MathUtils.clamp(camera.position.z + stepZ, -36.5, 36.5);
         camera.position.x = nextX;
         camera.position.z = nextZ;
       } else {
