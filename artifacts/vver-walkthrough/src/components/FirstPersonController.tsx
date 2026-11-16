@@ -386,7 +386,7 @@ export default function FirstPersonController({
     // 3. WASD Movement in the horizontal plane with smooth acceleration & sliding physics
     const k = keys.current;
     const isSprinting = k['ShiftLeft'] || k['ShiftRight'];
-    const baseSpeed = isSprinting ? 7.2 : 4.4; // Realistic walking (~4.4 m/s) and brisk walk (~7.2 m/s)
+    const baseSpeed = isSprinting ? 11.0 : 4.8; // Масштаб 1:1 — естественный шаг и быстрый обход 225м площадки
 
     camera.getWorldDirection(_dir);
     _dir.y = 0;
@@ -413,8 +413,16 @@ export default function FirstPersonController({
 
     if (Math.abs(stepX) > 0.0001 || Math.abs(stepZ) > 0.0001) {
       if (freeGroundY !== undefined) {
-        const nextX = THREE.MathUtils.clamp(camera.position.x + stepX, -36.5, 36.5);
-        const nextZ = THREE.MathUtils.clamp(camera.position.z + stepZ, -36.5, 36.5);
+        let nextX = THREE.MathUtils.clamp(camera.position.x + stepX, -108, 108);
+        let nextZ = THREE.MathUtils.clamp(camera.position.z + stepZ, -108, 108);
+        // Защита от выхода за вырез юго-восточного двора (X > 20 && Z > 12)
+        if (nextX > 20 && nextZ > 12) {
+          if (camera.position.x <= 20) {
+            nextX = 20;
+          } else {
+            nextZ = 12;
+          }
+        }
         camera.position.x = nextX;
         camera.position.z = nextZ;
       } else {

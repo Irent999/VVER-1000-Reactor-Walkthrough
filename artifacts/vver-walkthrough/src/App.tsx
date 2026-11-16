@@ -171,7 +171,7 @@ function SmoothCameraController({
       enableDamping={true}
       dampingFactor={0.05}
       minDistance={2}
-      maxDistance={220}
+      maxDistance={420}
       maxPolarAngle={Math.PI * 0.495}
       makeDefault
       onChange={() => invalidate()}
@@ -194,17 +194,17 @@ function SceneContent({
 }: SceneContentProps) {
   return (
     <group>
-      {/* Чистая CAD-модель assembly.glb с индустриальными PBR-материалами, плоскостью сечения и X-Ray оболочкой */}
+      {/* Чистая CAD-модель assembly.glb в натуральном масштабе 1:1 (225 м) с PBR-материалами, разрезом и X-Ray оболочкой */}
       <GlbAssemblyModel
         key={reloadKey}
-        targetMaxSize={75}
+        targetMaxSize={225}
         groundY={0}
         containmentOpacity={containmentOpacity}
         shellTransparent={shellTransparent}
         onStatusChange={onStatusChange}
       />
-      {/* Детализация интерьера (пульт БЩУ, мониторы, стойки АСУ ТП) строго внутри помещения восточного крыла assembly.glb */}
-      <CadInteriorBSHU position={[12.05, 0.22, -24.5]} />
+      {/* Детализация интерьера (пульт БЩУ, мониторы, стойки АСУ ТП) в масштабе 1:1 внутри помещения восточного крыла */}
+      <CadInteriorBSHU position={[36.15, 0.65, -73.5]} />
     </group>
   );
 }
@@ -253,7 +253,7 @@ function SceneUnavailable({ onRetry }: { onRetry: () => void }) {
 export default function App() {
   const [webglAvailable, setWebglAvailable] = useState(canCreateWebGL2);
   const [pointerLocked, setPointerLocked] = useState(false);
-  const [activeView, setActiveView] = useState('view-aerial');
+  const [activeView, setActiveView] = useState('walk-tour');
   const [containmentOpacity, setContainmentOpacity] = useState(1.0);
   const [shellTransparent, setShellTransparent] = useState(false);
   const [renderMode, setRenderMode] = useState<RenderVisualizationMode>('standard');
@@ -368,8 +368,10 @@ export default function App() {
     if (!view) return;
     setWalkOverride(null);
     setActiveView(viewId);
-    if (viewId === 'view-cutaway') {
+    if (viewId === 'view-cutaway' || viewId === 'view-core-catcher') {
       setContainmentOpacity((prev) => (prev > 0.65 ? 0.48 : prev));
+    } else if (viewId === 'view-reactor-hall' || viewId === 'view-polar-crane') {
+      setContainmentOpacity((prev) => (prev > 0.8 ? 0.72 : prev));
     }
     if (view.mode === 'walk') {
       setFloorTarget(view.floorY);
@@ -403,7 +405,20 @@ export default function App() {
   }, []);
 
   const vrSpawnTarget: [number, number, number] =
-    activeViewData.mode === 'walk' ? activeViewData.cameraPos : [0, 0.14, 32];
+    activeViewData.mode === 'walk'
+      ? activeViewData.cameraPos
+      : activeViewData.cameraPos[1] <= 18
+      ? [activeViewData.cameraPos[0], activeViewData.floorY, activeViewData.cameraPos[2]]
+      : [64, 0.4, -18];
+
+  const safeWalkFallbackPos: [number, number, number] = (() => {
+    const cx = THREE.MathUtils.clamp(activeViewData.cameraPos[0], -106, 106);
+    const cz = THREE.MathUtils.clamp(activeViewData.cameraPos[2], -106, 106);
+    if (cx > 18 && cz > 12) {
+      return [64, activeViewData.floorY + 1.6, -18];
+    }
+    return [cx, activeViewData.floorY + 1.6, cz];
+  })();
 
   return (
     <div className="scene-grain w-full h-[100dvh] relative bg-[#182327] overflow-hidden">
@@ -416,7 +431,7 @@ export default function App() {
         <Canvas
           frameloop="demand"
           shadows={enableShadows && !isVRPresenting}
-          camera={{ position: [42, 22, 46], fov: 50, near: 0.1, far: 900 }}
+          camera={{ position: [64, 2.0, -18], fov: 55, near: 0.15, far: 1400 }}
           gl={{
             antialias: false,
             alpha: false,
@@ -436,7 +451,7 @@ export default function App() {
             gl.domElement.tabIndex = 0;
             gl.domElement.style.outline = 'none';
             camera.near = 0.15;
-            camera.far = 900;
+            camera.far = 1400;
             camera.updateProjectionMatrix();
 
             // Однократный процедурный IBL (Environment) чтобы PBR-материалы не выглядели чёрными
@@ -465,9 +480,9 @@ export default function App() {
           />
           <VisualizationModeManager mode={renderMode} />
 
-          {/* Согласованный фон неба и линейный туман горизонта */}
+          {/* Согласованный фон неба и линейный туман горизонта (225м площадка 1:1) */}
           <color attach="background" args={['#bdd0e0']} />
-          <fog attach="fog" args={['#bdd0e0', 180, 560]} />
+          <fog attach="fog" args={['#bdd0e0', 260, 880]} />
 
           {!isVRPresenting && <AdaptiveDpr pixelated />}
 
@@ -475,20 +490,20 @@ export default function App() {
           <ambientLight intensity={0.62} color="#ffffff" />
           <hemisphereLight args={['#eef6ff', '#9aa3ad', 1.1]} />
           <directionalLight
-            position={[45, 65, 40]}
+            position={[110, 145, 95]}
             intensity={2.1}
             color="#fff7eb"
             castShadow={enableShadows && !isVRPresenting}
             shadow-mapSize={[1024, 1024]}
-            shadow-camera-left={-45}
-            shadow-camera-right={45}
-            shadow-camera-top={45}
-            shadow-camera-bottom={-45}
-            shadow-camera-far={200}
+            shadow-camera-left={-125}
+            shadow-camera-right={125}
+            shadow-camera-top={125}
+            shadow-camera-bottom={-125}
+            shadow-camera-far={420}
             shadow-bias={-0.0005}
             shadow-normalBias={0.04}
           />
-          <directionalLight position={[-55, 45, -60]} intensity={0.65} color="#b7d2ff" />
+          <directionalLight position={[-125, 105, -135]} intensity={0.65} color="#b7d2ff" />
 
           <XR store={xrStore}>
             <TeleportTarget>
@@ -530,11 +545,7 @@ export default function App() {
               spawnPosition={
                 activeViewData.mode === 'walk'
                   ? activeViewData.cameraPos
-                  : [
-                      THREE.MathUtils.clamp(activeViewData.cameraPos[0], -36.5, 36.5),
-                      activeViewData.floorY + 1.6,
-                      THREE.MathUtils.clamp(activeViewData.cameraPos[2], -36.5, 36.5),
-                    ]
+                  : safeWalkFallbackPos
               }
               lookAtTarget={activeViewData.target}
               freeGroundY={activeViewData.floorY}

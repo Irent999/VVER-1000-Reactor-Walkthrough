@@ -31,15 +31,15 @@ interface GlbAssemblyModelProps {
 const MODEL_URL = '/assembly.glb';
 
 function computeCutawayHeight(opacity: number): number {
-  if (opacity >= 0.98) return 30;
+  if (opacity >= 0.98) return 60;
   if (opacity <= 0.5) {
-    return 1.5 + (Math.max(0, opacity) / 0.5) * 1.9;
+    return 3.8 + (Math.max(0, opacity) / 0.5) * 6.2;
   }
-  return 3.4 + ((opacity - 0.5) / 0.48) * 8.6;
+  return 10.0 + ((opacity - 0.5) / 0.48) * 26.0;
 }
 
 export default function GlbAssemblyModel({
-  targetMaxSize = 75,
+  targetMaxSize = 225,
   groundY = 0,
   containmentOpacity = 1.0,
   shellTransparent = false,
@@ -47,7 +47,7 @@ export default function GlbAssemblyModel({
 }: GlbAssemblyModelProps) {
   const { invalidate } = useThree();
   const [loadedScene, setLoadedScene] = useState<THREE.Object3D | null>(null);
-  const cutawayPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, -1, 0), 30), []);
+  const cutawayPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, -1, 0), 60), []);
   const shellMaterialsRef = useRef<THREE.MeshStandardMaterial[]>([]);
   const shellTransparentRef = useRef(shellTransparent);
   shellTransparentRef.current = shellTransparent;
@@ -414,7 +414,7 @@ export default function GlbAssemblyModel({
           const isRoofOrShellPanel =
             origName.includes('000066') ||
             origName.includes('000099') ||
-            (origName.includes('FFFFFF') && maxMeshDim >= 5.0);
+            (origName.includes('FFFFFF') && maxMeshDim >= 10.0);
           const isLargeConcreteStructure = maxMeshDim >= targetMaxSize * 0.16 && vertCount < 180000;
 
           if (isRoofOrShellPanel) {

@@ -186,16 +186,16 @@ export interface CadInteriorBSHUProps {
  * Не добавляет никаких внешних зданий, крыш или стен.
  */
 export default function CadInteriorBSHU({
-  position = [12.05, 0.22, -24.5],
+  position = [36.15, 0.65, -73.5],
 }: CadInteriorBSHUProps) {
   return (
     <group position={position} name="CAD_Internal_BSHU_And_Racks">
       {/* Мягкое внутреннее освещение помещения БЩУ */}
-      <pointLight position={[0, 3.0, 0]} intensity={2.2} distance={16} decay={1.5} color="#eef6ff" />
+      <pointLight position={[0, 3.6, 0]} intensity={3.2} distance={28} decay={1.4} color="#eef6ff" />
 
-      {/* Компактный антистатический пол зоны БЩУ (6.4 x 7.4 м, строго внутри стен 8.1 x 15.3 м) */}
+      {/* Компактный антистатический пол зоны БЩУ (9.0 x 10.0 м, внутри зала 24.3 x 45.9 м) */}
       <mesh position={[0, 0.015, 0]} material={floorMatMat} receiveShadow>
-        <boxGeometry args={[6.4, 0.03, 7.4]} />
+        <boxGeometry args={[9.0, 0.03, 10.0]} />
       </mesh>
 
       {/* 1. ПАНОРАМНАЯ ВИДЕОСТЕНА И МОНИТОРЫ ОПЕРАТОРОВ (северная сторона зала) */}

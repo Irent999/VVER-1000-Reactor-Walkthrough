@@ -89,24 +89,24 @@ export default function DroneFlyByController({
   const isInitialized = useRef(false);
   const lastTelemetryTime = useRef(0);
 
-  // Closed cinematic camera flight path around the centered GLB assembly
+  // Closed cinematic camera flight path around the centered 225m 1:1 GLB assembly
   const { cameraPath, targetPath } = useMemo(() => {
     const camPoints = [
-      new THREE.Vector3(-42, 22, 42),
-      new THREE.Vector3(0, 16, 52),
-      new THREE.Vector3(44, 20, 32),
-      new THREE.Vector3(44, 24, -36),
-      new THREE.Vector3(0, 28, -50),
-      new THREE.Vector3(-44, 20, -28),
+      new THREE.Vector3(-118, 48, 95),
+      new THREE.Vector3(10, 40, 118),
+      new THREE.Vector3(118, 45, 30),
+      new THREE.Vector3(115, 52, -95),
+      new THREE.Vector3(-25, 60, -132),
+      new THREE.Vector3(-128, 48, -55),
     ];
 
     const tgtPoints = [
-      new THREE.Vector3(0, 4, 0),
-      new THREE.Vector3(0, 3, 0),
-      new THREE.Vector3(0, 4, 0),
-      new THREE.Vector3(0, 4, 0),
-      new THREE.Vector3(0, 5, 0),
-      new THREE.Vector3(0, 3, 0),
+      new THREE.Vector3(-45, 12, -10),
+      new THREE.Vector3(-20, 10, -25),
+      new THREE.Vector3(15, 8, -42),
+      new THREE.Vector3(20, 10, -55),
+      new THREE.Vector3(-40, 14, -45),
+      new THREE.Vector3(-72, 15, -40),
     ];
 
     const cPath = new THREE.CatmullRomCurve3(camPoints, true, 'centripetal');

@@ -171,9 +171,10 @@ interface ViewpointsListProps {
   onViewChange: (viewId: string) => void;
 }
 
-const GROUP_HEADERS: Array<{ key: 'overview' | 'vver'; label: string }> = [
-  { key: 'overview', label: 'Обзор, разрез и обход' },
-  { key: 'vver', label: 'Узлы сборки и БЩУ' },
+const GROUP_HEADERS: Array<{ key: 'overview' | 'vver' | 'infra'; label: string }> = [
+  { key: 'overview', label: 'Обзор, прогулка 1:1 и туры' },
+  { key: 'vver', label: 'Энергоблок ВВЭР-1000 и цеха' },
+  { key: 'infra', label: 'БЩУ, АСУ ТП и инфраструктура' },
 ];
 
 const MemoizedViewpointsList = memo(function ViewpointsList({
@@ -359,7 +360,12 @@ export default function UIOverlay({
   const active = FLOOR_VIEWS.find((item) => item.id === activeView) ?? FLOOR_VIEWS[0];
   const fmt = (value: number, digits = 1) => value.toFixed(digits);
 
-  const choosePOI = (poi: POIInfo) => setSelectedPOI(poi);
+  const choosePOI = (poi: POIInfo) => {
+    if (poi.viewId) {
+      onViewChange(poi.viewId);
+    }
+    setSelectedPOI(poi);
+  };
 
   /**
    * Robust WebXR / OpenXR Initialization & Error Handling:
@@ -752,7 +758,7 @@ export default function UIOverlay({
                   containmentOpacity < 0.95 && containmentOpacity > 0.1 ? 'bg-[#d69a43]/30 text-[#f5c26f] font-bold' : 'bg-white/5 text-[#81918d] hover:text-white'
                 }`}
               >
-                Срез 3.4м
+                Срез 9.8м
               </button>
               <button
                 onClick={() => onContainmentOpacityChange(0.0)}
@@ -760,7 +766,7 @@ export default function UIOverlay({
                   containmentOpacity <= 0.1 ? 'bg-[#d69a43]/30 text-[#f5c26f] font-bold' : 'bg-white/5 text-[#81918d] hover:text-white'
                 }`}
               >
-                Срез 1.5м
+                Срез 3.8м
               </button>
             </div>
             {onToggleShellTransparent && (

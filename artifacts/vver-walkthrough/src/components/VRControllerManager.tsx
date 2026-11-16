@@ -51,7 +51,7 @@ export interface VRControllerManagerProps {
 function LocomotionRig({ viewTarget, floorY, activeViewId }: VRControllerManagerProps) {
   const playerRef = useRef<THREE.Group>(null);
   const { session } = useXR();
-  const [teleportPos, setTeleportPos] = useState<[number, number, number]>([0, 0.14, 32]);
+  const [teleportPos, setTeleportPos] = useState<[number, number, number]>([64, 0.4, -18]);
   const [showRing, setShowRing] = useState(false);
 
   // Динамический перенос VR Dolly при смене ракурса в UI без сбивания трекинга головы
@@ -61,7 +61,7 @@ function LocomotionRig({ viewTarget, floorY, activeViewId }: VRControllerManager
       const key = `${viewTarget[0]}:${viewTarget[1]}:${viewTarget[2]}:${floorY ?? ''}`;
       if (key !== lastTargetKey.current) {
         lastTargetKey.current = key;
-        const targetY = floorY !== undefined ? floorY : 0.14;
+        const targetY = floorY !== undefined ? floorY : 0.4;
         playerRef.current.position.set(viewTarget[0], targetY, viewTarget[2]);
         playerRef.current.updateMatrixWorld(true);
         setTeleportPos([viewTarget[0], targetY, viewTarget[2]]);
@@ -73,7 +73,7 @@ function LocomotionRig({ viewTarget, floorY, activeViewId }: VRControllerManager
   useEffect(() => {
     const handleXRStart = (e: Event) => {
       const customEvent = e as CustomEvent<{ spawn?: [number, number, number] }>;
-      const spawn = customEvent.detail?.spawn || [0, 0.14, 32];
+      const spawn = customEvent.detail?.spawn || [64, 0.4, -18];
       if (playerRef.current) {
         playerRef.current.position.set(spawn[0], spawn[1], spawn[2]);
         playerRef.current.updateMatrixWorld(true);
@@ -87,7 +87,7 @@ function LocomotionRig({ viewTarget, floorY, activeViewId }: VRControllerManager
   // 1. Controller Thumbstick locomotion + 45° Snap Turn
   useXRControllerLocomotion(
     playerRef as RefObject<THREE.Object3D | null>,
-    { speed: 4.5 },
+    { speed: 5.0 },
     { type: 'snap', degrees: 45 },
     'left',
   );
@@ -99,26 +99,30 @@ function LocomotionRig({ viewTarget, floorY, activeViewId }: VRControllerManager
     'right',
   );
 
-  // 2. VR player grounding and compact platform boundary clamping (80x80m pad)
+  // 2. VR player grounding and 225x225m plant boundary clamping (1:1 human scale)
   useFrame(() => {
     if (!session || !playerRef.current) return;
     const p = playerRef.current.position;
 
-    const targetY = floorY !== undefined ? floorY : 0.14;
+    const targetY = floorY !== undefined ? floorY : 0.4;
     if (Math.abs(p.y - targetY) > 0.02) {
       p.y = THREE.MathUtils.lerp(p.y, targetY, 0.25);
     }
 
-    p.x = THREE.MathUtils.clamp(p.x, -36.5, 36.5);
-    p.z = THREE.MathUtils.clamp(p.z, -36.5, 36.5);
+    p.x = THREE.MathUtils.clamp(p.x, -108, 108);
+    p.z = THREE.MathUtils.clamp(p.z, -108, 108);
+    if (p.x > 20 && p.z > 12) {
+      if (p.x - 20 < p.z - 12) p.x = 20;
+      else p.z = 12;
+    }
   });
 
   useEffect(() => {
     if (session) {
       setShowRing(true);
       if (playerRef.current) {
-        const isWalk = activeViewId && activeViewId.startsWith('walk');
-        const defaultSpawn: [number, number, number] = [0, 0.14, 32];
+        const isWalk = activeViewId && (activeViewId.startsWith('walk') || activeViewId.includes('steam'));
+        const defaultSpawn: [number, number, number] = [64, 0.4, -18];
         const spawnX = isWalk && viewTarget ? viewTarget[0] : defaultSpawn[0];
         const spawnY = isWalk && floorY !== undefined ? floorY : defaultSpawn[1];
         const spawnZ = isWalk && viewTarget ? viewTarget[2] : defaultSpawn[2];
@@ -136,7 +140,7 @@ function LocomotionRig({ viewTarget, floorY, activeViewId }: VRControllerManager
     <>
       <XROrigin
         ref={playerRef as RefObject<THREE.Group>}
-        position={[0, 0.14, 32]}
+        position={[64, 0.4, -18]}
       />
       <VRTeleportRing position={teleportPos} visible={showRing} />
     </>

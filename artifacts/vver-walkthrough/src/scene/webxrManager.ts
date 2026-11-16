@@ -30,8 +30,8 @@ export interface WebXRSceneManagerProps {
 }
 
 export default function WebXRSceneManager({
-  activeSpawnPos = [0, 0.14, 34],
-  floorY = 0.14,
+  activeSpawnPos = [64, 0.4, -18],
+  floorY = 0.4,
   activeViewId,
 }: WebXRSceneManagerProps) {
   const { gl, scene, camera, invalidate } = useThree();
@@ -63,9 +63,9 @@ export default function WebXRSceneManager({
     scene.background = bgColor;
     gl.setClearColor(bgColor, 1.0);
 
-    // Плоскости отсечения камеры для VR без Z-fighting и обрезки ближних деталей
+    // Плоскости отсечения камеры для VR без Z-fighting и обрезки дальних корпусов
     camera.near = 0.15;
-    camera.far = 900;
+    camera.far = 1400;
     camera.updateProjectionMatrix();
 
     // 2. Группа XR-камеры (XR Rig / Player Base)
@@ -108,7 +108,7 @@ export default function WebXRSceneManager({
       gl.setPixelRatio(1);
 
       camera.near = 0.15;
-      camera.far = 900;
+      camera.far = 1400;
       camera.updateProjectionMatrix();
 
       if (gl.xr) {
@@ -117,11 +117,11 @@ export default function WebXRSceneManager({
           const xrCamera = gl.xr.getCamera();
           if (xrCamera) {
             xrCamera.near = 0.15;
-            xrCamera.far = 900;
+            xrCamera.far = 1400;
             xrCamera.updateProjectionMatrix();
             xrCamera.cameras?.forEach((eyeCam) => {
               eyeCam.near = 0.15;
-              eyeCam.far = 900;
+              eyeCam.far = 1400;
               eyeCam.updateProjectionMatrix();
             });
           }
@@ -130,11 +130,11 @@ export default function WebXRSceneManager({
         }
       }
 
-      // Стартовая позиция в VR на отметке площадки перед центральной сборкой
-      const isWalk = activeViewId && activeViewId.startsWith('walk');
-      const spawnX = isWalk && currentSpawnRef.current ? currentSpawnRef.current[0] : 0;
-      const spawnY = isWalk && currentFloorYRef.current !== undefined ? currentFloorYRef.current : 0.14;
-      const spawnZ = isWalk && currentSpawnRef.current ? currentSpawnRef.current[2] : 34;
+      // Стартовая позиция в VR на отметке площадки рядом с оборудованием (1:1 масштаб)
+      const isWalk = activeViewId && (activeViewId.startsWith('walk') || activeViewId.includes('steam'));
+      const spawnX = isWalk && currentSpawnRef.current ? currentSpawnRef.current[0] : 64;
+      const spawnY = isWalk && currentFloorYRef.current !== undefined ? currentFloorYRef.current : 0.4;
+      const spawnZ = isWalk && currentSpawnRef.current ? currentSpawnRef.current[2] : -18;
 
       if (xrRigGroupRef.current) {
         xrRigGroupRef.current.position.set(spawnX, spawnY, spawnZ);
