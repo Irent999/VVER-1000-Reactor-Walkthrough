@@ -1,21 +1,25 @@
-import { useRef, useState, useEffect, type RefObject } from 'react';
+import { useRef, useEffect, type RefObject } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { useXRControllerLocomotion, XROrigin, useXR } from '@react-three/xr';
+import { XROrigin, useXR } from '@react-three/xr';
 import * as THREE from 'three';
-import {
-  collectCadWalkData,
-  resolveCadHorizontalStep,
-  sampleCadFloorHeight,
-  type CadWalkCollisionData,
-} from '@/scene/cadWalkPhysics';
 
-/** Animated glowing teleportation ring indicator for WebXR controller targeting */
-function VRTeleportRing({ position, visible }: { position: [number, number, number]; visible: boolean }) {
+const _camForward = new THREE.Vector3();
+const _camRight = new THREE.Vector3();
+const _up = new THREE.Vector3(0, 1, 0);
+const _rayOrigin = new THREE.Vector3();
+const _rayDir = new THREE.Vector3();
+const _poseQuat = new THREE.Quaternion();
+const _ray = new THREE.Ray();
+const _groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+const _hitPoint = new THREE.Vector3();
+
+/** Кольцо целеуказания телепорта на поверхности площадки Y = 0 (обновляется напрямую без setState) */
+function VRTeleportRing({ ringRef }: { ringRef: RefObject<THREE.Group> }) {
   const innerRingRef = useRef<THREE.Mesh>(null);
   const outerRingRef = useRef<THREE.Mesh>(null);
 
   useFrame((state) => {
-    if (!visible) return;
+    if (!ringRef.current || !ringRef.current.visible) return;
     const t = state.clock.elapsedTime;
     if (innerRingRef.current) {
       innerRingRef.current.scale.setScalar(1 + Math.sin(t * 4) * 0.08);
@@ -25,21 +29,16 @@ function VRTeleportRing({ position, visible }: { position: [number, number, numb
     }
   });
 
-  if (!visible) return null;
-
   return (
-    <group position={[position[0], position[1] + 0.04, position[2]]} rotation={[-Math.PI / 2, 0, 0]}>
-      {/* Outer segmented ring */}
+    <group ref={ringRef} position={[64, 0.04, -18]} rotation={[-Math.PI / 2, 0, 0]} visible={false}>
       <mesh ref={outerRingRef}>
         <ringGeometry args={[0.55, 0.65, 32]} />
         <meshBasicMaterial color="#62d1a2" transparent opacity={0.75} side={THREE.DoubleSide} />
       </mesh>
-      {/* Inner pulsing ring */}
       <mesh ref={innerRingRef}>
         <ringGeometry args={[0.3, 0.42, 32]} />
         <meshBasicMaterial color="#00ffcc" transparent opacity={0.85} side={THREE.DoubleSide} />
       </mesh>
-      {/* Center glowing beacon disc */}
       <mesh>
         <circleGeometry args={[0.18, 24]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={0.9} side={THREE.DoubleSide} />
@@ -54,149 +53,215 @@ export interface VRControllerManagerProps {
   activeViewId?: string;
 }
 
-function LocomotionRig({ viewTarget, floorY, activeViewId }: VRControllerManagerProps) {
+export default function VRControllerManager({
+  viewTarget,
+  floorY = 0,
+  activeViewId,
+}: VRControllerManagerProps) {
   const playerRef = useRef<THREE.Group>(null);
-  const { scene } = useThree();
+  const ringRef = useRef<THREE.Group>(null);
+  const { gl } = useThree();
   const { session } = useXR();
-  const [teleportPos, setTeleportPos] = useState<[number, number, number]>([64, 0.4, -18]);
-  const [showRing, setShowRing] = useState(false);
 
-  const cadDataRef = useRef<CadWalkCollisionData>({
-    rootFound: false,
-    floorMeshes: [],
-    wallMeshes: [],
-    heavyBoxes: [],
+  const rightSnapLatchRef = useRef(false);
+  const prevTriggerPressedRef = useRef<Record<string, boolean>>({});
+  const lastAimRef = useRef<{ valid: boolean; x: number; z: number }>({
+    valid: false,
+    x: 64,
+    z: -18,
   });
-  const lastCadRefresh = useRef(0);
-  const prevVrPos = useRef(new THREE.Vector3(64, 0.4, -18));
-  const currentVrFloorY = useRef(floorY !== undefined ? floorY : 0.4);
 
-  // Динамический перенос VR Dolly при смене ракурса в UI без сбивания трекинга головы
+  // Перенос VR Rig (<XROrigin>) при смене ракурса в UI без сбивания трекинга шлема
   const lastTargetKey = useRef<string>('');
   useEffect(() => {
     if (viewTarget && playerRef.current) {
-      const key = `${viewTarget[0]}:${viewTarget[1]}:${viewTarget[2]}:${floorY ?? ''}`;
+      const key = `${viewTarget[0]}:${viewTarget[1]}:${viewTarget[2]}:${floorY}`;
       if (key !== lastTargetKey.current) {
         lastTargetKey.current = key;
-        const targetY = floorY !== undefined ? floorY : 0.4;
-        currentVrFloorY.current = targetY;
-        playerRef.current.position.set(viewTarget[0], targetY, viewTarget[2]);
-        prevVrPos.current.set(viewTarget[0], targetY, viewTarget[2]);
+        const baseY = floorY > 1 ? floorY : 0;
+        playerRef.current.position.set(viewTarget[0], baseY, viewTarget[2]);
         playerRef.current.updateMatrixWorld(true);
-        setTeleportPos([viewTarget[0], targetY, viewTarget[2]]);
       }
     }
   }, [viewTarget, floorY]);
 
-  // Слушатель старта сессии WebXR: переносит игрока на отметку площадки выбранной зоны
+  // Слушатели старта сессии WebXR и телепортации от TeleportTarget
   useEffect(() => {
     const handleXRStart = (e: Event) => {
       const customEvent = e as CustomEvent<{ spawn?: [number, number, number] }>;
-      const spawn = customEvent.detail?.spawn || [64, 0.4, -18];
+      const spawn = customEvent.detail?.spawn || [64, 0, -18];
       if (playerRef.current) {
-        currentVrFloorY.current = spawn[1];
-        playerRef.current.position.set(spawn[0], spawn[1], spawn[2]);
-        prevVrPos.current.set(spawn[0], spawn[1], spawn[2]);
+        const spawnY = spawn[1] > 1 ? spawn[1] : 0;
+        playerRef.current.position.set(spawn[0], spawnY, spawn[2]);
+        playerRef.current.rotation.set(0, 0, 0);
         playerRef.current.updateMatrixWorld(true);
-        setTeleportPos([spawn[0], spawn[1], spawn[2]]);
       }
     };
+
+    const handleTeleportTo = (e: Event) => {
+      const customEvent = e as CustomEvent<{ x: number; y?: number; z: number }>;
+      if (!playerRef.current || !customEvent.detail) return;
+      const nx = THREE.MathUtils.clamp(customEvent.detail.x, -114, 114);
+      const nz = THREE.MathUtils.clamp(customEvent.detail.z, -114, 114);
+      const ny = floorY > 1 ? floorY : 0;
+      playerRef.current.position.set(nx, ny, nz);
+      playerRef.current.updateMatrixWorld(true);
+    };
+
     window.addEventListener('webxr-session-start', handleXRStart);
-    return () => window.removeEventListener('webxr-session-start', handleXRStart);
-  }, []);
+    window.addEventListener('vr-teleport-to', handleTeleportTo);
+    return () => {
+      window.removeEventListener('webxr-session-start', handleXRStart);
+      window.removeEventListener('vr-teleport-to', handleTeleportTo);
+    };
+  }, [floorY]);
 
-  // 1. Controller Thumbstick locomotion + 45° Snap Turn
-  useXRControllerLocomotion(
-    playerRef as RefObject<THREE.Object3D | null>,
-    { speed: 4.8 },
-    { type: 'snap', degrees: 45 },
-    'left',
-  );
-
-  useXRControllerLocomotion(
-    playerRef as RefObject<THREE.Object3D | null>,
-    false,
-    { type: 'snap', degrees: 45 },
-    'right',
-  );
-
-  // 2. Реальное перемещение по платформам/мостикам CAD и скольжение вдоль стен в масштабе 1:1
-  useFrame((_, dt) => {
-    if (!session || !playerRef.current) return;
-
-    const now = performance.now();
-    if (!cadDataRef.current.rootFound && now - lastCadRefresh.current > 800) {
-      lastCadRefresh.current = now;
-      cadDataRef.current = collectCadWalkData(scene);
-    }
-
-    const p = playerRef.current.position;
-    const dx = p.x - prevVrPos.current.x;
-    const dz = p.z - prevVrPos.current.z;
-
-    const resolved = resolveCadHorizontalStep(
-      prevVrPos.current.x,
-      prevVrPos.current.z,
-      currentVrFloorY.current,
-      dx,
-      dz,
-      cadDataRef.current
-    );
-    p.x = resolved.x;
-    p.z = resolved.z;
-
-    const fallbackY = floorY !== undefined ? floorY : 0.4;
-    const detectedFloorY = sampleCadFloorHeight(
-      p.x,
-      p.z,
-      currentVrFloorY.current,
-      fallbackY,
-      cadDataRef.current
-    );
-    currentVrFloorY.current = detectedFloorY;
-
-    const frameDt = Math.min(dt, 0.05);
-    if (Math.abs(p.y - detectedFloorY) > 0.01) {
-      p.y = THREE.MathUtils.damp(p.y, detectedFloorY, 16, frameDt);
-    } else {
-      p.y = detectedFloorY;
-    }
-
-    prevVrPos.current.copy(p);
-  });
-
+  // Начальная позиция при входе в сессию и сброс кольца при выходе
   useEffect(() => {
     if (session) {
-      setShowRing(true);
       if (playerRef.current) {
         const isWalk = activeViewId && (activeViewId.startsWith('walk') || activeViewId.includes('steam'));
-        const defaultSpawn: [number, number, number] = [64, 0.4, -18];
+        const defaultSpawn: [number, number, number] = [64, 0, -18];
         const spawnX = isWalk && viewTarget ? viewTarget[0] : defaultSpawn[0];
-        const spawnY = isWalk && floorY !== undefined ? floorY : defaultSpawn[1];
+        const spawnY = isWalk && floorY > 1 ? floorY : 0;
         const spawnZ = isWalk && viewTarget ? viewTarget[2] : defaultSpawn[2];
 
-        currentVrFloorY.current = spawnY;
         playerRef.current.position.set(spawnX, spawnY, spawnZ);
-        prevVrPos.current.set(spawnX, spawnY, spawnZ);
         playerRef.current.updateMatrixWorld(true);
-        setTeleportPos([spawnX, spawnY, spawnZ]);
       }
-    } else {
-      setShowRing(false);
+    } else if (ringRef.current) {
+      ringRef.current.visible = false;
+      lastAimRef.current.valid = false;
     }
   }, [session, viewTarget, floorY, activeViewId]);
 
+  // Прямое чтение inputSource.gamepad.axes и триггер-телепортация на пол Y = 0
+  useFrame((_, delta, frame) => {
+    const xrSession = gl.xr?.getSession();
+    if (!xrSession || !gl.xr.isPresenting || !playerRef.current) {
+      return;
+    }
+
+    const dt = Math.min(delta, 0.05);
+    const player = playerRef.current;
+    const xrCam = gl.xr.getCamera();
+    const refSpace = gl.xr.getReferenceSpace();
+    const activeFloorY = floorY > 1 ? floorY : 0;
+
+    let anyAimValid = false;
+
+    for (const source of xrSession.inputSources) {
+      const gp = source.gamepad;
+      const hand = source.handedness || 'none';
+
+      // 1. Считывание стиков контроллеров WebXR
+      if (gp && gp.axes && gp.axes.length >= 2) {
+        const useStickPair =
+          gp.axes.length >= 4 &&
+          (Math.abs(gp.axes[2] ?? 0) > 0.02 || Math.abs(gp.axes[3] ?? 0) > 0.02);
+        const sx = useStickPair ? (gp.axes[2] ?? 0) : (gp.axes[0] ?? 0);
+        const sy = useStickPair ? (gp.axes[3] ?? 0) : (gp.axes[1] ?? 0);
+
+        // Левый стик: плавное горизонтальное перемещение (X, Z) относительно направления взгляда камеры
+        if (hand === 'left' && Math.hypot(sx, sy) > 0.15) {
+          xrCam.getWorldDirection(_camForward);
+          _camForward.y = 0;
+          if (_camForward.lengthSq() > 1e-6) {
+            _camForward.normalize();
+          } else {
+            _camForward.set(0, 0, -1);
+          }
+          _camRight.crossVectors(_camForward, _up).normalize();
+
+          const moveSpeed = 5.5;
+          player.position.addScaledVector(_camForward, -sy * moveSpeed * dt);
+          player.position.addScaledVector(_camRight, sx * moveSpeed * dt);
+        }
+
+        // Правый стик: дискретный поворот (Snap Turn на 30°) вокруг вертикальной оси Y
+        if (hand === 'right') {
+          if (Math.abs(sx) > 0.6) {
+            if (!rightSnapLatchRef.current) {
+              player.rotation.y -= Math.sign(sx) * (Math.PI / 6);
+              player.updateMatrixWorld(true);
+              rightSnapLatchRef.current = true;
+            }
+          } else if (Math.abs(sx) < 0.25) {
+            rightSnapLatchRef.current = false;
+          }
+        }
+      }
+
+      // 2. Луч и кнопка курка (trigger) для телепортации на поверхность площадки (Y = 0)
+      if (frame && refSpace && source.targetRaySpace) {
+        const pose = frame.getPose(source.targetRaySpace, refSpace);
+        if (pose) {
+          player.updateMatrixWorld(true);
+          _rayOrigin
+            .set(pose.transform.position.x, pose.transform.position.y, pose.transform.position.z)
+            .applyMatrix4(player.matrixWorld);
+          _poseQuat.set(
+            pose.transform.orientation.x,
+            pose.transform.orientation.y,
+            pose.transform.orientation.z,
+            pose.transform.orientation.w
+          );
+          _rayDir
+            .set(0, 0, -1)
+            .applyQuaternion(_poseQuat)
+            .transformDirection(player.matrixWorld)
+            .normalize();
+
+          _groundPlane.set(_up, -activeFloorY);
+          _ray.set(_rayOrigin, _rayDir);
+
+          if (_ray.intersectPlane(_groundPlane, _hitPoint)) {
+            const dist = _hitPoint.distanceTo(_rayOrigin);
+            if (dist > 0.5 && dist < 120) {
+              const targetX = THREE.MathUtils.clamp(_hitPoint.x, -114, 114);
+              const targetZ = THREE.MathUtils.clamp(_hitPoint.z, -114, 114);
+
+              anyAimValid = true;
+              lastAimRef.current = { valid: true, x: targetX, z: targetZ };
+
+              if (ringRef.current) {
+                ringRef.current.position.set(targetX, activeFloorY + 0.04, targetZ);
+                ringRef.current.visible = true;
+              }
+
+              const triggerPressed = Boolean(gp?.buttons?.[0]?.pressed);
+              const prevPressed = prevTriggerPressedRef.current[hand] ?? false;
+              if (triggerPressed && !prevPressed) {
+                player.position.set(targetX, activeFloorY, targetZ);
+                player.updateMatrixWorld(true);
+              }
+              prevTriggerPressedRef.current[hand] = triggerPressed;
+              continue;
+            }
+          }
+        }
+      }
+
+      if (gp) {
+        prevTriggerPressedRef.current[hand] = Boolean(gp.buttons?.[0]?.pressed);
+      }
+    }
+
+    if (!anyAimValid && ringRef.current) {
+      ringRef.current.visible = false;
+      lastAimRef.current.valid = false;
+    }
+
+    // Фиксация высоты пола (Y = 0) и свободное перемещение без блокирующих коллизий со стенами
+    player.position.x = THREE.MathUtils.clamp(player.position.x, -115, 115);
+    player.position.z = THREE.MathUtils.clamp(player.position.z, -115, 115);
+    player.position.y = activeFloorY;
+  });
+
   return (
     <>
-      <XROrigin
-        ref={playerRef as RefObject<THREE.Group>}
-        position={[64, 0.4, -18]}
-      />
-      <VRTeleportRing position={teleportPos} visible={showRing} />
+      <XROrigin ref={playerRef as RefObject<THREE.Group>} position={[64, 0, -18]} />
+      <VRTeleportRing ringRef={ringRef} />
     </>
   );
-}
-
-export default function VRControllerManager(props: VRControllerManagerProps) {
-  return <LocomotionRig {...props} />;
 }

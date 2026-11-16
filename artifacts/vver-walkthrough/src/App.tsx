@@ -26,23 +26,6 @@ interface SmoothCameraControllerProps {
   mode: ViewMode;
   viewId?: string;
   onTransitionEnd?: () => void;
-  onMovingChange?: (moving: boolean) => void;
-}
-
-function DemandRenderBridge({ active }: { active: boolean }) {
-  const { invalidate } = useThree();
-
-  useEffect(() => {
-    invalidate();
-  }, [active, invalidate]);
-
-  useFrame(() => {
-    if (active) {
-      invalidate();
-    }
-  });
-
-  return null;
 }
 
 function SceneAtmosphere({ theme }: { theme: ThemeMode }) {
@@ -66,9 +49,8 @@ function SmoothCameraController({
   mode,
   viewId,
   onTransitionEnd,
-  onMovingChange,
 }: SmoothCameraControllerProps) {
-  const { camera, scene, invalidate } = useThree();
+  const { camera, scene } = useThree();
   const controlsRef = useRef<OCImpl | null>(null);
 
   const isTransitioning = useRef(false);
@@ -90,11 +72,9 @@ function SmoothCameraController({
 
     if (mode !== 'orbit') {
       isTransitioning.current = false;
-      onMovingChange?.(false);
       if (controlsRef.current) {
         controlsRef.current.enabled = false;
       }
-      invalidate();
       return;
     }
 
@@ -120,19 +100,21 @@ function SmoothCameraController({
     targetLook.current.set(...los.adjustedTarget);
     transitionStart.current = performance.now();
     isTransitioning.current = true;
-    onMovingChange?.(true);
-    invalidate();
 
     if (controlsRef.current) {
       controlsRef.current.enabled = false;
     }
-  }, [camera, cameraPos, lookAt, mode, scene, viewId, currentKey, invalidate, onMovingChange]);
+  }, [camera, cameraPos, lookAt, mode, scene, viewId, currentKey]);
 
   useFrame(() => {
-    if (mode !== 'orbit') return;
+    if (mode !== 'orbit') {
+      if (controlsRef.current) {
+        controlsRef.current.enabled = false;
+      }
+      return;
+    }
 
     if (isTransitioning.current) {
-      invalidate();
       const elapsed = (performance.now() - transitionStart.current) / 1000;
       const progress = Math.min(1.0, elapsed / transitionDuration);
       const t = progress * progress * (3 - 2 * progress);
@@ -147,7 +129,6 @@ function SmoothCameraController({
 
       if (progress >= 1.0) {
         isTransitioning.current = false;
-        onMovingChange?.(false);
         camera.position.copy(targetPos.current);
         camera.lookAt(targetLook.current);
         if (controlsRef.current) {
@@ -155,7 +136,6 @@ function SmoothCameraController({
           controlsRef.current.enabled = mode === 'orbit';
           controlsRef.current.update();
         }
-        invalidate();
         onTransitionEnd?.();
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('restore-camera-focus'));
@@ -164,7 +144,7 @@ function SmoothCameraController({
       return;
     }
 
-    if (mode === 'orbit' && controlsRef.current && controlsRef.current.enabled) {
+    if (controlsRef.current && controlsRef.current.enabled) {
       controlsRef.current.update();
     }
   });
@@ -174,13 +154,13 @@ function SmoothCameraController({
   return (
     <OrbitControls
       ref={controlsRef}
+      enabled={mode === 'orbit'}
       enableDamping={true}
       dampingFactor={0.05}
       minDistance={2}
       maxDistance={420}
       maxPolarAngle={Math.PI * 0.495}
       makeDefault
-      onChange={() => invalidate()}
     />
   );
 }
@@ -265,9 +245,7 @@ export default function App() {
   const [containmentOpacity, setContainmentOpacity] = useState(1.0);
   const [shellTransparent, setShellTransparent] = useState(false);
   const [vrSupported, setVrSupported] = useState<boolean | null>(null);
-  const [floorTarget, setFloorTarget] = useState<number | null>(null);
   const [isVRPresenting, setIsVRPresenting] = useState(false);
-  const [cameraMoving, setCameraMoving] = useState(false);
 
   const [reloadKey, setReloadKey] = useState(0);
   const [glbStatus, setGlbStatus] = useState<GlbLoadState>({
@@ -304,8 +282,6 @@ export default function App() {
         ? 'walk'
         : 'orbit'
       : activeViewData.mode;
-
-  const isContinuousRendering = cameraMoving || controlMode === 'drone' || isVRPresenting;
 
   // Синхронизация класса .dark на корневом элементе <html>
   useEffect(() => {
@@ -381,9 +357,7 @@ export default function App() {
     } else if (viewId === 'view-reactor-hall' || viewId === 'view-polar-crane') {
       setContainmentOpacity((prev) => (prev > 0.8 ? 0.72 : prev));
     }
-    if (view.mode === 'walk') {
-      setFloorTarget(view.floorY);
-    } else if (view.mode === 'drone') {
+    if (view.mode === 'drone') {
       setDronePaused(false);
       setScrubProgress(null);
     }
@@ -404,27 +378,20 @@ export default function App() {
     if (btn) btn.click();
   }, []);
 
-  const handleFloorArrived = useCallback(() => {
-    setFloorTarget(null);
-  }, []);
-
   const handlePointerLockChange = useCallback((locked: boolean) => {
     setPointerLocked(locked);
   }, []);
 
   const vrSpawnTarget: [number, number, number] =
     activeViewData.mode === 'walk'
-      ? activeViewData.cameraPos
+      ? [activeViewData.cameraPos[0], activeViewData.floorY, activeViewData.cameraPos[2]]
       : activeViewData.cameraPos[1] <= 18
       ? [activeViewData.cameraPos[0], activeViewData.floorY, activeViewData.cameraPos[2]]
-      : [64, 0.4, -18];
+      : [64, 0, -18];
 
   const safeWalkFallbackPos: [number, number, number] = (() => {
     const cx = THREE.MathUtils.clamp(activeViewData.cameraPos[0], -106, 106);
     const cz = THREE.MathUtils.clamp(activeViewData.cameraPos[2], -106, 106);
-    if (cx > 18 && cz > 12) {
-      return [64, activeViewData.floorY + 1.65, -18];
-    }
     return [cx, activeViewData.floorY + 1.65, cz];
   })();
 
@@ -435,10 +402,11 @@ export default function App() {
       </div>
 
       {webglAvailable ? (
-        <Canvas
-          frameloop="demand"
-          shadows={!isVRPresenting}
-          camera={{ position: [64, 2.05, -18], fov: 55, near: 0.15, far: 1400 }}
+        <div id="vver-canvas-wrapper" className="h-full w-full">
+          <Canvas
+            frameloop="always"
+            shadows={!isVRPresenting}
+            camera={{ position: [64, 1.65, -18], fov: 55, near: 0.15, far: 1400 }}
           gl={{
             antialias: false,
             alpha: false,
@@ -485,81 +453,86 @@ export default function App() {
             }
           }}
         >
-          <DemandRenderBridge active={isContinuousRendering} />
-          <SceneAtmosphere theme={theme} />
-          <WebXRSceneManager
-            activeSpawnPos={vrSpawnTarget}
-            floorY={activeViewData.floorY}
-            activeViewId={activeViewData.id}
-          />
-
-          {!isVRPresenting && <AdaptiveDpr pixelated />}
-
-          <ambientLight intensity={theme === 'dark' ? 0.56 : 0.65} color="#ffffff" />
-          <hemisphereLight args={['#eef6ff', '#8f99a3', theme === 'dark' ? 0.95 : 1.15]} />
-          <directionalLight
-            position={[110, 145, 95]}
-            intensity={theme === 'dark' ? 1.95 : 2.15}
-            color="#fff7eb"
-            castShadow={!isVRPresenting}
-            shadow-mapSize={[1024, 1024]}
-            shadow-camera-left={-125}
-            shadow-camera-right={125}
-            shadow-camera-top={125}
-            shadow-camera-bottom={-125}
-            shadow-camera-far={420}
-            shadow-bias={-0.0005}
-            shadow-normalBias={0.04}
-          />
-          <directionalLight position={[-125, 105, -135]} intensity={0.62} color="#b7d2ff" />
-
-          <XR store={xrStore}>
-            <TeleportTarget>
-              <SceneContent
-                reloadKey={reloadKey}
-                containmentOpacity={containmentOpacity}
-                shellTransparent={shellTransparent}
-                onStatusChange={handleGlbStatusChange}
-              />
-            </TeleportTarget>
-            <VRControllerManager
-              viewTarget={vrSpawnTarget}
+            <SceneAtmosphere theme={theme} />
+            <WebXRSceneManager
+              activeSpawnPos={vrSpawnTarget}
               floorY={activeViewData.floorY}
               activeViewId={activeViewData.id}
             />
-          </XR>
 
-          <SmoothCameraController
-            cameraPos={activeViewData.cameraPos}
-            lookAt={activeViewData.target ?? [0, activeViewData.floorY, 0]}
-            mode={controlMode}
-            viewId={activeViewData.id}
-            onMovingChange={setCameraMoving}
-          />
+            {!isVRPresenting && <AdaptiveDpr pixelated />}
 
-          {controlMode === 'drone' ? (
-            <DroneFlyByController
-              active={activeView === 'view-drone'}
-              speedMultiplier={droneSpeed}
-              paused={dronePaused}
-              scrubProgress={scrubProgress}
-              onTelemetryUpdate={setDroneTelemetry}
+            <ambientLight intensity={theme === 'dark' ? 0.56 : 0.65} color="#ffffff" />
+            <hemisphereLight args={['#eef6ff', '#8f99a3', theme === 'dark' ? 0.95 : 1.15]} />
+            <directionalLight
+              position={[110, 145, 95]}
+              intensity={theme === 'dark' ? 1.95 : 2.15}
+              color="#fff7eb"
+              castShadow={!isVRPresenting}
+              shadow-mapSize={[1024, 1024]}
+              shadow-camera-left={-125}
+              shadow-camera-right={125}
+              shadow-camera-top={125}
+              shadow-camera-bottom={-125}
+              shadow-camera-far={420}
+              shadow-bias={-0.0005}
+              shadow-normalBias={0.04}
             />
-          ) : controlMode === 'walk' ? (
-            <FirstPersonController
-              targetFloor={floorTarget}
-              onArrived={handleFloorArrived}
-              onLockChange={handlePointerLockChange}
-              spawnPosition={
-                activeViewData.mode === 'walk'
-                  ? activeViewData.cameraPos
-                  : safeWalkFallbackPos
-              }
-              lookAtTarget={activeViewData.target}
-              freeGroundY={activeViewData.floorY}
+            <directionalLight position={[-125, 105, -135]} intensity={0.62} color="#b7d2ff" />
+
+            <XR store={xrStore}>
+              <TeleportTarget
+                onTeleport={(point) => {
+                  window.dispatchEvent(
+                    new CustomEvent('vr-teleport-to', {
+                      detail: { x: point.x, y: point.y, z: point.z },
+                    })
+                  );
+                }}
+              >
+                <SceneContent
+                  reloadKey={reloadKey}
+                  containmentOpacity={containmentOpacity}
+                  shellTransparent={shellTransparent}
+                  onStatusChange={handleGlbStatusChange}
+                />
+              </TeleportTarget>
+              <VRControllerManager
+                viewTarget={vrSpawnTarget}
+                floorY={activeViewData.floorY}
+                activeViewId={activeViewData.id}
+              />
+            </XR>
+
+            <SmoothCameraController
+              cameraPos={activeViewData.cameraPos}
+              lookAt={activeViewData.target ?? [0, activeViewData.floorY, 0]}
+              mode={controlMode}
+              viewId={activeViewData.id}
             />
-          ) : null}
-        </Canvas>
+
+            {controlMode === 'drone' ? (
+              <DroneFlyByController
+                active={activeView === 'view-drone'}
+                speedMultiplier={droneSpeed}
+                paused={dronePaused}
+                scrubProgress={scrubProgress}
+                onTelemetryUpdate={setDroneTelemetry}
+              />
+            ) : controlMode === 'walk' && !isVRPresenting ? (
+              <FirstPersonController
+                onLockChange={handlePointerLockChange}
+                spawnPosition={
+                  activeViewData.mode === 'walk'
+                    ? activeViewData.cameraPos
+                    : safeWalkFallbackPos
+                }
+                lookAtTarget={activeViewData.target}
+                freeGroundY={activeViewData.floorY}
+              />
+            ) : null}
+          </Canvas>
+        </div>
       ) : (
         <SceneUnavailable onRetry={() => setWebglAvailable(canCreateWebGL2())} />
       )}

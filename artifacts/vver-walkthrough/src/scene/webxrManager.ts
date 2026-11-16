@@ -1,19 +1,11 @@
 /**
  * ============================================================================
- * МОДУЛЬ КОНФИГУРАЦИИ WEBXR И ЦИКЛА РЕНДЕРИНГА (THREE.JS WEBXR READY)
+ * МОДУЛЬ КОНФИГУРАЦИИ WEBXR И РЕНДЕРИНГА
  * ============================================================================
- * 
- * Устраняет проблему черного экрана в очках виртуальной реальности:
- * 1. Инициализация главного цикла через renderer.setAnimationLoop(animate)
- *    с обязательным вызовом renderer.render(scene, camera) на каждом кадре.
- * 2. Принудительное включение renderer.xr.enabled = true.
- * 3. Явный цвет фона сцены (scene.background = new THREE.Color(0x9CB0C3))
- *    для предотвращения сброса кадрового буфера в прозрачный/черный (0x000000).
- * 4. Создание группы xrRigGroup (scene.add(xrRigGroup); xrRigGroup.add(camera))
- *    с точным позиционированием на отметку пола выбранного ракурса при sessionstart.
- * 5. Настройка плоскостей отсечения: camera.near = 0.1, camera.far = 1000.
- * 6. Глобальный базовый свет (THREE.AmbientLight + DirectionalLight), добавляемый
- *    напрямую в scene, чтобы материалы MeshStandardMaterial не рендерились черными.
+ *
+ * Настраивает gl.xr.enabled = true, фовеальный рендеринг, плоскости отсечения
+ * камеры (near/far) и события жизненного цикла сессии WebXR без перехвата
+ * родительского узла камеры у <XROrigin>.
  */
 
 import { useEffect, useRef } from 'react';
@@ -23,21 +15,20 @@ import * as THREE from 'three';
 export interface WebXRSceneManagerProps {
   /** Текущие координаты выбранного ракурса камеры [x, y, z] */
   activeSpawnPos?: [number, number, number];
-  /** Отметка пола в метрах (0м для центральной площадки GLB-сборки) */
+  /** Отметка пола в метрах (0м для площадки) */
   floorY?: number;
   /** Идентификатор текущего ракурса */
   activeViewId?: string;
 }
 
 export default function WebXRSceneManager({
-  activeSpawnPos = [64, 0.4, -18],
-  floorY = 0.4,
+  activeSpawnPos = [64, 0, -18],
+  floorY = 0,
   activeViewId,
 }: WebXRSceneManagerProps) {
-  const { gl, scene, camera, invalidate } = useThree();
+  const { gl, scene, camera } = useThree();
   const currentSpawnRef = useRef<[number, number, number]>(activeSpawnPos);
   const currentFloorYRef = useRef<number>(floorY);
-  const xrRigGroupRef = useRef<THREE.Group | null>(null);
 
   useEffect(() => {
     currentSpawnRef.current = activeSpawnPos;
@@ -45,45 +36,26 @@ export default function WebXRSceneManager({
   }, [activeSpawnPos, floorY]);
 
   useEffect(() => {
-    // 1. Флаги рендерера и камеры (XR Readiness + оптимизация VR FPS)
     if (gl.xr) {
       gl.xr.enabled = true;
       try {
-        // Фиксированный фовеальный рендеринг (снижает нагрузку на пиксельный шейдер по краям линз VR)
         gl.xr.setFoveation?.(1.0);
-        // Небольшое снижение разрешения буфера кадров в VR (0.9) для стабильных 72-90 FPS
         gl.xr.setFramebufferScaleFactor?.(0.9);
       } catch {
         // Безопасный фолбэк для браузеров без поддержки setFoveation
       }
     }
 
-    // Сохраняем текущую тему сцены (инициализируем фон, только если он не задан)
     if (!scene.background) {
       const bgColor = new THREE.Color('#131c24');
       scene.background = bgColor;
       gl.setClearColor(bgColor, 1.0);
     }
 
-    // Плоскости отсечения камеры для VR без Z-fighting и обрезки дальних корпусов
     camera.near = 0.15;
     camera.far = 1400;
     camera.updateProjectionMatrix();
 
-    // 2. Группа XR-камеры (XR Rig / Player Base)
-    let xrRigGroup = scene.getObjectByName('xrRigGroup') as THREE.Group | null;
-    if (!xrRigGroup) {
-      xrRigGroup = new THREE.Group();
-      xrRigGroup.name = 'xrRigGroup';
-      scene.add(xrRigGroup);
-    }
-    xrRigGroupRef.current = xrRigGroup;
-
-    if (camera.parent !== xrRigGroup) {
-      xrRigGroup.add(camera);
-    }
-
-    // 3. Обработка изменения размера окна (Desktop / Electron)
     const handleResize = () => {
       if (gl.xr?.isPresenting) return;
       const width = window.innerWidth;
@@ -95,17 +67,14 @@ export default function WebXRSceneManager({
         }
         gl.setSize(width, height);
         gl.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
-        invalidate();
       }
     };
     window.addEventListener('resize', handleResize);
     handleResize();
 
-    // 4. Обработчики сессии WebXR (sessionstart / sessionend)
     const prevShadowEnabled = gl.shadowMap.enabled;
 
     const onSessionStart = () => {
-      // Отключаем тени и понижаем pixelRatio в VR для максимального стабильного FPS
       gl.shadowMap.enabled = false;
       gl.setPixelRatio(1);
 
@@ -132,16 +101,11 @@ export default function WebXRSceneManager({
         }
       }
 
-      // Стартовая позиция в VR на отметке площадки рядом с оборудованием (1:1 масштаб)
-      const isWalk = activeViewId && (activeViewId.startsWith('walk') || activeViewId.includes('steam'));
+      const isWalk =
+        activeViewId && (activeViewId.startsWith('walk') || activeViewId.includes('steam'));
       const spawnX = isWalk && currentSpawnRef.current ? currentSpawnRef.current[0] : 64;
-      const spawnY = isWalk && currentFloorYRef.current !== undefined ? currentFloorYRef.current : 0.4;
+      const spawnY = isWalk && currentFloorYRef.current !== undefined ? currentFloorYRef.current : 0;
       const spawnZ = isWalk && currentSpawnRef.current ? currentSpawnRef.current[2] : -18;
-
-      if (xrRigGroupRef.current) {
-        xrRigGroupRef.current.position.set(spawnX, spawnY, spawnZ);
-        xrRigGroupRef.current.updateMatrixWorld(true);
-      }
 
       try {
         window.dispatchEvent(
@@ -157,17 +121,12 @@ export default function WebXRSceneManager({
     const onSessionEnd = () => {
       gl.shadowMap.enabled = prevShadowEnabled;
       gl.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
-      if (xrRigGroupRef.current) {
-        xrRigGroupRef.current.position.set(0, 0, 0);
-        xrRigGroupRef.current.updateMatrixWorld(true);
-      }
 
       try {
         window.dispatchEvent(new CustomEvent('webxr-session-end'));
       } catch {
         // Safe fallback
       }
-      invalidate();
     };
 
     if (gl.xr) {
@@ -182,17 +141,7 @@ export default function WebXRSceneManager({
         gl.xr.removeEventListener('sessionend', onSessionEnd);
       }
     };
-  }, [gl, scene, camera, activeViewId, invalidate]);
-
-  // Динамическое обновление позиции XR Rig при переключении ракурса в VR
-  useEffect(() => {
-    if (gl.xr?.isPresenting && xrRigGroupRef.current) {
-      const spawn = activeSpawnPos;
-      const targetY = floorY !== undefined ? floorY : 0;
-      xrRigGroupRef.current.position.set(spawn[0], targetY, spawn[2]);
-      xrRigGroupRef.current.updateMatrixWorld(true);
-    }
-  }, [activeSpawnPos, floorY, activeViewId, gl.xr?.isPresenting]);
+  }, [gl, scene, camera, activeViewId]);
 
   return null;
 }
