@@ -6,7 +6,9 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { OrbitControls as OCImpl } from 'three-stdlib';
 
-import GlbAssemblyModel, { type GlbLoadState } from '@/components/GlbAssemblyModel';
+import GlbAssemblyModel, { type GlbLoadState, type SiteBox3Anchors } from '@/components/GlbAssemblyModel';
+import CadSiteAddons from '@/components/CadSiteAddons';
+import NppProcessVisualizer from '@/components/NppProcessVisualizer';
 import VRControllerManager from '@/components/VRControllerManager';
 import DroneFlyByController, { type DroneWaymark } from '@/components/DroneFlyByController';
 import FirstPersonController from '@/components/FirstPersonController';
@@ -32,10 +34,10 @@ function SceneAtmosphere({ theme }: { theme: ThemeMode }) {
   const { gl, scene, invalidate } = useThree();
 
   useEffect(() => {
-    const colorHex = theme === 'dark' ? '#131c24' : '#d6e2ec';
+    const colorHex = theme === 'dark' ? '#1a2430' : '#dce8f2';
     const bgColor = new THREE.Color(colorHex);
     scene.background = bgColor;
-    scene.fog = new THREE.Fog(colorHex, 280, 920);
+    scene.fog = new THREE.Fog(colorHex, 240, 780);
     gl.setClearColor(bgColor, 1.0);
     invalidate();
   }, [theme, gl, scene, invalidate]);
@@ -169,6 +171,7 @@ interface SceneContentProps {
   reloadKey: number;
   containmentOpacity: number;
   shellTransparent: boolean;
+  energyFlowActive: boolean;
   onStatusChange: (state: GlbLoadState) => void;
 }
 
@@ -176,19 +179,30 @@ function SceneContent({
   reloadKey,
   containmentOpacity,
   shellTransparent,
+  energyFlowActive,
   onStatusChange,
 }: SceneContentProps) {
+  const [siteAnchors, setSiteAnchors] = useState<SiteBox3Anchors | null>(null);
+
   return (
     <group>
-      {/* Исключительно чистая CAD-модель assembly.glb в масштабе 1:1 (225 м) на компактном основании */}
+      {/* CAD-сборка assembly.glb (225 м) + привязанные по Box3 венттрубы, ОРУ, К-1000, комплекс РИТМ-200Н и 3D-энергопоток */}
       <GlbAssemblyModel
         key={reloadKey}
         targetMaxSize={225}
         groundY={0}
         containmentOpacity={containmentOpacity}
         shellTransparent={shellTransparent}
+        energyFlowActive={energyFlowActive}
         onStatusChange={onStatusChange}
+        onAnchorsReady={setSiteAnchors}
       />
+      <CadSiteAddons
+        anchors={siteAnchors}
+        containmentOpacity={containmentOpacity}
+        energyFlowActive={energyFlowActive}
+      />
+      <NppProcessVisualizer active={energyFlowActive} anchors={siteAnchors} />
     </group>
   );
 }
@@ -238,12 +252,13 @@ function SceneUnavailable({ onRetry }: { onRetry: () => void }) {
 }
 
 export default function App() {
-  const [theme, setTheme] = useState<ThemeMode>('dark');
+  const [theme, setTheme] = useState<ThemeMode>('light');
   const [webglAvailable, setWebglAvailable] = useState(canCreateWebGL2);
   const [pointerLocked, setPointerLocked] = useState(false);
   const [activeView, setActiveView] = useState('walk-tour');
   const [containmentOpacity, setContainmentOpacity] = useState(1.0);
   const [shellTransparent, setShellTransparent] = useState(false);
+  const [energyFlowActive, setEnergyFlowActive] = useState(false);
   const [vrSupported, setVrSupported] = useState<boolean | null>(null);
   const [isVRPresenting, setIsVRPresenting] = useState(false);
 
@@ -354,7 +369,9 @@ export default function App() {
     setActiveView(viewId);
     if (viewId === 'view-cutaway' || viewId === 'view-core-catcher') {
       setContainmentOpacity((prev) => (prev > 0.65 ? 0.48 : prev));
-    } else if (viewId === 'view-reactor-hall' || viewId === 'view-polar-crane') {
+    } else if (viewId === 'view-ritm-200n') {
+      setContainmentOpacity((prev) => (prev > 0.65 ? 0.52 : prev));
+    } else if (viewId === 'view-reactor-hall') {
       setContainmentOpacity((prev) => (prev > 0.8 ? 0.72 : prev));
     }
     if (view.mode === 'drone') {
@@ -387,7 +404,7 @@ export default function App() {
       ? [activeViewData.cameraPos[0], activeViewData.floorY, activeViewData.cameraPos[2]]
       : activeViewData.cameraPos[1] <= 18
       ? [activeViewData.cameraPos[0], activeViewData.floorY, activeViewData.cameraPos[2]]
-      : [64, 0, -18];
+      : [-32, 0.4, -18];
 
   const safeWalkFallbackPos: [number, number, number] = (() => {
     const cx = THREE.MathUtils.clamp(activeViewData.cameraPos[0], -106, 106);
@@ -396,7 +413,7 @@ export default function App() {
   })();
 
   return (
-    <div className="relative h-[100dvh] w-full overflow-hidden bg-[#d6e2ec] dark:bg-[#131c24] transition-colors duration-200">
+    <div className="relative h-[100dvh] w-full overflow-hidden bg-[#dce8f2] dark:bg-[#1a2430] transition-colors duration-200">
       <div className="pointer-events-none absolute right-0 top-0 opacity-0">
         <VRButton store={xrStore} id="vr-btn" />
       </div>
@@ -406,19 +423,19 @@ export default function App() {
           <Canvas
             frameloop="always"
             shadows={!isVRPresenting}
-            camera={{ position: [64, 1.65, -18], fov: 55, near: 0.15, far: 1400 }}
+            camera={{ position: [-32, 2.05, -18], fov: 55, near: 0.15, far: 1400 }}
           gl={{
             antialias: false,
             alpha: false,
             stencil: false,
             depth: true,
             toneMapping: THREE.ACESFilmicToneMapping,
-            toneMappingExposure: 1.0,
+            toneMappingExposure: 1.05,
             powerPreference: 'high-performance',
           }}
           dpr={isVRPresenting ? 1 : [1, 1.25]}
           onCreated={({ gl, scene, camera }) => {
-            const bgColor = new THREE.Color(theme === 'dark' ? '#131c24' : '#d6e2ec');
+            const bgColor = new THREE.Color(theme === 'dark' ? '#1a2430' : '#dce8f2');
             scene.background = bgColor;
             gl.setClearColor(bgColor, 1.0);
             gl.localClippingEnabled = true;
@@ -462,12 +479,12 @@ export default function App() {
 
             {!isVRPresenting && <AdaptiveDpr pixelated />}
 
-            <ambientLight intensity={theme === 'dark' ? 0.56 : 0.65} color="#ffffff" />
-            <hemisphereLight args={['#eef6ff', '#8f99a3', theme === 'dark' ? 0.95 : 1.15]} />
+            <ambientLight intensity={theme === 'dark' ? 0.5 : 0.48} color="#ffffff" />
+            <hemisphereLight args={['#eef7ff', '#b4bec7', theme === 'dark' ? 0.92 : 1.18]} />
             <directionalLight
-              position={[110, 145, 95]}
-              intensity={theme === 'dark' ? 1.95 : 2.15}
-              color="#fff7eb"
+              position={[125, 165, 105]}
+              intensity={theme === 'dark' ? 1.85 : 2.3}
+              color="#fff9ed"
               castShadow={!isVRPresenting}
               shadow-mapSize={[1024, 1024]}
               shadow-camera-left={-125}
@@ -478,7 +495,7 @@ export default function App() {
               shadow-bias={-0.0005}
               shadow-normalBias={0.04}
             />
-            <directionalLight position={[-125, 105, -135]} intensity={0.62} color="#b7d2ff" />
+            <directionalLight position={[-120, 95, -110]} intensity={0.68} color="#cfe4ff" />
 
             <XR store={xrStore}>
               <TeleportTarget
@@ -494,6 +511,7 @@ export default function App() {
                   reloadKey={reloadKey}
                   containmentOpacity={containmentOpacity}
                   shellTransparent={shellTransparent}
+                  energyFlowActive={energyFlowActive}
                   onStatusChange={handleGlbStatusChange}
                 />
               </TeleportTarget>
@@ -609,6 +627,8 @@ export default function App() {
         onContainmentOpacityChange={setContainmentOpacity}
         shellTransparent={shellTransparent}
         onToggleShellTransparent={() => setShellTransparent((v) => !v)}
+        energyFlowActive={energyFlowActive}
+        onToggleEnergyFlow={() => setEnergyFlowActive((v) => !v)}
         controlMode={controlMode}
         onVRClick={handleVRClick}
         vrSupported={vrSupported}

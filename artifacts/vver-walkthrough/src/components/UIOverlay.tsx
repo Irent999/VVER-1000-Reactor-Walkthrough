@@ -15,6 +15,7 @@ import {
   Sun,
   Video,
   X,
+  Zap,
 } from 'lucide-react';
 import { FLOOR_VIEWS, type ViewMode } from '@/data/poiData';
 import { useTelemetry, type TelemetrySnapshot } from '@/hooks/useTelemetry';
@@ -30,6 +31,8 @@ interface UIOverlayProps {
   onContainmentOpacityChange: (v: number) => void;
   shellTransparent: boolean;
   onToggleShellTransparent: () => void;
+  energyFlowActive: boolean;
+  onToggleEnergyFlow: () => void;
   controlMode: ViewMode;
   onVRClick: () => void;
   vrSupported: boolean | null;
@@ -52,7 +55,7 @@ interface UIOverlayProps {
 }
 
 const glassSurface =
-  'border border-slate-900/10 dark:border-white/10 bg-white/75 dark:bg-slate-950/70 text-slate-900 dark:text-slate-100 backdrop-blur-xl shadow-[0_12px_36px_rgba(15,23,42,0.12)] dark:shadow-[0_14px_40px_rgba(0,0,0,0.45)] transition-colors duration-200';
+  'border border-slate-900/12 dark:border-white/12 bg-white/92 dark:bg-slate-950/88 text-slate-900 dark:text-slate-100 shadow-[0_10px_30px_rgba(15,23,42,0.10)] dark:shadow-[0_14px_40px_rgba(0,0,0,0.45)] transition-colors duration-200';
 
 export default function UIOverlay({
   activeView,
@@ -62,6 +65,8 @@ export default function UIOverlay({
   onContainmentOpacityChange,
   shellTransparent,
   onToggleShellTransparent,
+  energyFlowActive,
+  onToggleEnergyFlow,
   controlMode,
   onVRClick,
   telemetry: propTelemetry,
@@ -175,6 +180,7 @@ export default function UIOverlay({
   }
 
   const activeZone = FLOOR_VIEWS.find((v) => v.id === activeView) ?? FLOOR_VIEWS[0];
+  const walkLocations = FLOOR_VIEWS.filter((v) => v.group === 'walk');
   const zonePresets = FLOOR_VIEWS.filter((v) => v.group === 'zones');
   const cutawayPercent = Math.round((1 - containmentOpacity) * 100);
   const thermalMW = Math.round(telemetry.neutronFlux * 30);
@@ -274,12 +280,37 @@ export default function UIOverlay({
         </div>
       </aside>
 
-      {/* Подсказки над нижней панелью (для режима прогулки и дрон-облёта) */}
-      {controlMode === 'walk' && !pointerLocked && (
-        <div className="pointer-events-none fixed bottom-20 left-1/2 z-30 -translate-x-1/2">
-          <p className={`${glassSurface} whitespace-nowrap rounded-xl px-3.5 py-1.5 text-[11px] text-slate-600 dark:text-slate-300`}>
-            WASD — ходьба · Клик / мышь — обзор · Esc — курсор
-          </p>
+      {/* Компактный переключатель ключевых локаций для «Прогулки 1:1» и VR (Y = 1.65 м от пола) */}
+      {controlMode === 'walk' && (
+        <div className="pointer-events-auto fixed bottom-20 left-1/2 z-30 flex max-w-[calc(100vw-24px)] -translate-x-1/2 flex-col items-center gap-1.5">
+          <div
+            data-testid="walk-location-switcher"
+            className={`${glassSurface} flex flex-wrap sm:flex-nowrap items-center justify-center gap-1 rounded-2xl p-1`}
+          >
+            {walkLocations.map((loc) => {
+              const isSelected = activeView === loc.id;
+              return (
+                <button
+                  key={loc.id}
+                  type="button"
+                  data-testid={`button-walk-${loc.id}`}
+                  onClick={() => onViewChange(loc.id)}
+                  className={`whitespace-nowrap rounded-xl px-2.5 py-1.5 text-[11px] font-medium transition ${
+                    isSelected
+                      ? 'bg-sky-600 text-white dark:bg-sky-400 dark:text-slate-950 shadow-sm'
+                      : 'text-slate-700 hover:bg-slate-900/5 dark:text-slate-300 dark:hover:bg-white/10'
+                  }`}
+                >
+                  {loc.shortLabel || loc.label}
+                </button>
+              );
+            })}
+          </div>
+          {!pointerLocked && (
+            <p className={`${glassSurface} whitespace-nowrap rounded-xl px-3 py-1 text-[11px] text-slate-600 dark:text-slate-300`}>
+              WASD / стрелки — ходьба · Клик / мышь — обзор · Esc — курсор
+            </p>
+          )}
         </div>
       )}
 
@@ -337,7 +368,7 @@ export default function UIOverlay({
         className="pointer-events-auto fixed bottom-5 left-1/2 z-40 max-w-[calc(100vw-24px)] -translate-x-1/2"
       >
         <div
-          className={`${glassSurface} flex flex-wrap sm:flex-nowrap items-center justify-center gap-1.5 rounded-2xl p-1.5`}
+          className={`${glassSurface} flex flex-wrap lg:flex-nowrap items-center justify-center gap-1.5 rounded-2xl p-1.5`}
         >
           {/* Основные режимы обзора */}
           <div className="flex items-center gap-1">
@@ -407,8 +438,37 @@ export default function UIOverlay({
 
             {zonesOpen && (
               <div
-                className={`${glassSurface} panel-enter absolute bottom-12 left-0 w-56 rounded-2xl p-1.5`}
+                className={`${glassSurface} panel-enter absolute bottom-12 left-0 w-64 rounded-2xl p-1.5`}
               >
+                <p className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Локации прогулки (1:1)
+                </p>
+                {walkLocations.map((zone) => {
+                  const selected = activeView === zone.id;
+                  return (
+                    <button
+                      key={zone.id}
+                      type="button"
+                      data-testid={`button-view-${zone.id}`}
+                      onClick={() => {
+                        onViewChange(zone.id);
+                        setZonesOpen(false);
+                      }}
+                      className={`flex w-full items-center justify-between rounded-xl px-3 py-1.5 text-left text-xs font-medium transition ${
+                        selected
+                          ? 'bg-sky-600 text-white dark:bg-sky-400 dark:text-slate-950'
+                          : 'text-slate-700 hover:bg-slate-900/5 dark:text-slate-200 dark:hover:bg-white/10'
+                      }`}
+                    >
+                      <span className="truncate">{zone.shortLabel || zone.label}</span>
+                      <span className="mono text-[10px] opacity-70">1:1</span>
+                    </button>
+                  );
+                })}
+                <div className="my-1 h-px bg-slate-900/10 dark:bg-white/10" />
+                <p className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  3D-ракурсы и разрез
+                </p>
                 {zonePresets.map((zone) => {
                   const selected = activeView === zone.id;
                   return (
@@ -420,16 +480,14 @@ export default function UIOverlay({
                         onViewChange(zone.id);
                         setZonesOpen(false);
                       }}
-                      className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs font-medium transition ${
+                      className={`flex w-full items-center justify-between rounded-xl px-3 py-1.5 text-left text-xs font-medium transition ${
                         selected
                           ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950'
                           : 'text-slate-700 hover:bg-slate-900/5 dark:text-slate-200 dark:hover:bg-white/10'
                       }`}
                     >
                       <span className="truncate">{zone.label}</span>
-                      <span className="mono text-[10px] opacity-60">
-                        {zone.mode === 'walk' ? '1:1' : '3D'}
-                      </span>
+                      <span className="mono text-[10px] opacity-60">3D</span>
                     </button>
                   );
                 })}
@@ -473,6 +531,25 @@ export default function UIOverlay({
               <span className="hidden md:inline">X-Ray</span>
             </button>
           </div>
+
+          <span className="hidden sm:block h-5 w-px bg-slate-900/10 dark:bg-white/10" aria-hidden="true" />
+
+          {/* Кнопка запуска визуализации технологического цикла АЭС */}
+          <button
+            type="button"
+            data-testid="button-toggle-energy-flow"
+            onClick={onToggleEnergyFlow}
+            aria-pressed={energyFlowActive}
+            title="Анимация процессов АЭС: реактор, контуры, турбины, градирни и ОРУ"
+            className={`flex items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-2 text-xs font-semibold transition ${
+              energyFlowActive
+                ? 'bg-sky-500 text-white shadow-[0_0_18px_rgba(14,165,233,0.45)] hover:bg-sky-400 dark:bg-sky-400 dark:text-slate-950'
+                : 'bg-amber-500/15 text-amber-800 hover:bg-amber-500/25 dark:bg-amber-400/15 dark:text-amber-300 dark:hover:bg-amber-400/25'
+            }`}
+          >
+            <Zap size={14} />
+            <span>{energyFlowActive ? 'Цикл АЭС активен' : 'Визуализация процессов'}</span>
+          </button>
 
           <span className="hidden sm:block h-5 w-px bg-slate-900/10 dark:bg-white/10" aria-hidden="true" />
 

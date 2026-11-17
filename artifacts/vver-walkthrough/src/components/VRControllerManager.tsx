@@ -78,7 +78,7 @@ export default function VRControllerManager({
       const key = `${viewTarget[0]}:${viewTarget[1]}:${viewTarget[2]}:${floorY}`;
       if (key !== lastTargetKey.current) {
         lastTargetKey.current = key;
-        const baseY = floorY > 1 ? floorY : 0;
+        const baseY = Number.isFinite(floorY) ? floorY : 0.4;
         playerRef.current.position.set(viewTarget[0], baseY, viewTarget[2]);
         playerRef.current.updateMatrixWorld(true);
       }
@@ -120,10 +120,10 @@ export default function VRControllerManager({
   useEffect(() => {
     if (session) {
       if (playerRef.current) {
-        const isWalk = activeViewId && (activeViewId.startsWith('walk') || activeViewId.includes('steam'));
-        const defaultSpawn: [number, number, number] = [64, 0, -18];
+        const isWalk = activeViewId && activeViewId.startsWith('walk');
+        const defaultSpawn: [number, number, number] = [-32, 0.4, -18];
         const spawnX = isWalk && viewTarget ? viewTarget[0] : defaultSpawn[0];
-        const spawnY = isWalk && floorY > 1 ? floorY : 0;
+        const spawnY = isWalk && Number.isFinite(floorY) ? floorY : 0.4;
         const spawnZ = isWalk && viewTarget ? viewTarget[2] : defaultSpawn[2];
 
         playerRef.current.position.set(spawnX, spawnY, spawnZ);
@@ -135,7 +135,7 @@ export default function VRControllerManager({
     }
   }, [session, viewTarget, floorY, activeViewId]);
 
-  // Прямое чтение inputSource.gamepad.axes и триггер-телепортация на пол Y = 0
+  // Прямое чтение inputSource.gamepad.axes и триггер-телепортация на текущую отметку пола
   useFrame((_, delta, frame) => {
     const xrSession = gl.xr?.getSession();
     if (!xrSession || !gl.xr.isPresenting || !playerRef.current) {
@@ -146,7 +146,7 @@ export default function VRControllerManager({
     const player = playerRef.current;
     const xrCam = gl.xr.getCamera();
     const refSpace = gl.xr.getReferenceSpace();
-    const activeFloorY = floorY > 1 ? floorY : 0;
+    const activeFloorY = Number.isFinite(floorY) ? floorY : 0.4;
 
     let anyAimValid = false;
 
@@ -260,7 +260,7 @@ export default function VRControllerManager({
 
   return (
     <>
-      <XROrigin ref={playerRef as RefObject<THREE.Group>} position={[64, 0, -18]} />
+      <XROrigin ref={playerRef as RefObject<THREE.Group>} position={[-32, 0.4, -18]} />
       <VRTeleportRing ringRef={ringRef} />
     </>
   );

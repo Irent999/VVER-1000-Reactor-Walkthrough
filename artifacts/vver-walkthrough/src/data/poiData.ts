@@ -3,6 +3,7 @@ export type POIId =
   | 'steamGenerator'
   | 'polarCrane'
   | 'turboGenerator'
+  | 'ritm200n'
   | 'coreCatcher'
   | 'containmentCutaway';
 
@@ -82,7 +83,7 @@ export const POI_LIST: POIInfo[] = [
   {
     id: 'turboGenerator',
     viewId: 'walk-turbine-hall',
-    position: [13.1, 4.0, -41.3],
+    position: [-27.6, 5.1, -72.75],
     titleEn: 'Turbine Hall & K-1000',
     titleRu: 'Турбоагрегат К-1000',
     categoryEn: 'Secondary Circuit',
@@ -90,13 +91,32 @@ export const POI_LIST: POIInfo[] = [
     color: '#cbd5e1',
     specs: [
       { labelEn: 'Rated Output', labelRu: 'Мощность', value: '1000 MWe' },
-      { labelEn: 'Train Length', labelRu: 'Длина вала', value: '146.5 м' },
+      { labelEn: 'Configuration', labelRu: 'Компоновка', value: 'ЦВД + 3×ЦНД + ТВВ' },
       { labelEn: 'Shaft Speed', labelRu: 'Обороты', value: '1500 об/мин' },
     ],
     descriptionEn:
-      'Full-scale multi-cylinder steam turbine and synchronous generator train.',
+      'Full-scale K-1000 multi-cylinder steam turbine, condensers, and synchronous generator train.',
     descriptionRu:
-      'Полноразмерный турбоагрегат К-1000 с цилиндрами высокого и низкого давления в машинном зале.',
+      'Полноразмерный турбоагрегат К-1000 (ЦВД, 3 ЦНД, конденсаторы, валопровод и турбогенератор ТВВ-1000) вдоль оси машинного зала.',
+  },
+  {
+    id: 'ritm200n',
+    viewId: 'walk-ritm-200n',
+    position: [35.5, 7.5, -70.9],
+    titleEn: 'RITM-200N Small Modular Reactor Complex',
+    titleRu: 'Комплекс РИТМ-200Н',
+    categoryEn: 'SMR Block',
+    categoryRu: 'Энергоблок АСММ',
+    color: '#38bdf8',
+    specs: [
+      { labelEn: 'Thermal Power', labelRu: 'Тепловая мощность', value: '190 MWt' },
+      { labelEn: 'Electrical Power', labelRu: 'Электрическая мощность', value: '55 MWe' },
+      { labelEn: 'Layout', labelRu: 'Компоновка', value: 'Интегральный реактор + ТГ' },
+    ],
+    descriptionEn:
+      'Integral RITM-200N reactor vessel with vertical CRDM drives and adjacent compact turbine-generator set inside the dedicated SMR hall.',
+    descriptionRu:
+      'Интегральный корпус реактора РИТМ-200Н с приводами СУЗ и компактный турбоагрегат вдоль продольной оси корпуса АСММ.',
   },
   {
     id: 'coreCatcher',
@@ -138,11 +158,12 @@ export const POI_LIST: POIInfo[] = [
 
 export type ViewMode = 'orbit' | 'walk' | 'drone';
 
-export type FloorGroup = 'primary' | 'zones';
+export type FloorGroup = 'primary' | 'walk' | 'zones';
 
 export type FloorTarget = {
   id: string;
   label: string;
+  shortLabel?: string;
   group: FloorGroup;
   floorY: number;
   cameraPos: [number, number, number];
@@ -153,11 +174,52 @@ export type FloorTarget = {
 export const FLOOR_VIEWS: FloorTarget[] = [
   {
     id: 'walk-tour',
-    label: 'Прогулка 1:1',
-    group: 'primary',
-    floorY: 0,
-    cameraPos: [64, 1.65, -18],
-    target: [36, 3.2, -41],
+    label: 'Площадка АЭС (улица)',
+    shortLabel: 'Площадка АЭС',
+    group: 'walk',
+    floorY: 0.40,
+    cameraPos: [-32, 2.05, -18],
+    target: [-60, 8.0, -40],
+    mode: 'walk',
+  },
+  {
+    id: 'walk-ritm-200n',
+    label: 'Комплекс РИТМ-200Н (зал)',
+    shortLabel: 'Зал РИТМ-200Н',
+    group: 'walk',
+    floorY: 0.62,
+    cameraPos: [35.5, 2.27, -87.5],
+    target: [35.0, 4.6, -69.0],
+    mode: 'walk',
+  },
+  {
+    id: 'walk-reactor-hall',
+    label: 'Центральный зал ВВЭР-1000',
+    shortLabel: 'Центральный зал',
+    group: 'walk',
+    floorY: 14.41,
+    cameraPos: [-76.8, 16.06, -40.0],
+    target: [-84.1, 15.8, -40.2],
+    mode: 'walk',
+  },
+  {
+    id: 'walk-turbine-hall',
+    label: 'Машинный зал (турбоагрегат)',
+    shortLabel: 'Машинный зал',
+    group: 'walk',
+    floorY: 0.62,
+    cameraPos: [-22.4, 2.27, -58.5],
+    target: [-27.6, 4.2, -72.8],
+    mode: 'walk',
+  },
+  {
+    id: 'walk-polar-crane',
+    label: 'Эстакада полярного крана',
+    shortLabel: 'Эстакада крана',
+    group: 'walk',
+    floorY: 19.71,
+    cameraPos: [-80.8, 21.36, -44.2],
+    target: [-83.2, 19.2, -39.5],
     mode: 'walk',
   },
   {
@@ -180,16 +242,25 @@ export const FLOOR_VIEWS: FloorTarget[] = [
   },
   {
     id: 'view-cutaway',
-    label: 'Разрез оболочки',
+    label: 'Разрез оболочки и машзала',
     group: 'zones',
     floorY: 0.62,
-    cameraPos: [-18, 42, 12],
-    target: [-52, 8, -40],
+    cameraPos: [-18, 54, -122],
+    target: [-20, 7, -68],
+    mode: 'orbit',
+  },
+  {
+    id: 'view-ritm-200n',
+    label: 'Комплекс РИТМ-200Н (разрез)',
+    group: 'zones',
+    floorY: 0.62,
+    cameraPos: [10, 32, -112],
+    target: [35.5, 5.5, -70.9],
     mode: 'orbit',
   },
   {
     id: 'view-reactor-hall',
-    label: 'Реактор ВВЭР-1000',
+    label: 'Реактор ВВЭР-1000 (3D)',
     group: 'zones',
     floorY: 14.41,
     cameraPos: [-62, 27, -20],
@@ -201,27 +272,9 @@ export const FLOOR_VIEWS: FloorTarget[] = [
     label: 'Парогенераторы и ГЦН',
     group: 'zones',
     floorY: 14.41,
-    cameraPos: [-42, 16.06, -38],
+    cameraPos: [-42, 22, -20],
     target: [-56, 15.6, -40.1],
-    mode: 'walk',
-  },
-  {
-    id: 'view-polar-crane',
-    label: 'Полярный кран',
-    group: 'zones',
-    floorY: 14.41,
-    cameraPos: [-60, 29, -56],
-    target: [-81, 19.5, -40],
     mode: 'orbit',
-  },
-  {
-    id: 'walk-turbine-hall',
-    label: 'Машинный зал',
-    group: 'zones',
-    floorY: 0,
-    cameraPos: [0, 1.65, -18],
-    target: [0, 3.2, -41],
-    mode: 'walk',
   },
   {
     id: 'view-core-catcher',

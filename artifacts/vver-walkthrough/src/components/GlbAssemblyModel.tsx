@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useThree } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
@@ -15,6 +15,33 @@ export interface GlbLoadState {
   errorMessage?: string;
 }
 
+export interface BoxBounds {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  minZ: number;
+  maxZ: number;
+  center: [number, number, number];
+}
+
+export interface VentStackAnchor {
+  id: string;
+  x: number;
+  y: number;
+  z: number;
+  h: number;
+  r: number;
+}
+
+export interface SiteBox3Anchors {
+  westHall: BoxBounds;
+  midHall: BoxBounds;
+  ritmHall: BoxBounds;
+  reactorDome: BoxBounds;
+  ventStacks: VentStackAnchor[];
+}
+
 interface GlbAssemblyModelProps {
   /** Целевой максимальный габарит модели в метрах после масштабирования по центру сцены */
   targetMaxSize?: number;
@@ -24,13 +51,17 @@ interface GlbAssemblyModelProps {
   containmentOpacity?: number;
   /** Полупрозрачный режим наружных стен и крыши оболочки (X-Ray стены) */
   shellTransparent?: boolean;
+  /** Включена ли визуализация технологических процессов АЭС */
+  energyFlowActive?: boolean;
   /** Коллбэк состояния загрузки для отображения прогресса в HUD */
   onStatusChange?: (state: GlbLoadState) => void;
+  /** Коллбэк расчёта точных мировых границ Box3 и высот крыш для привязки оборудования */
+  onAnchorsReady?: (anchors: SiteBox3Anchors) => void;
 }
 
 const MODEL_URL = '/assembly.glb';
 
-function computeCutawayHeight(opacity: number): number {
+export function computeCutawayHeight(opacity: number): number {
   if (opacity >= 0.98) return 60;
   if (opacity <= 0.5) {
     return 3.8 + (Math.max(0, opacity) / 0.5) * 6.2;
@@ -43,25 +74,32 @@ export default function GlbAssemblyModel({
   groundY = 0,
   containmentOpacity = 1.0,
   shellTransparent = false,
+  energyFlowActive = false,
   onStatusChange,
+  onAnchorsReady,
 }: GlbAssemblyModelProps) {
   const { invalidate } = useThree();
   const [loadedScene, setLoadedScene] = useState<THREE.Object3D | null>(null);
   const cutawayPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, -1, 0), 60), []);
   const shellMaterialsRef = useRef<THREE.MeshStandardMaterial[]>([]);
+  const glazingMaterialRef = useRef<THREE.MeshStandardMaterial | null>(null);
+  const reactorVesselMaterialRef = useRef<THREE.MeshStandardMaterial | null>(null);
   const shellTransparentRef = useRef(shellTransparent);
   shellTransparentRef.current = shellTransparent;
+  const energyFlowActiveRef = useRef(energyFlowActive);
+  energyFlowActiveRef.current = energyFlowActive;
+  const onAnchorsReadyRef = useRef(onAnchorsReady);
+  onAnchorsReadyRef.current = onAnchorsReady;
+  const ritmHallBoxRef = useRef(
+    new THREE.Box3(new THREE.Vector3(23.05, 0.5, -94.33), new THREE.Vector3(48.31, 18.0, -47.48))
+  );
+  const proximityXrayRef = useRef(false);
 
-  useEffect(() => {
-    cutawayPlane.constant = computeCutawayHeight(containmentOpacity);
-    invalidate();
-  }, [containmentOpacity, cutawayPlane, invalidate]);
-
-  useEffect(() => {
+  const applyShellOpacityState = (transparentMode: boolean, opacityValue = 0.16) => {
     for (const mat of shellMaterialsRef.current) {
-      if (shellTransparent) {
+      if (transparentMode) {
         mat.transparent = true;
-        mat.opacity = 0.16;
+        mat.opacity = opacityValue;
         mat.depthWrite = false;
       } else {
         mat.transparent = false;
@@ -70,8 +108,45 @@ export default function GlbAssemblyModel({
       }
       mat.needsUpdate = true;
     }
+    if (glazingMaterialRef.current) {
+      glazingMaterialRef.current.opacity = transparentMode ? 0.14 : 0.72;
+      glazingMaterialRef.current.needsUpdate = true;
+    }
+  };
+
+  useEffect(() => {
+    cutawayPlane.constant = computeCutawayHeight(containmentOpacity);
+    invalidate();
+  }, [containmentOpacity, cutawayPlane, invalidate]);
+
+  useEffect(() => {
+    const active = shellTransparent || proximityXrayRef.current;
+    applyShellOpacityState(active, shellTransparent ? 0.16 : 0.24);
     invalidate();
   }, [shellTransparent, invalidate]);
+
+  useEffect(() => {
+    const mat = reactorVesselMaterialRef.current;
+    if (mat) {
+      mat.transparent = energyFlowActive;
+      mat.opacity = energyFlowActive ? 0.44 : 1.0;
+      mat.depthWrite = !energyFlowActive;
+      mat.needsUpdate = true;
+      invalidate();
+    }
+  }, [energyFlowActive, invalidate]);
+
+  // Автоматическая полупрозрачность наружных стен при близком приближении к корпусу РИТМ-200Н
+  useFrame(({ camera }) => {
+    if (shellTransparentRef.current || shellMaterialsRef.current.length === 0) return;
+    const dist = ritmHallBoxRef.current.distanceToPoint(camera.position);
+    const shouldApproachXray = dist > 0.25 && dist <= 9.5 && camera.position.y < 24.0;
+    if (shouldApproachXray !== proximityXrayRef.current) {
+      proximityXrayRef.current = shouldApproachXray;
+      applyShellOpacityState(shouldApproachXray, 0.24);
+      invalidate();
+    }
+  });
 
   // Критично для frameloop="demand": вызываем invalidate() ПОСЛЕ монтирования <primitive /> в сцену
   useEffect(() => {
@@ -209,47 +284,44 @@ export default function GlbAssemblyModel({
           }
         }
 
-        // 5. Назначение PBR-материалов строго по эталонному физическому макету (полный уход от зелёного цвета)
-        // Основание площадки — нейтральный архитектурный бетон (не режется cutaway)
+        // Процедурная текстура рёбер жёсткости для градирен и лёгкой бетонной фактуры
+        const coolingRibCanvas = document.createElement('canvas');
+        coolingRibCanvas.width = 256;
+        coolingRibCanvas.height = 256;
+        const ribCtx = coolingRibCanvas.getContext('2d');
+        if (ribCtx) {
+          ribCtx.fillStyle = '#d8dee5';
+          ribCtx.fillRect(0, 0, 256, 256);
+          ribCtx.fillStyle = 'rgba(130, 140, 152, 0.28)';
+          for (let x = 0; x < 256; x += 16) {
+            ribCtx.fillRect(x, 0, 2, 256);
+          }
+          ribCtx.fillStyle = 'rgba(140, 150, 162, 0.20)';
+          for (let y = 0; y < 256; y += 32) {
+            ribCtx.fillRect(0, y, 256, 2);
+          }
+        }
+        const coolingRibTexture = new THREE.CanvasTexture(coolingRibCanvas);
+        coolingRibTexture.colorSpace = THREE.SRGBColorSpace;
+        coolingRibTexture.wrapS = THREE.RepeatWrapping;
+        coolingRibTexture.wrapT = THREE.RepeatWrapping;
+        coolingRibTexture.repeat.set(8, 6);
+
+        // 5. Дневные реалистичные PBR-материалы зданий, градирен и оборудования АЭС
+        // Основание площадки — светло-серый бетон, совпадающий с круглой вставкой
         const baseConcreteMat = new THREE.MeshStandardMaterial({
-          color: 0x7a828b,
+          color: 0xcfd5dc,
           roughness: 0.88,
-          metalness: 0.04,
+          metalness: 0.03,
           side: THREE.FrontSide,
         });
 
         const isXray = shellTransparentRef.current;
 
-        // Энергоблоки ВВЭР-1000 и основные контайнменты: благородный тёмно-серый / графитовый бетон (#4a5056)
-        const vverGraphiteConcreteMat = new THREE.MeshStandardMaterial({
-          color: 0x4a5056,
-          roughness: 0.8,
-          metalness: 0.08,
-          side: THREE.DoubleSide,
-          transparent: isXray,
-          opacity: isXray ? 0.16 : 1.0,
-          depthWrite: !isXray,
-          clippingPlanes: [cutawayPlane],
-          clipShadows: true,
-        });
-
-        // Глубокий графитовый бетон для рам, откосов и контуров ВВЭР-1000
-        const vverDeepGraphiteMat = new THREE.MeshStandardMaterial({
-          color: 0x3e444a,
-          roughness: 0.82,
-          metalness: 0.08,
-          side: THREE.DoubleSide,
-          transparent: isXray,
-          opacity: isXray ? 0.16 : 1.0,
-          depthWrite: !isXray,
-          clippingPlanes: [cutawayPlane],
-          clipShadows: true,
-        });
-
-        // Вспомогательные корпуса, РИТМ-200Н и градирни: светло-серые стены
-        const auxLightConcreteMat = new THREE.MeshStandardMaterial({
-          color: 0xc8cfd6,
-          roughness: 0.78,
+        // Светло-белые архитектурные фасады энергоблоков и машинного зала (поддерживают Cutaway и X-Ray)
+        const facadeLightWhiteMat = new THREE.MeshStandardMaterial({
+          color: 0xeef1f4,
+          roughness: 0.72,
           metalness: 0.05,
           side: THREE.DoubleSide,
           transparent: isXray,
@@ -259,11 +331,38 @@ export default function GlbAssemblyModel({
           clipShadows: true,
         });
 
-        // Белые / серебристые раструбы, венцы и верхние архитектурные элементы
-        const silverWhiteRimMat = new THREE.MeshStandardMaterial({
-          color: 0xe4e9ee,
-          roughness: 0.52,
-          metalness: 0.18,
+        // Светло-серые бетонные стены и корпуса (#c6cdd5)
+        const vverLightConcreteMat = new THREE.MeshStandardMaterial({
+          color: 0xc6cdd5,
+          roughness: 0.78,
+          metalness: 0.06,
+          side: THREE.DoubleSide,
+          transparent: isXray,
+          opacity: isXray ? 0.16 : 1.0,
+          depthWrite: !isXray,
+          clippingPlanes: [cutawayPlane],
+          clipShadows: true,
+        });
+
+        // Тёмные архитектурные пояса, цоколи и откосы (#555e68)
+        const darkBeltConcreteMat = new THREE.MeshStandardMaterial({
+          color: 0x555e68,
+          roughness: 0.8,
+          metalness: 0.08,
+          side: THREE.DoubleSide,
+          transparent: isXray,
+          opacity: isXray ? 0.18 : 1.0,
+          depthWrite: !isXray,
+          clippingPlanes: [cutawayPlane],
+          clipShadows: true,
+        });
+
+        // Градирни: светло-серый бетон с тонкими рёбрами жёсткости
+        const coolingTowerConcreteMat = new THREE.MeshStandardMaterial({
+          map: coolingRibTexture,
+          color: 0xdbe0e6,
+          roughness: 0.84,
+          metalness: 0.04,
           side: THREE.DoubleSide,
           transparent: isXray,
           opacity: isXray ? 0.2 : 1.0,
@@ -272,46 +371,78 @@ export default function GlbAssemblyModel({
           clipShadows: true,
         });
 
-        // Контрастные синие кровли и элементы корпусов РИТМ-200Н / вспомогательных зданий (#2a4b7c)
-        const ritmCobaltRoofMat = new THREE.MeshStandardMaterial({
-          color: 0x2a4b7c,
-          roughness: 0.48,
-          metalness: 0.24,
+        // Белые парапеты, карнизы и верхние ободки градирен (#f4f6f8)
+        const silverWhiteRimMat = new THREE.MeshStandardMaterial({
+          color: 0xf4f6f8,
+          roughness: 0.65,
+          metalness: 0.1,
           side: THREE.DoubleSide,
           transparent: isXray,
-          opacity: isXray ? 0.22 : 1.0,
+          opacity: isXray ? 0.2 : 1.0,
           depthWrite: !isXray,
           clippingPlanes: [cutawayPlane],
           clipShadows: true,
         });
 
-        // Перекрытия и платформы обслуживания (остаются плотными в X-Ray для наглядности ходьбы)
+        // Кровли энергоблоков и машинного зала — стальной графитовый лист (с Cutaway / X-Ray для просмотра турбоагрегата)
+        const industrialRoofMat = new THREE.MeshStandardMaterial({
+          color: 0x76818e,
+          roughness: 0.7,
+          metalness: 0.18,
+          side: THREE.DoubleSide,
+          transparent: isXray,
+          opacity: isXray ? 0.14 : 1.0,
+          depthWrite: !isXray,
+          clippingPlanes: [cutawayPlane],
+          clipShadows: true,
+        });
+
+        // Перекрытия и платформы обслуживания (остаются плотными в X-Ray)
         const structuralPlinthMat = new THREE.MeshStandardMaterial({
-          color: 0x5c636b,
-          roughness: 0.84,
+          color: 0x9aa2ab,
+          roughness: 0.82,
           metalness: 0.06,
           side: THREE.DoubleSide,
           clippingPlanes: [cutawayPlane],
           clipShadows: true,
         });
 
-        shellMaterialsRef.current = [
-          vverGraphiteConcreteMat,
-          vverDeepGraphiteMat,
-          auxLightConcreteMat,
-          silverWhiteRimMat,
-          ritmCobaltRoofMat,
-        ];
-
-        // Корпуса оборудования ВВЭР, парогенераторы, турбоагрегат — сатинированная нержавеющая сталь
-        const stainlessSteelMat = new THREE.MeshStandardMaterial({
-          color: 0xc4ccd4,
-          roughness: 0.34,
-          metalness: 0.76,
+        // Металлические рамы витражей и фасадных поясов (поддерживают Cutaway и X-Ray)
+        const shellMetalFrameMat = new THREE.MeshStandardMaterial({
+          color: 0x454e58,
+          roughness: 0.48,
+          metalness: 0.58,
           side: THREE.DoubleSide,
+          transparent: isXray,
+          opacity: isXray ? 0.16 : 1.0,
+          depthWrite: !isXray,
+          clippingPlanes: [cutawayPlane],
+          clipShadows: true,
         });
 
-        // Мостовой / полярный кран внутри зала — традиционный ярко-жёлтый индустриальный цвет (#f0a500)
+        shellMaterialsRef.current = [
+          facadeLightWhiteMat,
+          vverLightConcreteMat,
+          darkBeltConcreteMat,
+          coolingTowerConcreteMat,
+          silverWhiteRimMat,
+          industrialRoofMat,
+          shellMetalFrameMat,
+        ];
+
+        // Корпуса оборудования ВВЭР, парогенераторы и трубопроводы — сатинированная нержавеющая сталь
+        const stainlessSteelMat = new THREE.MeshStandardMaterial({
+          color: 0xc4ccd4,
+          roughness: 0.32,
+          metalness: 0.78,
+          side: THREE.DoubleSide,
+          transparent: energyFlowActiveRef.current,
+          opacity: energyFlowActiveRef.current ? 0.44 : 1.0,
+          depthWrite: !energyFlowActiveRef.current,
+        });
+        reactorVesselMaterialRef.current = stainlessSteelMat;
+
+        // Мостовой / полярный кран внутри зала — контрастный индустриальный жёлтый (#f0a500)
         const craneYellowMat = new THREE.MeshStandardMaterial({
           color: 0xf0a500,
           roughness: 0.36,
@@ -319,11 +450,11 @@ export default function GlbAssemblyModel({
           side: THREE.DoubleSide,
         });
 
-        // Металлические фермы, опоры ОРУ / эстакады — технический серый металл
+        // Металлические фермы, опоры и обвязка верхнего блока — технический серый металл
         const technicalMetalMat = new THREE.MeshStandardMaterial({
           color: 0x7e8791,
           roughness: 0.38,
-          metalness: 0.78,
+          metalness: 0.76,
           side: THREE.DoubleSide,
         });
 
@@ -335,25 +466,26 @@ export default function GlbAssemblyModel({
           side: THREE.DoubleSide,
         });
 
-        // Контрастный синий для технологических узлов и крышек
+        // Индустриальный стальной синий для крышек и элементов технологических узлов
         const techBlueMetalMat = new THREE.MeshStandardMaterial({
-          color: 0x2a4b7c,
-          roughness: 0.4,
-          metalness: 0.45,
+          color: 0x355887,
+          roughness: 0.42,
+          metalness: 0.46,
           side: THREE.DoubleSide,
         });
 
-        // Полупрозрачное витражное остекление
-        const glazingCutawayMat = new THREE.MeshStandardMaterial({
-          color: 0xc2d4e4,
-          roughness: 0.18,
-          metalness: 0.15,
+        // Тёмные тонированные окна фасадов зданий (поддерживают X-Ray и Cutaway)
+        const darkWindowGlazingMat = new THREE.MeshStandardMaterial({
+          color: 0x1d2a38,
+          roughness: 0.14,
+          metalness: 0.42,
           transparent: true,
-          opacity: 0.28,
+          opacity: isXray ? 0.14 : 0.72,
           depthWrite: false,
           side: THREE.DoubleSide,
           clippingPlanes: [cutawayPlane],
         });
+        glazingMaterialRef.current = darkWindowGlazingMat;
 
         let meshCount = 0;
         let triangleCount = 0;
@@ -367,8 +499,42 @@ export default function GlbAssemblyModel({
           }
         };
 
+        const meshesToKeep: THREE.Mesh[] = [];
         for (let idx = 0; idx < meshes.length; idx++) {
           const mesh = meshes[idx];
+
+          const origMat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+          const origName = (origMat?.name ?? '').toUpperCase();
+          const mBox = new THREE.Box3().setFromObject(mesh);
+          const mSize = meshBoxes.get(mesh) ?? new THREE.Vector3(1, 1, 1);
+
+          // Удаление лишних висящих плоских планок/мостиков (M31 75FFFFFF с нулевой толщиной, M37 32FFFFFF,
+          // а также любых посторонних плоских прямоугольных артефактов у основания градирен)
+          const isZeroThicknessFloatingPlank =
+            origName.includes('75FFFFFF') ||
+            (mSize.y < 0.03 && mBox.min.y > 1.2 && !origName.includes('006633'));
+          const isDetachedExteriorGlass =
+            origName.includes('32FFFFFF') && mBox.min.x > 18 && mBox.max.x < 23;
+          const isStrayCoolingTowerPlank =
+            mesh !== largestBaseMesh &&
+            mBox.max.z > -4 &&
+            mBox.min.x < -8 &&
+            mBox.max.y < 14 &&
+            mSize.y < 1.2 &&
+            !origName.includes('B3B3B3') &&
+            !origName.includes('D8D8D8') &&
+            !origName.includes('484848') &&
+            !origName.includes('663300') &&
+            !origName.includes('6C6C6C');
+
+          if (isZeroThicknessFloatingPlank || isDetachedExteriorGlass || isStrayCoolingTowerPlank) {
+            trackOriginalMaterial(mesh);
+            mesh.removeFromParent();
+            mesh.geometry?.dispose();
+            continue;
+          }
+
+          meshesToKeep.push(mesh);
           meshCount++;
           mesh.visible = true;
           mesh.frustumCulled = true;
@@ -386,8 +552,6 @@ export default function GlbAssemblyModel({
             vertCount = geo.attributes.position ? geo.attributes.position.count : 0;
           }
 
-          const origMat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
-          const origName = (origMat?.name ?? '').toUpperCase();
           const origOpacity =
             origMat && 'opacity' in origMat && typeof origMat.opacity === 'number'
               ? origMat.opacity
@@ -402,9 +566,9 @@ export default function GlbAssemblyModel({
 
           trackOriginalMaterial(mesh);
 
-          // 1. Полупрозрачное остекление и витражи
-          if (isOriginalTransparent) {
-            mesh.material = glazingCutawayMat;
+          // 1. Полупрозрачные окна и витражи (исключая нижние пояса градирен 29D8D8D8/32D8D8D8)
+          if (isOriginalTransparent && !origName.includes('D8D8D8')) {
+            mesh.material = darkWindowGlazingMat;
             mesh.castShadow = false;
             mesh.userData.isCadGlass = true;
             continue;
@@ -419,7 +583,6 @@ export default function GlbAssemblyModel({
             continue;
           }
 
-          const mSize = meshBoxes.get(mesh) ?? new THREE.Vector3(1, 1, 1);
           const maxMeshDim = Math.max(mSize.x, mSize.y, mSize.z);
 
           // 3. Мостовой и полярный кран (ярко-жёлтый #f0a500)
@@ -432,26 +595,25 @@ export default function GlbAssemblyModel({
             continue;
           }
 
-          // 4. Реакторный корпус, парогенераторы и турбоагрегат -> сатинированная сталь
+          // 4. Реакторный корпус, парогенераторы и трубопроводы -> сатинированная сталь
           if (origName.includes('006633') || vertCount >= 180000) {
             mesh.material = stainlessSteelMat;
             mesh.userData.isHeavyEquipment = vertCount >= 180000;
             continue;
           }
 
-          // 5. Металлические фермы, опоры и обвязка верхнего блока (бывшие оливковые 00C39E / 01BC99 и тёмный металл 232323)
-          if (
-            origName.includes('00C39E') ||
-            origName.includes('01BC99') ||
-            origName.includes('232323')
-          ) {
+          // 5. Металлические рамы фасадов (232323) -> участвуют в Cutaway / X-Ray; опоры реактора -> technicalMetalMat
+          if (origName.includes('232323')) {
+            mesh.material = shellMetalFrameMat;
+            continue;
+          }
+          if (origName.includes('00C39E') || origName.includes('01BC99')) {
             mesh.material = technicalMetalMat;
             mesh.userData.isWalkableFloor = true;
             continue;
           }
 
-          // 6. Синие кровли и элементы вспомогательных корпусов / РИТМ-200Н (#2a4b7c)
-          // В исходном CAD это ABGR-синие материалы: FF663300, FF994C00, FFFF7F00, а также кровельные панели FF000066 / FF000099
+          // 6. Кровли и верхние технологические пояса (поддерживают Cutaway и X-Ray)
           if (
             origName.includes('663300') ||
             origName.includes('994C00') ||
@@ -459,7 +621,7 @@ export default function GlbAssemblyModel({
             origName.includes('000066') ||
             origName.includes('000099')
           ) {
-            mesh.material = maxMeshDim >= 8.0 ? ritmCobaltRoofMat : techBlueMetalMat;
+            mesh.material = maxMeshDim >= 8.0 ? industrialRoofMat : techBlueMetalMat;
             continue;
           }
 
@@ -470,43 +632,51 @@ export default function GlbAssemblyModel({
             continue;
           }
 
-          // 8. Белые / серебристые раструбы, верхние венцы и парапеты (FFFFFFFF)
+          // 8. Белые парапеты, карнизы и верхние ободки градирен (FFFFFFFF)
           if (origName.includes('FFFFFF') && maxMeshDim >= 8.0) {
             mesh.material = silverWhiteRimMat;
             continue;
           }
 
-          // 9. Энергоблоки ВВЭР-1000 и основные контайнменты (#4a5056 тёмно-серый графитовый бетон)
+          // 9. Градирни (FFB3B3B3) — светло-серый бетон с тонкими рёбрами жёсткости
+          if (origName.includes('B3B3B3')) {
+            mesh.material = coolingTowerConcreteMat;
+            mesh.userData.isWalkableFloor = true;
+            mesh.userData.isWallCollider = true;
+            continue;
+          }
+
+          // 10. Светло-белые фасады энергоблоков и машинного зала (FFD8D8D8, 29D8D8D8, 32D8D8D8)
+          if (origName.includes('D8D8D8')) {
+            mesh.material = facadeLightWhiteMat;
+            mesh.userData.isWalkableFloor = true;
+            mesh.userData.isWallCollider = true;
+            continue;
+          }
+
+          // 11. Светло-серые корпуса энергоблоков (FF8F8F8F) и тёмные пояса (FF6C6C6C)
           if (origName.includes('8F8F8F')) {
-            mesh.material = vverGraphiteConcreteMat;
+            mesh.material = vverLightConcreteMat;
             mesh.userData.isWalkableFloor = true;
             mesh.userData.isWallCollider = true;
             continue;
           }
           if (origName.includes('6C6C6C')) {
-            mesh.material = vverDeepGraphiteMat;
+            mesh.material = darkBeltConcreteMat;
             mesh.userData.isWalkableFloor = true;
             mesh.userData.isWallCollider = true;
             continue;
           }
 
-          // 10. Вспомогательные корпуса и южное/восточное крыло (РИТМ-200Н, АБК): светло-серый бетон (#c8cfd6)
-          if (origName.includes('D8D8D8') || origName.includes('B3B3B3')) {
-            mesh.material = auxLightConcreteMat;
-            mesh.userData.isWalkableFloor = true;
-            mesh.userData.isWallCollider = true;
-            continue;
-          }
-
-          // 11. Крупные бетонные узлы без явного имени
+          // 12. Крупные бетонные узлы без явного имени
           if (maxMeshDim >= targetMaxSize * 0.16 && vertCount < 180000) {
-            mesh.material = vverGraphiteConcreteMat;
+            mesh.material = vverLightConcreteMat;
             mesh.userData.isWalkableFloor = true;
             mesh.userData.isWallCollider = true;
             continue;
           }
 
-          // 12. Мелкие металлические опоры, трубопроводы и элементы ОРУ
+          // 13. Мелкие металлические опоры и арматура
           const pipingPalette = [technicalMetalMat, darkGraphiteMetalMat, techBlueMetalMat];
           mesh.material = pipingPalette[pipingIndex % pipingPalette.length];
           pipingIndex++;
@@ -521,8 +691,110 @@ export default function GlbAssemblyModel({
           oldMat.dispose();
         }
 
+        // 6. Точный расчёт Box3 корпусов и raycast высот крыш (без летающих объектов)
+        const roofCandidates = meshesToKeep.filter((m) => {
+          const name = String(m.userData.cadMatName || '');
+          const verts = Number(m.userData.cadVertCount || 0);
+          return !m.userData.isCadBase && verts < 200000 && !name.includes('006633');
+        });
+        const downRaycaster = new THREE.Raycaster();
+        const downDir = new THREE.Vector3(0, -1, 0);
+        const rayOrigin = new THREE.Vector3();
+
+        const measureRoofAt = (x: number, z: number, fallbackY: number): number => {
+          rayOrigin.set(x, 60, z);
+          downRaycaster.set(rayOrigin, downDir);
+          const hits = downRaycaster.intersectObjects(roofCandidates, false);
+          for (const h of hits) {
+            if (h.point.y >= 2.0 && h.point.y <= 40.0) {
+              return h.point.y;
+            }
+          }
+          return fallbackY;
+        };
+
+        const rpvMesh = meshes[0];
+        const rpvBox = rpvMesh ? new THREE.Box3().setFromObject(rpvMesh) : new THREE.Box3(
+          new THREE.Vector3(-91.42, 7.12, -47.53),
+          new THREE.Vector3(-76.81, 20.96, -32.92)
+        );
+        const rpvCenter = new THREE.Vector3();
+        rpvBox.getCenter(rpvCenter);
+
+        const westMinX = Math.max(-93.48, finalBox.min.x + 19.0);
+        const westHallBounds: BoxBounds = {
+          minX: westMinX,
+          maxX: -74.74,
+          minY: 0.62,
+          maxY: measureRoofAt(-82.0, -72.0, 17.1),
+          minZ: -93.25,
+          maxZ: -52.26,
+          center: [(-93.48 + -74.74) / 2, 0.62, (-93.25 + -52.26) / 2],
+        };
+
+        const midHallBounds: BoxBounds = {
+          minX: -34.76,
+          maxX: -16.02,
+          minY: 0.62,
+          maxY: measureRoofAt(-22.5, -72.0, 17.1),
+          minZ: -93.25,
+          maxZ: -52.26,
+          center: [(-34.76 + -16.02) / 2, 0.62, (-93.25 + -52.26) / 2],
+        };
+
+        const ritmHallBounds: BoxBounds = {
+          minX: 23.05,
+          maxX: Math.min(48.31, finalBox.max.x - 60.0),
+          minY: 0.62,
+          maxY: measureRoofAt(35.68, -70.9, 17.57),
+          minZ: -94.33,
+          maxZ: -47.48,
+          center: [(23.05 + 48.31) / 2, 0.62, (-94.33 + -47.48) / 2],
+        };
+        ritmHallBoxRef.current.set(
+          new THREE.Vector3(ritmHallBounds.minX, 0.5, ritmHallBounds.minZ),
+          new THREE.Vector3(ritmHallBounds.maxX, ritmHallBounds.maxY + 0.5, ritmHallBounds.maxZ)
+        );
+
+        const reactorDomeBounds: BoxBounds = {
+          minX: Math.min(-88.0, rpvBox.min.x),
+          maxX: Math.max(-75.0, rpvBox.max.x),
+          minY: 0.62,
+          maxY: measureRoofAt(rpvCenter.x, rpvCenter.z, 23.49),
+          minZ: Math.min(-47.0, rpvBox.min.z),
+          maxZ: Math.max(-33.0, rpvBox.max.z),
+          center: [rpvCenter.x, rpvCenter.y, rpvCenter.z],
+        };
+
+        const stackTargets = [
+          { id: 'vent-west-vver', x: -81.5, z: -50.0, fallbackY: 17.1, h: 15.5, r: 0.95 },
+          { id: 'vent-mid-vver', x: -22.5, z: -50.0, fallbackY: 17.1, h: 15.5, r: 0.95 },
+          { id: 'vent-east-ritm-main', x: 36.0, z: -70.4, fallbackY: 17.57, h: 14.5, r: 0.85 },
+          { id: 'vent-east-ritm-wing', x: 36.0, z: -54.0, fallbackY: 12.95, h: 13.5, r: 0.8 },
+        ];
+
+        const ventStacks: VentStackAnchor[] = stackTargets.map((st) => {
+          const exactRoofY = measureRoofAt(st.x, st.z, st.fallbackY);
+          return {
+            id: st.id,
+            x: st.x,
+            y: exactRoofY - 0.15,
+            z: st.z,
+            h: st.h,
+            r: st.r,
+          };
+        });
+
+        onAnchorsReadyRef.current?.({
+          westHall: westHallBounds,
+          midHall: midHallBounds,
+          ritmHall: ritmHallBounds,
+          reactorDome: reactorDomeBounds,
+          ventStacks,
+        });
+
         console.info(
-          `[GLB Loader] ✅ Модель выровнена и окрашена по эталонному макету (мешей: ${meshCount}, треугольников: ${Math.round(triangleCount).toLocaleString()}).`
+          `[GLB Loader] ✅ Модель выровнена и окрашена по эталонному макету (мешей: ${meshCount}, треугольников: ${Math.round(triangleCount).toLocaleString()}). Венттрубы: ${ventStacks.map((v) => `${v.id}@Y=${v.y.toFixed(2)}`).join(', ')}`
         );
 
         loadedRoot = model;
