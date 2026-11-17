@@ -109,7 +109,7 @@ export default function GlbAssemblyModel({
       mat.needsUpdate = true;
     }
     if (glazingMaterialRef.current) {
-      glazingMaterialRef.current.opacity = transparentMode ? 0.14 : 0.72;
+      glazingMaterialRef.current.opacity = transparentMode ? 0.14 : 0.86;
       glazingMaterialRef.current.needsUpdate = true;
     }
   };
@@ -284,21 +284,21 @@ export default function GlbAssemblyModel({
           }
         }
 
-        // Процедурная текстура рёбер жёсткости для градирен и лёгкой бетонной фактуры
+        // Лёгкая фактура бетона для белоснежных градирен (едва заметные вертикальные швы)
         const coolingRibCanvas = document.createElement('canvas');
         coolingRibCanvas.width = 256;
         coolingRibCanvas.height = 256;
         const ribCtx = coolingRibCanvas.getContext('2d');
         if (ribCtx) {
-          ribCtx.fillStyle = '#d8dee5';
+          ribCtx.fillStyle = '#f8fafc';
           ribCtx.fillRect(0, 0, 256, 256);
-          ribCtx.fillStyle = 'rgba(130, 140, 152, 0.28)';
+          ribCtx.fillStyle = 'rgba(176, 186, 198, 0.14)';
           for (let x = 0; x < 256; x += 16) {
-            ribCtx.fillRect(x, 0, 2, 256);
+            ribCtx.fillRect(x, 0, 1, 256);
           }
-          ribCtx.fillStyle = 'rgba(140, 150, 162, 0.20)';
+          ribCtx.fillStyle = 'rgba(180, 190, 202, 0.10)';
           for (let y = 0; y < 256; y += 32) {
-            ribCtx.fillRect(0, y, 256, 2);
+            ribCtx.fillRect(0, y, 256, 1);
           }
         }
         const coolingRibTexture = new THREE.CanvasTexture(coolingRibCanvas);
@@ -307,48 +307,35 @@ export default function GlbAssemblyModel({
         coolingRibTexture.wrapT = THREE.RepeatWrapping;
         coolingRibTexture.repeat.set(8, 6);
 
-        // 5. Дневные реалистичные PBR-материалы зданий, градирен и оборудования АЭС
-        // Основание площадки — светло-серый бетон, совпадающий с круглой вставкой
+        // 5. Насыщенные контрастные PBR-материалы по эталонной CAD-схеме сборки АЭС
+        // Основание площадки — светло-серый бетон, совпадающий с круглой заглушкой
         const baseConcreteMat = new THREE.MeshStandardMaterial({
-          color: 0xcfd5dc,
-          roughness: 0.88,
+          color: 0xd2d8df,
+          roughness: 0.86,
           metalness: 0.03,
           side: THREE.FrontSide,
         });
 
         const isXray = shellTransparentRef.current;
 
-        // Светло-белые архитектурные фасады энергоблоков и машинного зала (поддерживают Cutaway и X-Ray)
-        const facadeLightWhiteMat = new THREE.MeshStandardMaterial({
-          color: 0xeef1f4,
+        // Белоснежные и чистые светлые фасады вспомогательных зданий, обстройки ВВЭР и крыльев РИТМ-200Н
+        const facadeCrispWhiteMat = new THREE.MeshStandardMaterial({
+          color: 0xf1f4f8,
+          roughness: 0.68,
+          metalness: 0.04,
+          side: THREE.DoubleSide,
+          transparent: isXray,
+          opacity: isXray ? 0.16 : 1.0,
+          depthWrite: !isXray,
+          clippingPlanes: [cutawayPlane],
+          clipShadows: true,
+        });
+
+        // Главные корпуса энергоблоков (машзалы и реакторные здания): насыщенный антрацит (#464e59)
+        const vverAnthraciteMat = new THREE.MeshStandardMaterial({
+          color: 0x464e59,
           roughness: 0.72,
-          metalness: 0.05,
-          side: THREE.DoubleSide,
-          transparent: isXray,
-          opacity: isXray ? 0.16 : 1.0,
-          depthWrite: !isXray,
-          clippingPlanes: [cutawayPlane],
-          clipShadows: true,
-        });
-
-        // Светло-серые бетонные стены и корпуса (#c6cdd5)
-        const vverLightConcreteMat = new THREE.MeshStandardMaterial({
-          color: 0xc6cdd5,
-          roughness: 0.78,
-          metalness: 0.06,
-          side: THREE.DoubleSide,
-          transparent: isXray,
-          opacity: isXray ? 0.16 : 1.0,
-          depthWrite: !isXray,
-          clippingPlanes: [cutawayPlane],
-          clipShadows: true,
-        });
-
-        // Тёмные архитектурные пояса, цоколи и откосы (#555e68)
-        const darkBeltConcreteMat = new THREE.MeshStandardMaterial({
-          color: 0x555e68,
-          roughness: 0.8,
-          metalness: 0.08,
+          metalness: 0.12,
           side: THREE.DoubleSide,
           transparent: isXray,
           opacity: isXray ? 0.18 : 1.0,
@@ -357,96 +344,181 @@ export default function GlbAssemblyModel({
           clipShadows: true,
         });
 
-        // Градирни: светло-серый бетон с тонкими рёбрами жёсткости
-        const coolingTowerConcreteMat = new THREE.MeshStandardMaterial({
-          map: coolingRibTexture,
-          color: 0xdbe0e6,
-          roughness: 0.84,
-          metalness: 0.04,
-          side: THREE.DoubleSide,
-          transparent: isXray,
-          opacity: isXray ? 0.2 : 1.0,
-          depthWrite: !isXray,
-          clippingPlanes: [cutawayPlane],
-          clipShadows: true,
-        });
-
-        // Белые парапеты, карнизы и верхние ободки градирен (#f4f6f8)
-        const silverWhiteRimMat = new THREE.MeshStandardMaterial({
-          color: 0xf4f6f8,
-          roughness: 0.65,
-          metalness: 0.1,
-          side: THREE.DoubleSide,
-          transparent: isXray,
-          opacity: isXray ? 0.2 : 1.0,
-          depthWrite: !isXray,
-          clippingPlanes: [cutawayPlane],
-          clipShadows: true,
-        });
-
-        // Кровли энергоблоков и машинного зала — стальной графитовый лист (с Cutaway / X-Ray для просмотра турбоагрегата)
-        const industrialRoofMat = new THREE.MeshStandardMaterial({
-          color: 0x76818e,
+        // Тёмно-графитовые кровли, парапеты и пояса главных корпусов (#3b424c)
+        const darkAnthraciteMat = new THREE.MeshStandardMaterial({
+          color: 0x3b424c,
           roughness: 0.7,
+          metalness: 0.16,
+          side: THREE.DoubleSide,
+          transparent: isXray,
+          opacity: isXray ? 0.18 : 1.0,
+          depthWrite: !isXray,
+          clippingPlanes: [cutawayPlane],
+          clipShadows: true,
+        });
+
+        // Градирни: белоснежный бетон (#f5f7fa)
+        const coolingTowerWhiteMat = new THREE.MeshStandardMaterial({
+          map: coolingRibTexture,
+          color: 0xf5f7fa,
+          roughness: 0.76,
+          metalness: 0.03,
+          side: THREE.DoubleSide,
+          transparent: isXray,
+          opacity: isXray ? 0.2 : 1.0,
+          depthWrite: !isXray,
+          clippingPlanes: [cutawayPlane],
+          clipShadows: true,
+        });
+
+        // Глубокий индустриальный синий (#1d4580) для РИТМ-200Н, вспомогательных кровель и колец градирен
+        const industrialBlueMat = new THREE.MeshStandardMaterial({
+          color: 0x1d4580,
+          roughness: 0.52,
           metalness: 0.18,
           side: THREE.DoubleSide,
           transparent: isXray,
-          opacity: isXray ? 0.14 : 1.0,
+          opacity: isXray ? 0.22 : 1.0,
           depthWrite: !isXray,
           clippingPlanes: [cutawayPlane],
           clipShadows: true,
         });
 
-        // Перекрытия и платформы обслуживания (остаются плотными в X-Ray)
+        // Белые парапеты, карнизы и верхние ободки градирен (#f6f8fa)
+        const silverWhiteRimMat = new THREE.MeshStandardMaterial({
+          color: 0xf6f8fa,
+          roughness: 0.64,
+          metalness: 0.06,
+          side: THREE.DoubleSide,
+          transparent: isXray,
+          opacity: isXray ? 0.2 : 1.0,
+          depthWrite: !isXray,
+          clippingPlanes: [cutawayPlane],
+          clipShadows: true,
+        });
+
+        // Отмостки, цоколи и контуры проездов/площадок (#8c95a0, плотные в X-Ray)
         const structuralPlinthMat = new THREE.MeshStandardMaterial({
-          color: 0x9aa2ab,
-          roughness: 0.82,
+          color: 0x8c95a0,
+          roughness: 0.84,
           metalness: 0.06,
           side: THREE.DoubleSide,
           clippingPlanes: [cutawayPlane],
           clipShadows: true,
         });
 
-        // Металлические рамы витражей и фасадных поясов (поддерживают Cutaway и X-Ray)
+        // Металлические рамы витражей и оконные переплёты (#28303a)
         const shellMetalFrameMat = new THREE.MeshStandardMaterial({
-          color: 0x454e58,
-          roughness: 0.48,
-          metalness: 0.58,
+          color: 0x28303a,
+          roughness: 0.46,
+          metalness: 0.56,
           side: THREE.DoubleSide,
           transparent: isXray,
-          opacity: isXray ? 0.16 : 1.0,
+          opacity: isXray ? 0.18 : 1.0,
           depthWrite: !isXray,
           clippingPlanes: [cutawayPlane],
           clipShadows: true,
         });
 
         shellMaterialsRef.current = [
-          facadeLightWhiteMat,
-          vverLightConcreteMat,
-          darkBeltConcreteMat,
-          coolingTowerConcreteMat,
+          facadeCrispWhiteMat,
+          vverAnthraciteMat,
+          darkAnthraciteMat,
+          coolingTowerWhiteMat,
+          industrialBlueMat,
           silverWhiteRimMat,
-          industrialRoofMat,
           shellMetalFrameMat,
         ];
 
-        // Корпуса оборудования ВВЭР, парогенераторы и трубопроводы — сатинированная нержавеющая сталь
-        const stainlessSteelMat = new THREE.MeshStandardMaterial({
-          color: 0xc4ccd4,
-          roughness: 0.32,
-          metalness: 0.78,
+        // Оборудование реакторного зала ВВЭР-1000 (детальное функциональное разделение узлов)
+        // 1. Корпус реактора и верхний блок (приводы СУЗ / БЗТ) — индустриальный сине-графитовый (#264d73)
+        const rpvSteelBlueMat = new THREE.MeshStandardMaterial({
+          color: 0x264d73,
+          roughness: 0.35,
+          metalness: 0.65,
           side: THREE.DoubleSide,
           transparent: energyFlowActiveRef.current,
           opacity: energyFlowActiveRef.current ? 0.44 : 1.0,
           depthWrite: !energyFlowActiveRef.current,
         });
-        reactorVesselMaterialRef.current = stainlessSteelMat;
+        reactorVesselMaterialRef.current = rpvSteelBlueMat;
 
-        // Мостовой / полярный кран внутри зала — контрастный индустриальный жёлтый (#f0a500)
-        const craneYellowMat = new THREE.MeshStandardMaterial({
-          color: 0xf0a500,
+        // Контрастный светло-стальной для фланцев, крышки реактора и обвязки (#d0d7df)
+        const flangeLightSteelMat = new THREE.MeshStandardMaterial({
+          color: 0xd0d7df,
+          roughness: 0.28,
+          metalness: 0.74,
+          side: THREE.DoubleSide,
+        });
+
+        // 2. Парогенераторы (ПГВ-1000) — тёплый медно-бронзовый металлик (#c88a36)
+        const pgvBronzeMat = new THREE.MeshStandardMaterial({
+          color: 0xc88a36,
+          roughness: 0.4,
+          metalness: 0.55,
+          side: THREE.DoubleSide,
+        });
+
+        // Верхние пароотводящие трубы / коллекторы над ПГ — светло-серебристый (#d8dee6)
+        const steamHeaderSilverMat = new THREE.MeshStandardMaterial({
+          color: 0xd8dee6,
+          roughness: 0.26,
+          metalness: 0.78,
+          side: THREE.DoubleSide,
+        });
+
+        // 3. Главные циркуляционные насосы (ГЦН) — насыщенный бирюзово-стальной (#1f616b)
+        const mcpTealMat = new THREE.MeshStandardMaterial({
+          color: 0x1f616b,
           roughness: 0.36,
-          metalness: 0.48,
+          metalness: 0.58,
+          side: THREE.DoubleSide,
+        });
+
+        // Главные циркуляционные трубопроводы (ГЦТ) — тёмно-графитовый металл (#363d45)
+        const gctGraphiteMat = new THREE.MeshStandardMaterial({
+          color: 0x363d45,
+          roughness: 0.38,
+          metalness: 0.72,
+          side: THREE.DoubleSide,
+        });
+
+        // 4. Гидроёмкости САОЗ на верхнем перекрытии — сине-голубой (#3b6e9c) и светлый бежево-серый (#b8bcc2)
+        const eccsSteelBlueMat = new THREE.MeshStandardMaterial({
+          color: 0x3b6e9c,
+          roughness: 0.42,
+          metalness: 0.45,
+          side: THREE.DoubleSide,
+        });
+
+        const eccsBeigeGrayMat = new THREE.MeshStandardMaterial({
+          color: 0xb8bcc2,
+          roughness: 0.48,
+          metalness: 0.32,
+          side: THREE.DoubleSide,
+        });
+
+        // Фирменный ярко-жёлтый (#f0a500) для перегрузочной машины, полярного крана и ограждений верхнего зала
+        const refuelingYellowMat = new THREE.MeshStandardMaterial({
+          color: 0xf0a500,
+          roughness: 0.34,
+          metalness: 0.42,
+          side: THREE.DoubleSide,
+        });
+
+        // Наружные технологические акценты (верхние обвязки куполов, наружные баки) — охристо-золотой (#e5a922)
+        const craneYellowMat = new THREE.MeshStandardMaterial({
+          color: 0xe5a922,
+          roughness: 0.34,
+          metalness: 0.36,
+          side: THREE.DoubleSide,
+        });
+
+        // Сатинированная сталь для прочих тяжёлых металлоконструкций
+        const stainlessSteelMat = new THREE.MeshStandardMaterial({
+          color: 0xc2cbd4,
+          roughness: 0.32,
+          metalness: 0.78,
           side: THREE.DoubleSide,
         });
 
@@ -466,21 +538,21 @@ export default function GlbAssemblyModel({
           side: THREE.DoubleSide,
         });
 
-        // Индустриальный стальной синий для крышек и элементов технологических узлов
+        // Индустриальный стальной синий для технологических узлов
         const techBlueMetalMat = new THREE.MeshStandardMaterial({
-          color: 0x355887,
+          color: 0x1d4580,
           roughness: 0.42,
-          metalness: 0.46,
+          metalness: 0.42,
           side: THREE.DoubleSide,
         });
 
-        // Тёмные тонированные окна фасадов зданий (поддерживают X-Ray и Cutaway)
+        // Контрастные тёмные тонированные окна фасадов зданий
         const darkWindowGlazingMat = new THREE.MeshStandardMaterial({
-          color: 0x1d2a38,
+          color: 0x141d27,
           roughness: 0.14,
-          metalness: 0.42,
+          metalness: 0.45,
           transparent: true,
-          opacity: isXray ? 0.14 : 0.72,
+          opacity: isXray ? 0.14 : 0.86,
           depthWrite: false,
           side: THREE.DoubleSide,
           clippingPlanes: [cutawayPlane],
@@ -498,6 +570,64 @@ export default function GlbAssemblyModel({
             if (mat) replacedOriginalMaterials.add(mat);
           }
         };
+
+        const splitTmpV0 = new THREE.Vector3();
+        const splitTmpV1 = new THREE.Vector3();
+        const splitTmpV2 = new THREE.Vector3();
+        const splitGeometryByMaterial = (
+          targetMesh: THREE.Mesh,
+          matList: THREE.MeshStandardMaterial[],
+          classifyCentroid: (cx: number, cy: number, cz: number) => number
+        ) => {
+          const geo = targetMesh.geometry;
+          if (!geo || !geo.attributes.position) return;
+          const posAttr = geo.attributes.position;
+          const indexAttr = geo.index;
+          const matWorld = targetMesh.matrixWorld;
+          const triTotal = indexAttr ? indexAttr.count / 3 : posAttr.count / 3;
+          const buckets: number[][] = matList.map(() => []);
+
+          for (let t = 0; t < triTotal; t++) {
+            const i0 = indexAttr ? indexAttr.getX(t * 3) : t * 3;
+            const i1 = indexAttr ? indexAttr.getX(t * 3 + 1) : t * 3 + 1;
+            const i2 = indexAttr ? indexAttr.getX(t * 3 + 2) : t * 3 + 2;
+
+            splitTmpV0.fromBufferAttribute(posAttr, i0).applyMatrix4(matWorld);
+            splitTmpV1.fromBufferAttribute(posAttr, i1).applyMatrix4(matWorld);
+            splitTmpV2.fromBufferAttribute(posAttr, i2).applyMatrix4(matWorld);
+
+            const cx = (splitTmpV0.x + splitTmpV1.x + splitTmpV2.x) / 3;
+            const cy = (splitTmpV0.y + splitTmpV1.y + splitTmpV2.y) / 3;
+            const cz = (splitTmpV0.z + splitTmpV1.z + splitTmpV2.z) / 3;
+
+            const bucketIdx = Math.max(0, Math.min(matList.length - 1, classifyCentroid(cx, cy, cz)));
+            buckets[bucketIdx].push(i0, i1, i2);
+          }
+
+          const totalIndices = triTotal * 3;
+          const useUint32 = posAttr.count > 65535;
+          const merged = useUint32 ? new Uint32Array(totalIndices) : new Uint16Array(totalIndices);
+          geo.clearGroups();
+          let cursor = 0;
+          for (let m = 0; m < buckets.length; m++) {
+            const arr = buckets[m];
+            if (arr.length === 0) continue;
+            merged.set(arr, cursor);
+            geo.addGroup(cursor, arr.length, m);
+            cursor += arr.length;
+          }
+          geo.setIndex(new THREE.BufferAttribute(merged, 1));
+          targetMesh.material = matList;
+        };
+
+        const mcpCenters: [number, number][] = [
+          [-85.7, -35.43],
+          [-81.1, -36.62],
+          [-87.28, -44.18],
+          [-82.66, -45.33],
+        ];
+        const rpvAxisX = -84.11;
+        const rpvAxisZ = -40.22;
 
         const meshesToKeep: THREE.Mesh[] = [];
         for (let idx = 0; idx < meshes.length; idx++) {
@@ -566,7 +696,7 @@ export default function GlbAssemblyModel({
 
           trackOriginalMaterial(mesh);
 
-          // 1. Полупрозрачные окна и витражи (исключая нижние пояса градирен 29D8D8D8/32D8D8D8)
+          // 1. Полупрозрачные окна и витражи (исключая нижние белые пояса градирен 29D8D8D8/32D8D8D8)
           if (isOriginalTransparent && !origName.includes('D8D8D8')) {
             mesh.material = darkWindowGlazingMat;
             mesh.castShadow = false;
@@ -574,7 +704,7 @@ export default function GlbAssemblyModel({
             continue;
           }
 
-          // 2. Плита основания площадки (без самозатенения)
+          // 2. Плита основания площадки — светло-серый бетон (без самозатенения)
           if (mesh === largestBaseMesh) {
             mesh.material = baseConcreteMat;
             mesh.castShadow = false;
@@ -585,47 +715,123 @@ export default function GlbAssemblyModel({
 
           const maxMeshDim = Math.max(mSize.x, mSize.y, mSize.z);
 
-          // 3. Мостовой и полярный кран (ярко-жёлтый #f0a500)
+          // 3А. Внутренние узлы верхнего яруса реакторного зала:
+          // перегрузочная машина, полярный кран и жёлтые ограждения (#f0a500)
           if (
-            origName.includes('FFFF') ||
-            origName.includes('CCCC') ||
+            origName.includes('00FFFF') ||
+            origName.includes('00CCCC') ||
             origName.includes('009999')
+          ) {
+            mesh.material = refuelingYellowMat;
+            continue;
+          }
+          if (origName.includes('33FFFF')) {
+            // Ограждения вокруг левых баков (y >= 14.70) — ярко-жёлтые (#f0a500), настил (y < 14.70) — бежево-серый (#b8bcc2)
+            splitGeometryByMaterial(mesh, [refuelingYellowMat, eccsBeigeGrayMat], (_cx, cy) =>
+              cy >= 14.7 ? 0 : 1
+            );
+            mesh.userData.isWalkableFloor = true;
+            continue;
+          }
+
+          // 3Б. Наружные технологические акценты: верхние обвязки куполов, наружные баки (#e5a922)
+          if (
+            origName.includes('FF7F00') ||
+            origName.includes('000099') ||
+            origName.includes('994C00')
           ) {
             mesh.material = craneYellowMat;
             continue;
           }
 
-          // 4. Реакторный корпус, парогенераторы и трубопроводы -> сатинированная сталь
-          if (origName.includes('006633') || vertCount >= 180000) {
-            mesh.material = stainlessSteelMat;
-            mesh.userData.isHeavyEquipment = vertCount >= 180000;
+          // 4. Детальное цветовое разделение оборудования 1-го контура ВВЭР-1000:
+          if (origName.includes('006633')) {
+            if (idx === 0) {
+              // M0: центральный корпус реактора + верхний блок СУЗ (#264d73), фланцы/крышка (#d0d7df), патрубки (#363d45)
+              splitGeometryByMaterial(
+                mesh,
+                [rpvSteelBlueMat, flangeLightSteelMat, gctGraphiteMat],
+                (cx, cy, cz) => {
+                  const rRpv = Math.hypot(cx - rpvAxisX, cz - rpvAxisZ);
+                  if (rRpv >= 2.2) return 1;
+                  if (rRpv >= 0.76) return 2;
+                  if (cy >= 14.08 || (cy >= 12.16 && cy <= 12.5) || (cy >= 10.12 && cy <= 10.26)) {
+                    return 1;
+                  }
+                  return 0;
+                }
+              );
+              continue;
+            }
+            if (idx === 1) {
+              // M1: опорный фланец корпуса реактора -> светло-стальной (#d0d7df)
+              mesh.material = flangeLightSteelMat;
+              continue;
+            }
+            // M10: 4x ПГВ-1000 (#c88a36), верхние паровые коллекторы (#d8dee6), 4x ГЦН (#1f616b), ГЦТ (#363d45)
+            splitGeometryByMaterial(
+              mesh,
+              [pgvBronzeMat, steamHeaderSilverMat, mcpTealMat, gctGraphiteMat, flangeLightSteelMat, rpvSteelBlueMat],
+              (cx, cy, cz) => {
+                if (cy >= 16.5) return 4;
+                const rRpv = Math.hypot(cx - rpvAxisX, cz - rpvAxisZ);
+                if (cy < 10.22 && rRpv < 1.2) return 5;
+                for (let m = 0; m < mcpCenters.length; m++) {
+                  const dx = cx - mcpCenters[m][0];
+                  const dz = cz - mcpCenters[m][1];
+                  if (dx * dx + dz * dz < 0.88 && cy >= 10.15 && cy <= 13.35) {
+                    return 2;
+                  }
+                }
+                if (cy >= 13.12 && cy < 15.0) return 1;
+                if (cy < 11.55 || rRpv < 1.4) return 3;
+                return 0;
+              }
+            );
+            mesh.userData.isHeavyEquipment = true;
             continue;
           }
 
-          // 5. Металлические рамы фасадов (232323) -> участвуют в Cutaway / X-Ray; опоры реактора -> technicalMetalMat
+          if (vertCount >= 180000) {
+            mesh.material = stainlessSteelMat;
+            mesh.userData.isHeavyEquipment = true;
+            continue;
+          }
+
+          // 5. Металлические рамы витражей (232323) и гидроёмкости САОЗ на верхнем перекрытии (00C39E / 01BC99)
           if (origName.includes('232323')) {
             mesh.material = shellMetalFrameMat;
             continue;
           }
-          if (origName.includes('00C39E') || origName.includes('01BC99')) {
-            mesh.material = technicalMetalMat;
+          if (origName.includes('00C39E')) {
+            // Правые гидроёмкости САОЗ (M3) -> сине-голубой (#3b6e9c); нижнее кольцо (M15) -> светлый бежево-серый (#b8bcc2)
+            mesh.material = mSize.y > 0.8 ? eccsSteelBlueMat : eccsBeigeGrayMat;
+            mesh.userData.isWalkableFloor = true;
+            continue;
+          }
+          if (origName.includes('01BC99')) {
+            // Левые гидроёмкости САОЗ (M14) -> светлый технический бежево-серый (#b8bcc2)
+            mesh.material = eccsBeigeGrayMat;
             mesh.userData.isWalkableFloor = true;
             continue;
           }
 
-          // 6. Кровли и верхние технологические пояса (поддерживают Cutaway и X-Ray)
-          if (
-            origName.includes('663300') ||
-            origName.includes('994C00') ||
-            origName.includes('FF7F00') ||
-            origName.includes('000066') ||
-            origName.includes('000099')
-          ) {
-            mesh.material = maxMeshDim >= 8.0 ? industrialRoofMat : techBlueMetalMat;
+          // 6. Глубокий индустриальный синий (#1d4580 / #1e4b8f):
+          // кольца градирен, фасады блока РИТМ-200Н, синие кровли вспомогательных зданий
+          if (origName.includes('663300')) {
+            mesh.material = industrialBlueMat;
+            mesh.userData.isWalkableFloor = true;
+            mesh.userData.isWallCollider = true;
             continue;
           }
 
-          // 7. Перекрытия и полы цехов / мостиков обслуживания (FF484848)
+          // Верхняя тёмная крыша высокого пролёта РИТМ-200Н (FF000066) -> тёмный антрацит (#3b424c)
+          if (origName.includes('000066')) {
+            mesh.material = darkAnthraciteMat;
+            continue;
+          }
+
+          // 7. Отмостки, цоколи и контуры проездов (FF484848)
           if (origName.includes('484848')) {
             mesh.material = structuralPlinthMat;
             mesh.userData.isWalkableFloor = true;
@@ -638,39 +844,39 @@ export default function GlbAssemblyModel({
             continue;
           }
 
-          // 9. Градирни (FFB3B3B3) — светло-серый бетон с тонкими рёбрами жёсткости
+          // 9. Градирни (FFB3B3B3) — белоснежные гиперболические башни (#f5f7fa)
           if (origName.includes('B3B3B3')) {
-            mesh.material = coolingTowerConcreteMat;
+            mesh.material = coolingTowerWhiteMat;
             mesh.userData.isWalkableFloor = true;
             mesh.userData.isWallCollider = true;
             continue;
           }
 
-          // 10. Светло-белые фасады энергоблоков и машинного зала (FFD8D8D8, 29D8D8D8, 32D8D8D8)
+          // 10. Белоснежные фасады вспомогательных корпусов и крыльев РИТМ-200Н (FFD8D8D8, 29D8D8D8, 32D8D8D8)
           if (origName.includes('D8D8D8')) {
-            mesh.material = facadeLightWhiteMat;
+            mesh.material = facadeCrispWhiteMat;
             mesh.userData.isWalkableFloor = true;
             mesh.userData.isWallCollider = true;
             continue;
           }
 
-          // 11. Светло-серые корпуса энергоблоков (FF8F8F8F) и тёмные пояса (FF6C6C6C)
+          // 11. Главные корпуса энергоблоков (машзалы и обстройка реакторов): антрацит (#464e59) и графит (#3b424c)
           if (origName.includes('8F8F8F')) {
-            mesh.material = vverLightConcreteMat;
+            mesh.material = vverAnthraciteMat;
             mesh.userData.isWalkableFloor = true;
             mesh.userData.isWallCollider = true;
             continue;
           }
           if (origName.includes('6C6C6C')) {
-            mesh.material = darkBeltConcreteMat;
+            mesh.material = darkAnthraciteMat;
             mesh.userData.isWalkableFloor = true;
             mesh.userData.isWallCollider = true;
             continue;
           }
 
-          // 12. Крупные бетонные узлы без явного имени
+          // 12. Кровли и крупные строительные узлы без явного имени
           if (maxMeshDim >= targetMaxSize * 0.16 && vertCount < 180000) {
-            mesh.material = vverLightConcreteMat;
+            mesh.material = darkAnthraciteMat;
             mesh.userData.isWalkableFloor = true;
             mesh.userData.isWallCollider = true;
             continue;

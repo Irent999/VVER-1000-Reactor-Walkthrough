@@ -479,11 +479,11 @@ export default function App() {
 
             {!isVRPresenting && <AdaptiveDpr pixelated />}
 
-            <ambientLight intensity={theme === 'dark' ? 0.5 : 0.48} color="#ffffff" />
-            <hemisphereLight args={['#eef7ff', '#b4bec7', theme === 'dark' ? 0.92 : 1.18]} />
+            <ambientLight intensity={theme === 'dark' ? 0.42 : 0.34} color="#ffffff" />
+            <hemisphereLight args={['#eef6ff', '#8d96a2', theme === 'dark' ? 0.82 : 0.94]} />
             <directionalLight
               position={[125, 165, 105]}
-              intensity={theme === 'dark' ? 1.85 : 2.3}
+              intensity={theme === 'dark' ? 1.85 : 2.15}
               color="#fff9ed"
               castShadow={!isVRPresenting}
               shadow-mapSize={[1024, 1024]}
@@ -495,7 +495,7 @@ export default function App() {
               shadow-bias={-0.0005}
               shadow-normalBias={0.04}
             />
-            <directionalLight position={[-120, 95, -110]} intensity={0.68} color="#cfe4ff" />
+            <directionalLight position={[-120, 95, -110]} intensity={0.62} color="#cfe4ff" />
 
             <XR store={xrStore}>
               <TeleportTarget

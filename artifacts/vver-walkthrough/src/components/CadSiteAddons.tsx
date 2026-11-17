@@ -3,49 +3,35 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { computeCutawayHeight, type SiteBox3Anchors } from '@/components/GlbAssemblyModel';
 
-function createVentStackTexture(): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = 64;
-  canvas.height = 512;
-  const ctx = canvas.getContext('2d');
-  if (ctx) {
-    const bands = 8;
-    const bandH = canvas.height / bands;
-    for (let i = 0; i < bands; i++) {
-      ctx.fillStyle = i % 2 === 0 ? '#e24c28' : '#f4f6f8';
-      ctx.fillRect(0, i * bandH, canvas.width, bandH);
-    }
-  }
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.ClampToEdgeWrapping;
-  return tex;
-}
-
 function createAsphaltRoadTexture(): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = 256;
   canvas.height = 256;
   const ctx = canvas.getContext('2d');
   if (ctx) {
-    ctx.fillStyle = '#3b4148';
+    ctx.fillStyle = '#48515c';
     ctx.fillRect(0, 0, 256, 256);
 
     for (let i = 0; i < 1800; i++) {
       const x = (i * 73) % 256;
       const y = (i * 137) % 256;
-      const shade = 48 + ((i * 29) % 24);
-      ctx.fillStyle = `rgb(${shade},${shade + 4},${shade + 9})`;
+      const shade = 58 + ((i * 29) % 20);
+      ctx.fillStyle = `rgb(${shade},${shade + 5},${shade + 11})`;
       ctx.fillRect(x, y, 2, 2);
     }
 
-    ctx.fillStyle = '#eef2f6';
-    ctx.fillRect(10, 0, 6, 256);
-    ctx.fillRect(240, 0, 6, 256);
+    // Тёмные чёткие контуры дорог и светлая бордюрная кромка
+    ctx.fillStyle = '#2d343e';
+    ctx.fillRect(0, 0, 12, 256);
+    ctx.fillRect(244, 0, 12, 256);
 
-    ctx.fillRect(125, 16, 6, 88);
-    ctx.fillRect(125, 144, 6, 88);
+    ctx.fillStyle = '#d5dbe2';
+    ctx.fillRect(12, 0, 4, 256);
+    ctx.fillRect(240, 0, 4, 256);
+
+    ctx.fillStyle = '#dce2e8';
+    ctx.fillRect(126, 16, 4, 84);
+    ctx.fillRect(126, 144, 4, 84);
   }
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -61,9 +47,9 @@ function createConcretePadTexture(): THREE.CanvasTexture {
   canvas.height = 256;
   const ctx = canvas.getContext('2d');
   if (ctx) {
-    ctx.fillStyle = '#cfd5dc';
+    ctx.fillStyle = '#d2d8df';
     ctx.fillRect(0, 0, 256, 256);
-    ctx.strokeStyle = 'rgba(120, 130, 142, 0.22)';
+    ctx.strokeStyle = 'rgba(92, 102, 114, 0.20)';
     ctx.lineWidth = 2;
     for (let x = 0; x <= 256; x += 64) {
       ctx.beginPath();
@@ -186,11 +172,11 @@ function TurboGeneratorK1000({
       {/* Жёлтые перила площадки обслуживания */}
       <mesh position={[0, 3.68, 2.9]}>
         <boxGeometry args={[33.0, 0.08, 0.08]} />
-        <meshStandardMaterial color="#f0a500" roughness={0.4} metalness={0.45} />
+        <meshStandardMaterial color="#e5a922" roughness={0.4} metalness={0.45} />
       </mesh>
       <mesh position={[0, 3.68, -2.9]}>
         <boxGeometry args={[33.0, 0.08, 0.08]} />
-        <meshStandardMaterial color="#f0a500" roughness={0.4} metalness={0.45} />
+        <meshStandardMaterial color="#e5a922" roughness={0.4} metalness={0.45} />
       </mesh>
 
       {/* 3 Конденсатора под ЦНД и циркуляционные водоводы */}
@@ -319,11 +305,11 @@ function TurboGeneratorK1000({
       <group name={`${name}BridgeCrane`} position={[1.5, 9.85, 0]}>
         <mesh position={[-1.15, 0, 0]} castShadow>
           <boxGeometry args={[0.85, 0.95, 11.6]} />
-          <meshStandardMaterial color="#f0a500" roughness={0.38} metalness={0.45} />
+          <meshStandardMaterial color="#e5a922" roughness={0.38} metalness={0.45} />
         </mesh>
         <mesh position={[1.15, 0, 0]} castShadow>
           <boxGeometry args={[0.85, 0.95, 11.6]} />
-          <meshStandardMaterial color="#f0a500" roughness={0.38} metalness={0.45} />
+          <meshStandardMaterial color="#e5a922" roughness={0.38} metalness={0.45} />
         </mesh>
         <mesh position={[0, 0.65, -1.2]} castShadow>
           <boxGeometry args={[2.8, 0.7, 2.2]} />
@@ -331,7 +317,7 @@ function TurboGeneratorK1000({
         </mesh>
         <mesh position={[0, -1.05, -1.2]}>
           <boxGeometry args={[0.65, 1.0, 0.65]} />
-          <meshStandardMaterial color="#f0a500" roughness={0.38} metalness={0.5} />
+          <meshStandardMaterial color="#e5a922" roughness={0.38} metalness={0.5} />
         </mesh>
       </group>
     </group>
@@ -380,15 +366,13 @@ export default function CadSiteAddons({
   }, [containmentOpacity, cutawayPlane]);
 
   const textures = useMemo(() => {
-    const ventTex = createVentStackTexture();
     const roadTex = createAsphaltRoadTexture();
     const padTex = createConcretePadTexture();
-    return { ventTex, roadTex, padTex };
+    return { roadTex, padTex };
   }, []);
 
   useEffect(() => {
     return () => {
-      textures.ventTex.dispose();
       textures.roadTex.dispose();
       textures.padTex.dispose();
     };
@@ -462,20 +446,20 @@ export default function CadSiteAddons({
           <cylinderGeometry args={[43.25, 43.25, 0.4, 64]} />
           <meshStandardMaterial
             map={textures.padTex}
-            color="#cfd5dc"
-            roughness={0.88}
+            color="#d2d8df"
+            roughness={0.86}
             metalness={0.03}
           />
         </mesh>
 
         <mesh position={[62.05, 0.405, 61.93]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
           <ringGeometry args={[42.6, 43.3, 64]} />
-          <meshStandardMaterial color="#a8b0b9" roughness={0.88} metalness={0.05} />
+          <meshStandardMaterial color="#58616c" roughness={0.84} metalness={0.08} />
         </mesh>
 
         <mesh position={[62, 0.48, 64]} receiveShadow>
           <boxGeometry args={[46, 0.16, 52]} />
-          <meshStandardMaterial color="#b7bfc8" roughness={0.86} metalness={0.04} />
+          <meshStandardMaterial color="#b4bcc6" roughness={0.85} metalness={0.05} />
         </mesh>
 
         <mesh position={[62, 0.42, 26]} receiveShadow>
@@ -574,39 +558,45 @@ export default function CadSiteAddons({
         </mesh>
       </group>
 
-      {/* 3. Вентиляционные трубы на кровлях зданий (срезаются тем же cutawayPlane без зависания в воздухе) */}
+      {/* 3. Вентиляционные трубы на кровлях зданий (высокие ВВЭР #e5a922, РИТМ-200Н #f1f4f8 + #1d4580) */}
       <group name="VentilationStacks">
-        {resolved.ventStacks.map((st) => (
-          <group key={st.id} name={st.id} position={[st.x, st.y, st.z]}>
-            <mesh position={[0, 0.45, 0]} castShadow receiveShadow>
-              <cylinderGeometry args={[st.r * 1.4, st.r * 1.65, 0.9, 20]} />
-              <meshStandardMaterial
-                color="#9ea6b0"
-                roughness={0.72}
-                metalness={0.28}
-                clippingPlanes={[cutawayPlane]}
-              />
-            </mesh>
-            <mesh position={[0, st.h / 2 + 0.5, 0]} castShadow receiveShadow>
-              <cylinderGeometry args={[st.r * 0.84, st.r, st.h, 24]} />
-              <meshStandardMaterial
-                map={textures.ventTex}
-                roughness={0.55}
-                metalness={0.22}
-                clippingPlanes={[cutawayPlane]}
-              />
-            </mesh>
-            <mesh position={[0, st.h + 0.7, 0]}>
-              <cylinderGeometry args={[st.r * 0.96, st.r * 0.86, 0.45, 24]} />
-              <meshStandardMaterial
-                color="#e24c28"
-                roughness={0.4}
-                metalness={0.3}
-                clippingPlanes={[cutawayPlane]}
-              />
-            </mesh>
-          </group>
-        ))}
+        {resolved.ventStacks.map((st) => {
+          const isRitmStack = st.id.includes('ritm');
+          const shaftColor = isRitmStack ? '#f1f4f8' : '#e5a922';
+          const capColor = isRitmStack ? '#1d4580' : '#3b424c';
+          const baseColor = isRitmStack ? '#3b424c' : '#464e59';
+          return (
+            <group key={st.id} name={st.id} position={[st.x, st.y, st.z]}>
+              <mesh position={[0, 0.45, 0]} castShadow receiveShadow>
+                <cylinderGeometry args={[st.r * 1.4, st.r * 1.65, 0.9, 20]} />
+                <meshStandardMaterial
+                  color={baseColor}
+                  roughness={0.68}
+                  metalness={0.28}
+                  clippingPlanes={[cutawayPlane]}
+                />
+              </mesh>
+              <mesh position={[0, st.h / 2 + 0.5, 0]} castShadow receiveShadow>
+                <cylinderGeometry args={[st.r * 0.84, st.r, st.h, 24]} />
+                <meshStandardMaterial
+                  color={shaftColor}
+                  roughness={isRitmStack ? 0.52 : 0.36}
+                  metalness={isRitmStack ? 0.14 : 0.32}
+                  clippingPlanes={[cutawayPlane]}
+                />
+              </mesh>
+              <mesh position={[0, st.h + 0.7, 0]}>
+                <cylinderGeometry args={[st.r * 0.96, st.r * 0.86, 0.52, 24]} />
+                <meshStandardMaterial
+                  color={capColor}
+                  roughness={0.42}
+                  metalness={0.35}
+                  clippingPlanes={[cutawayPlane]}
+                />
+              </mesh>
+            </group>
+          );
+        })}
       </group>
 
       {/* 4. Турбоагрегаты К-1000 в обоих машзалах ВВЭР-1000 (ось Z) */}
@@ -632,11 +622,11 @@ export default function CadSiteAddons({
           {/* Продольная технологическая разметка коридора */}
           <mesh position={[ritmWalkwayCenterX - 1.55, ritmFloorY + 0.032, ritmHallCenterZ]}>
             <boxGeometry args={[0.14, 0.008, 38.0]} />
-            <meshStandardMaterial color="#f0a500" roughness={0.5} metalness={0.2} />
+            <meshStandardMaterial color="#e5a922" roughness={0.5} metalness={0.2} />
           </mesh>
           <mesh position={[ritmWalkwayCenterX + 1.55, ritmFloorY + 0.032, ritmHallCenterZ]}>
             <boxGeometry args={[0.14, 0.008, 38.0]} />
-            <meshStandardMaterial color="#f0a500" roughness={0.5} metalness={0.2} />
+            <meshStandardMaterial color="#e5a922" roughness={0.5} metalness={0.2} />
           </mesh>
         </group>
 
@@ -659,7 +649,7 @@ export default function CadSiteAddons({
           {/* Жёлтое круговое ограждение площадки реактора */}
           <mesh position={[0, 5.45, 0]} rotation={[Math.PI / 2, 0, 0]}>
             <torusGeometry args={[2.38, 0.06, 10, 36]} />
-            <meshStandardMaterial color="#f0a500" roughness={0.38} metalness={0.45} />
+            <meshStandardMaterial color="#e5a922" roughness={0.38} metalness={0.45} />
           </mesh>
 
           {/* Интегральный корпус реактора РИТМ-200Н (полупрозрачный в режиме Энергопотока для видимости Черенковского свечения) */}
@@ -718,7 +708,7 @@ export default function CadSiteAddons({
           {/* Верхняя траверса и защитный кожух приводов СУЗ */}
           <mesh position={[0, 9.95, 0]} castShadow>
             <cylinderGeometry args={[1.08, 1.08, 0.24, 24]} />
-            <meshStandardMaterial color="#f0a500" roughness={0.38} metalness={0.48} />
+            <meshStandardMaterial color="#e5a922" roughness={0.38} metalness={0.48} />
           </mesh>
 
           {/* Паропроводы свежего пара над коридором в турбинный пролёт (просвет > 4.0 м над полом) */}
@@ -743,11 +733,11 @@ export default function CadSiteAddons({
           <group name="RitmReactorCrane" position={[0, 12.6, -1.6]}>
             <mesh position={[0, 0, -0.75]} castShadow>
               <boxGeometry args={[8.8, 0.68, 0.58]} />
-              <meshStandardMaterial color="#f0a500" roughness={0.38} metalness={0.46} />
+              <meshStandardMaterial color="#e5a922" roughness={0.38} metalness={0.46} />
             </mesh>
             <mesh position={[0, 0, 0.75]} castShadow>
               <boxGeometry args={[8.8, 0.68, 0.58]} />
-              <meshStandardMaterial color="#f0a500" roughness={0.38} metalness={0.46} />
+              <meshStandardMaterial color="#e5a922" roughness={0.38} metalness={0.46} />
             </mesh>
             <mesh position={[0, 0.52, 0]}>
               <boxGeometry args={[1.7, 0.58, 1.9]} />
@@ -825,11 +815,11 @@ export default function CadSiteAddons({
           </mesh>
           <mesh position={[0, 2.9, 2.0]}>
             <boxGeometry args={[23.8, 0.06, 0.06]} />
-            <meshStandardMaterial color="#f0a500" roughness={0.4} metalness={0.45} />
+            <meshStandardMaterial color="#e5a922" roughness={0.4} metalness={0.45} />
           </mesh>
           <mesh position={[0, 2.9, -2.0]}>
             <boxGeometry args={[23.8, 0.06, 0.06]} />
-            <meshStandardMaterial color="#f0a500" roughness={0.4} metalness={0.45} />
+            <meshStandardMaterial color="#e5a922" roughness={0.4} metalness={0.45} />
           </mesh>
 
           {/* Конденсатор под ЦНД */}
@@ -921,11 +911,11 @@ export default function CadSiteAddons({
           <group name="RitmTurbineCrane" position={[0, 8.9, 0]}>
             <mesh position={[-0.9, 0, 0]} castShadow>
               <boxGeometry args={[0.65, 0.72, 7.6]} />
-              <meshStandardMaterial color="#f0a500" roughness={0.38} metalness={0.45} />
+              <meshStandardMaterial color="#e5a922" roughness={0.38} metalness={0.45} />
             </mesh>
             <mesh position={[0.9, 0, 0]} castShadow>
               <boxGeometry args={[0.65, 0.72, 7.6]} />
-              <meshStandardMaterial color="#f0a500" roughness={0.38} metalness={0.45} />
+              <meshStandardMaterial color="#e5a922" roughness={0.38} metalness={0.45} />
             </mesh>
             <mesh position={[0, 0.48, -0.6]} castShadow>
               <boxGeometry args={[2.0, 0.55, 1.65]} />
@@ -939,15 +929,15 @@ export default function CadSiteAddons({
       <group name="ReactorHallWalkableDecks">
         <mesh position={[deckCenterX, 14.3, deckCenterZ]} receiveShadow>
           <boxGeometry args={[deckWidthX, 0.22, deckDepthZ]} />
-          <meshStandardMaterial color="#8c95a0" roughness={0.72} metalness={0.32} />
+          <meshStandardMaterial color="#b8bcc2" roughness={0.68} metalness={0.32} />
         </mesh>
         <mesh position={[deckCenterX, 15.35, deckCenterZ + deckDepthZ / 2 - 0.1]}>
           <boxGeometry args={[deckWidthX - 0.2, 0.08, 0.08]} />
-          <meshStandardMaterial color="#f0a500" roughness={0.38} metalness={0.45} />
+          <meshStandardMaterial color="#f0a500" roughness={0.36} metalness={0.45} />
         </mesh>
         <mesh position={[deckCenterX, 15.35, deckCenterZ - deckDepthZ / 2 + 0.1]}>
           <boxGeometry args={[deckWidthX - 0.2, 0.08, 0.08]} />
-          <meshStandardMaterial color="#f0a500" roughness={0.38} metalness={0.45} />
+          <meshStandardMaterial color="#f0a500" roughness={0.36} metalness={0.45} />
         </mesh>
 
         {/* Обзорный мостик полярного крана строго внутри купола */}
