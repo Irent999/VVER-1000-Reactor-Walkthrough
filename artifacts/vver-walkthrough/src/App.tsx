@@ -9,6 +9,7 @@ import type { OrbitControls as OCImpl } from 'three-stdlib';
 import GlbAssemblyModel, { type GlbLoadState, type SiteBox3Anchors } from '@/components/GlbAssemblyModel';
 import CadSiteAddons from '@/components/CadSiteAddons';
 import NppProcessVisualizer from '@/components/NppProcessVisualizer';
+import EvacuationRoutesVisualizer from '@/components/EvacuationRoutesVisualizer';
 import VRControllerManager from '@/components/VRControllerManager';
 import DroneFlyByController, { type DroneWaymark } from '@/components/DroneFlyByController';
 import FirstPersonController from '@/components/FirstPersonController';
@@ -172,6 +173,7 @@ interface SceneContentProps {
   containmentOpacity: number;
   shellTransparent: boolean;
   energyFlowActive: boolean;
+  evacuationRoutesActive: boolean;
   onStatusChange: (state: GlbLoadState) => void;
 }
 
@@ -180,6 +182,7 @@ function SceneContent({
   containmentOpacity,
   shellTransparent,
   energyFlowActive,
+  evacuationRoutesActive,
   onStatusChange,
 }: SceneContentProps) {
   const [siteAnchors, setSiteAnchors] = useState<SiteBox3Anchors | null>(null);
@@ -203,6 +206,7 @@ function SceneContent({
         energyFlowActive={energyFlowActive}
       />
       <NppProcessVisualizer active={energyFlowActive} anchors={siteAnchors} />
+      <EvacuationRoutesVisualizer active={evacuationRoutesActive} anchors={siteAnchors} />
     </group>
   );
 }
@@ -259,6 +263,7 @@ export default function App() {
   const [containmentOpacity, setContainmentOpacity] = useState(1.0);
   const [shellTransparent, setShellTransparent] = useState(false);
   const [energyFlowActive, setEnergyFlowActive] = useState(false);
+  const [evacuationRoutesActive, setEvacuationRoutesActive] = useState(false);
   const [vrSupported, setVrSupported] = useState<boolean | null>(null);
   const [isVRPresenting, setIsVRPresenting] = useState(false);
 
@@ -512,6 +517,7 @@ export default function App() {
                   containmentOpacity={containmentOpacity}
                   shellTransparent={shellTransparent}
                   energyFlowActive={energyFlowActive}
+                  evacuationRoutesActive={evacuationRoutesActive}
                   onStatusChange={handleGlbStatusChange}
                 />
               </TeleportTarget>
@@ -629,6 +635,8 @@ export default function App() {
         onToggleShellTransparent={() => setShellTransparent((v) => !v)}
         energyFlowActive={energyFlowActive}
         onToggleEnergyFlow={() => setEnergyFlowActive((v) => !v)}
+        evacuationRoutesActive={evacuationRoutesActive}
+        onToggleEvacuationRoutes={() => setEvacuationRoutesActive((v) => !v)}
         controlMode={controlMode}
         onVRClick={handleVRClick}
         vrSupported={vrSupported}

@@ -12,6 +12,7 @@ import {
   Pause,
   Play,
   Scissors,
+  Siren,
   Sun,
   Video,
   X,
@@ -33,6 +34,8 @@ interface UIOverlayProps {
   onToggleShellTransparent: () => void;
   energyFlowActive: boolean;
   onToggleEnergyFlow: () => void;
+  evacuationRoutesActive: boolean;
+  onToggleEvacuationRoutes: () => void;
   controlMode: ViewMode;
   onVRClick: () => void;
   vrSupported: boolean | null;
@@ -67,6 +70,8 @@ export default function UIOverlay({
   onToggleShellTransparent,
   energyFlowActive,
   onToggleEnergyFlow,
+  evacuationRoutesActive,
+  onToggleEvacuationRoutes,
   controlMode,
   onVRClick,
   telemetry: propTelemetry,
@@ -549,6 +554,23 @@ export default function UIOverlay({
           >
             <Zap size={14} />
             <span>{energyFlowActive ? 'Цикл АЭС активен' : 'Визуализация процессов'}</span>
+          </button>
+
+          {/* Кнопка подсветки путей эвакуации и точек безопасного сбора */}
+          <button
+            type="button"
+            data-testid="button-toggle-evacuation"
+            onClick={onToggleEvacuationRoutes}
+            aria-pressed={evacuationRoutesActive}
+            title="Подсветка маршрутов эвакуации из энергоблоков и залов к точкам сбора"
+            className={`flex items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-2 text-xs font-semibold transition ${
+              evacuationRoutesActive
+                ? 'bg-emerald-500 text-white shadow-[0_0_18px_rgba(16,185,129,0.5)] hover:bg-emerald-400 dark:text-slate-950'
+                : 'border border-emerald-500/30 bg-emerald-500/12 text-emerald-800 hover:bg-emerald-500/20 dark:border-emerald-400/25 dark:bg-emerald-400/15 dark:text-emerald-300 dark:hover:bg-emerald-400/25'
+            }`}
+          >
+            <Siren size={14} />
+            <span>{evacuationRoutesActive ? 'Эвакуация активна' : 'Пути эвакуации'}</span>
           </button>
 
           <span className="hidden sm:block h-5 w-px bg-slate-900/10 dark:bg-white/10" aria-hidden="true" />
