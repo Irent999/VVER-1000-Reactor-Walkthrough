@@ -420,12 +420,12 @@ export default function CadSiteAddons({
 
   // Координаты настилов центрального зала ВВЭР-1000, строго вписанные внутрь контайнмента
   const dome = resolved.reactorDome;
-  const deckMinX = Math.max(dome.minX + 4.5, -83.2);
-  const deckMaxX = Math.min(dome.maxX - 0.3, -75.4);
+  const deckMinX = Math.max(dome.minX + 4.8, -83.0);
+  const deckMaxX = Math.min(dome.maxX - 0.8, -76.2);
   const deckCenterX = (deckMinX + deckMaxX) / 2;
-  const deckWidthX = Math.max(4.5, deckMaxX - deckMinX);
+  const deckWidthX = Math.max(4.0, deckMaxX - deckMinX);
   const deckCenterZ = (dome.minZ + dome.maxZ) / 2;
-  const deckDepthZ = Math.min(11.6, dome.maxZ - dome.minZ - 2.2);
+  const deckDepthZ = Math.min(8.2, dome.maxZ - dome.minZ - 3.6);
 
   // Кластер 7 приводов СУЗ поверх крышки РИТМ-200Н
   const crdmOffsets: [number, number][] = [
@@ -942,15 +942,15 @@ export default function CadSiteAddons({
 
         {/* Обзорный мостик полярного крана строго внутри купола */}
         <mesh position={[-80.8, 19.6, -44.2]} receiveShadow>
-          <boxGeometry args={[4.6, 0.22, 2.2]} />
+          <boxGeometry args={[3.6, 0.22, 1.8]} />
           <meshStandardMaterial color="#7d8792" roughness={0.62} metalness={0.45} />
         </mesh>
-        <mesh position={[-80.8, 20.65, -43.15]}>
-          <boxGeometry args={[4.4, 0.08, 0.08]} />
+        <mesh position={[-80.8, 20.65, -43.35]}>
+          <boxGeometry args={[3.4, 0.08, 0.08]} />
           <meshStandardMaterial color="#f0a500" roughness={0.38} metalness={0.45} />
         </mesh>
-        <mesh position={[-80.8, 20.65, -45.25]}>
-          <boxGeometry args={[4.4, 0.08, 0.08]} />
+        <mesh position={[-80.8, 20.65, -45.05]}>
+          <boxGeometry args={[3.4, 0.08, 0.08]} />
           <meshStandardMaterial color="#f0a500" roughness={0.38} metalness={0.45} />
         </mesh>
       </group>

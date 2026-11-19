@@ -629,6 +629,72 @@ export default function GlbAssemblyModel({
         const rpvAxisX = -84.11;
         const rpvAxisZ = -40.22;
 
+        const coolingTowerCenters: [number, number][] = [
+          [-83.855, 13.415],
+          [-26.035, 13.415],
+          [-83.855, 59.645],
+          [-26.035, 59.645],
+        ];
+        const tmpTriV0 = new THREE.Vector3();
+        const tmpTriV1 = new THREE.Vector3();
+        const tmpTriV2 = new THREE.Vector3();
+
+        const isPointInsideCoolingTowerZone = (px: number, py: number, pz: number): boolean => {
+          if (py <= 0.85 || pz < -2.4 || px > -10.5) return false;
+          for (let t = 0; t < coolingTowerCenters.length; t++) {
+            const dx = px - coolingTowerCenters[t][0];
+            const dz = pz - coolingTowerCenters[t][1];
+            if (dx * dx + dz * dz < 15.8 * 15.8) {
+              return true;
+            }
+          }
+          return false;
+        };
+
+        const stripStrayCoolingTowerTriangles = (targetMesh: THREE.Mesh): boolean => {
+          const geo = targetMesh.geometry;
+          if (!geo || !geo.attributes.position) return true;
+          const posAttr = geo.attributes.position;
+          const indexAttr = geo.index;
+          const matWorld = targetMesh.matrixWorld;
+          const triTotal = indexAttr ? indexAttr.count / 3 : posAttr.count / 3;
+          const keptIndices: number[] = [];
+          let strippedCount = 0;
+
+          for (let t = 0; t < triTotal; t++) {
+            const i0 = indexAttr ? indexAttr.getX(t * 3) : t * 3;
+            const i1 = indexAttr ? indexAttr.getX(t * 3 + 1) : t * 3 + 1;
+            const i2 = indexAttr ? indexAttr.getX(t * 3 + 2) : t * 3 + 2;
+
+            tmpTriV0.fromBufferAttribute(posAttr, i0).applyMatrix4(matWorld);
+            tmpTriV1.fromBufferAttribute(posAttr, i1).applyMatrix4(matWorld);
+            tmpTriV2.fromBufferAttribute(posAttr, i2).applyMatrix4(matWorld);
+
+            const cx = (tmpTriV0.x + tmpTriV1.x + tmpTriV2.x) / 3;
+            const cy = (tmpTriV0.y + tmpTriV1.y + tmpTriV2.y) / 3;
+            const cz = (tmpTriV0.z + tmpTriV1.z + tmpTriV2.z) / 3;
+
+            if (isPointInsideCoolingTowerZone(cx, cy, cz)) {
+              strippedCount++;
+              continue;
+            }
+            keptIndices.push(i0, i1, i2);
+          }
+
+          if (strippedCount > 0) {
+            if (keptIndices.length === 0) {
+              return false;
+            }
+            const useUint32 = posAttr.count > 65535;
+            const nextIdx = useUint32 ? new Uint32Array(keptIndices) : new Uint16Array(keptIndices);
+            geo.setIndex(new THREE.BufferAttribute(nextIdx, 1));
+            geo.clearGroups();
+            geo.computeBoundingBox();
+            geo.computeBoundingSphere();
+          }
+          return true;
+        };
+
         const meshesToKeep: THREE.Mesh[] = [];
         for (let idx = 0; idx < meshes.length; idx++) {
           const mesh = meshes[idx];
@@ -639,29 +705,53 @@ export default function GlbAssemblyModel({
           const mSize = meshBoxes.get(mesh) ?? new THREE.Vector3(1, 1, 1);
 
           // Удаление лишних висящих плоских планок/мостиков (M31 75FFFFFF с нулевой толщиной, M37 32FFFFFF,
-          // а также любых посторонних плоских прямоугольных артефактов у основания градирен)
+          // а также любых посторонних плоских прямоугольных артефактов или жёлтых поручней в зоне градирен на любой высоте > 0.5 м)
           const isZeroThicknessFloatingPlank =
             origName.includes('75FFFFFF') ||
             (mSize.y < 0.03 && mBox.min.y > 1.2 && !origName.includes('006633'));
           const isDetachedExteriorGlass =
             origName.includes('32FFFFFF') && mBox.min.x > 18 && mBox.max.x < 23;
+          const isCoolingTowerNativePart =
+            origName.includes('B3B3B3') ||
+            origName.includes('29D8D8D8') ||
+            origName.includes('32D8D8D8') ||
+            origName.includes('663300');
           const isStrayCoolingTowerPlank =
             mesh !== largestBaseMesh &&
-            mBox.max.z > -4 &&
-            mBox.min.x < -8 &&
-            mBox.max.y < 14 &&
-            mSize.y < 1.2 &&
-            !origName.includes('B3B3B3') &&
-            !origName.includes('D8D8D8') &&
-            !origName.includes('484848') &&
-            !origName.includes('663300') &&
-            !origName.includes('6C6C6C');
+            !isCoolingTowerNativePart &&
+            mBox.min.y > 0.5 &&
+            mBox.max.z > -2.4 &&
+            mBox.min.x < -10.5 &&
+            (mSize.y < 2.2 ||
+              origName.includes('00FFFF') ||
+              origName.includes('00CCCC') ||
+              origName.includes('009999') ||
+              origName.includes('33FFFF') ||
+              origName.includes('FF7F00') ||
+              origName.includes('FFFF7F00'));
 
           if (isZeroThicknessFloatingPlank || isDetachedExteriorGlass || isStrayCoolingTowerPlank) {
             trackOriginalMaterial(mesh);
             mesh.removeFromParent();
             mesh.geometry?.dispose();
             continue;
+          }
+
+          // Для составных мешей сборки проверяем пересечение треугольников с зоной градирен (Y > 0.85 м)
+          if (
+            mesh !== largestBaseMesh &&
+            !isCoolingTowerNativePart &&
+            mBox.max.z > -2.4 &&
+            mBox.min.x < -10.5 &&
+            mBox.max.y > 0.85
+          ) {
+            const hasRemaining = stripStrayCoolingTowerTriangles(mesh);
+            if (!hasRemaining) {
+              trackOriginalMaterial(mesh);
+              mesh.removeFromParent();
+              mesh.geometry?.dispose();
+              continue;
+            }
           }
 
           meshesToKeep.push(mesh);
