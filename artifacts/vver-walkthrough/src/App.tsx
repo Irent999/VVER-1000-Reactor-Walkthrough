@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { XR, createXRStore } from '@react-three/xr';
@@ -27,8 +27,11 @@ import { FLOOR_VIEWS, type ViewMode } from '@/data/poiData';
 import { validateAndAdjustCameraLineOfSight } from '@/scene/cameraLineOfSightModule';
 import { resolveAssetBaseUrl } from '@/utils/resolveAssetUrl';
 
+const _orbitForwardDir = new THREE.Vector3();
+
 // Конфигурация WebXR без внешнего эмулятора и загрузки моделей контроллеров с CDN:
 // поддерживаются HTC Vive / SteamVR / OpenXR / Meta Quest с фолбэком по referenceSpace.
+// frameBufferScaling: 0.72 снижает нагрузку стерео-рендеринга на GPU без зависания при старте VR.
 // baseAssetPath формируется через resolveAssetBaseUrl('./'), чтобы new URL(...) в @pmndrs/xr никогда не падал с Invalid base URL.
 const xrStore = createXRStore({
   emulate: false,
@@ -36,6 +39,7 @@ const xrStore = createXRStore({
   enterGrantedSession: false,
   baseAssetPath: resolveAssetBaseUrl('./'),
   foveation: 1.0,
+  frameBufferScaling: 0.72,
   frameRate: false,
   bounded: false,
   hand: false,
@@ -122,9 +126,8 @@ function SmoothCameraController({
     if (controlsRef.current) {
       startTarget.current.copy(controlsRef.current.target);
     } else {
-      const dir = new THREE.Vector3();
-      camera.getWorldDirection(dir);
-      startTarget.current.copy(camera.position).add(dir.multiplyScalar(20));
+      camera.getWorldDirection(_orbitForwardDir);
+      startTarget.current.copy(camera.position).add(_orbitForwardDir.multiplyScalar(20));
     }
 
     targetLook.current.set(...los.adjustedTarget);
@@ -204,7 +207,7 @@ interface SceneContentProps {
   onStatusChange: (state: GlbLoadState) => void;
 }
 
-function SceneContent({
+const SceneContent = memo(function SceneContent({
   reloadKey,
   containmentOpacity,
   shellTransparent,
@@ -213,9 +216,17 @@ function SceneContent({
   onStatusChange,
 }: SceneContentProps) {
   const [siteAnchors, setSiteAnchors] = useState<SiteBox3Anchors | null>(null);
+  const rootRef = useRef<THREE.Group | null>(null);
+
+  // Отключаем ежекадровый обход всей геометрии сцены системой @pmndrs/pointer-events внутри VR
+  useEffect(() => {
+    if (rootRef.current) {
+      (rootRef.current as unknown as { intersectChildren?: boolean }).intersectChildren = false;
+    }
+  }, []);
 
   return (
-    <group>
+    <group ref={rootRef}>
       {/* CAD-сборка assembly.glb (225 м) + привязанные по Box3 венттрубы, ОРУ, К-1000, комплекс РИТМ-200Н и 3D-энергопоток */}
       <GlbAssemblyModel
         key={reloadKey}
@@ -236,7 +247,7 @@ function SceneContent({
       <EvacuationRoutesVisualizer active={evacuationRoutesActive} anchors={siteAnchors} />
     </group>
   );
-}
+});
 
 function canCreateWebGL2() {
   if (typeof document === 'undefined') return false;
@@ -436,8 +447,8 @@ export default function App() {
 
   // Подписки на события XR-сессии, потерю WebGL-контекста и асинхронные unhandledrejection
   useEffect(() => {
-    const onStart = () => setIsVRPresenting(true);
-    const onEnd = () => setIsVRPresenting(false);
+    const onStart = () => setIsVRPresenting((prev) => (prev ? prev : true));
+    const onEnd = () => setIsVRPresenting((prev) => (prev ? false : prev));
     const onContextLost = () => {
       setIsVRPresenting(false);
       setVrError({
@@ -482,9 +493,9 @@ export default function App() {
 
     const unsubscribeStore = xrStore.subscribe((state, prevState) => {
       if (state.session && !prevState.session) {
-        setIsVRPresenting(true);
+        setIsVRPresenting((prev) => (prev ? prev : true));
       } else if (!state.session && prevState.session) {
-        setIsVRPresenting(false);
+        setIsVRPresenting((prev) => (prev ? false : prev));
       }
     });
 
@@ -704,18 +715,27 @@ export default function App() {
     setPointerLocked(locked);
   }, []);
 
-  const vrSpawnTarget: [number, number, number] =
-    activeViewData.mode === 'walk'
-      ? [activeViewData.cameraPos[0], activeViewData.floorY, activeViewData.cameraPos[2]]
-      : activeViewData.cameraPos[1] <= 18
-      ? [activeViewData.cameraPos[0], activeViewData.floorY, activeViewData.cameraPos[2]]
-      : [-32, 0.4, -18];
+  // Стабилизируем ссылки координат, чтобы вход в VR не перезапускал эффекты сцены и контроллеров
+  const vrSpawnTarget = useMemo<[number, number, number]>(
+    () =>
+      activeViewData.mode === 'walk'
+        ? [activeViewData.cameraPos[0], activeViewData.floorY, activeViewData.cameraPos[2]]
+        : activeViewData.cameraPos[1] <= 18
+        ? [activeViewData.cameraPos[0], activeViewData.floorY, activeViewData.cameraPos[2]]
+        : [-32, 0.4, -18],
+    [activeViewData.mode, activeViewData.cameraPos, activeViewData.floorY]
+  );
 
-  const safeWalkFallbackPos: [number, number, number] = (() => {
+  const orbitLookAt = useMemo<[number, number, number]>(
+    () => activeViewData.target ?? [0, activeViewData.floorY, 0],
+    [activeViewData.target, activeViewData.floorY]
+  );
+
+  const safeWalkFallbackPos = useMemo<[number, number, number]>(() => {
     const cx = THREE.MathUtils.clamp(activeViewData.cameraPos[0], -106, 106);
     const cz = THREE.MathUtils.clamp(activeViewData.cameraPos[2], -106, 106);
     return [cx, activeViewData.floorY + 1.65, cz];
-  })();
+  }, [activeViewData.cameraPos, activeViewData.floorY]);
 
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden bg-[#dce8f2] dark:bg-[#1a2430] transition-colors duration-200">
@@ -781,11 +801,12 @@ export default function App() {
 
             <ambientLight intensity={theme === 'dark' ? 0.42 : 0.34} color="#ffffff" />
             <hemisphereLight args={['#eef6ff', '#8d96a2', theme === 'dark' ? 0.82 : 0.94]} />
+            {/* castShadow остаётся стабильным: в VR рендер теней отключается напрямую через gl.shadowMap без перекомпиляции шейдеров */}
             <directionalLight
               position={[125, 165, 105]}
               intensity={theme === 'dark' ? 1.85 : 2.15}
               color="#fff9ed"
-              castShadow={!isVRPresenting}
+              castShadow
               shadow-mapSize={[1024, 1024]}
               shadow-camera-left={-125}
               shadow-camera-right={125}
@@ -816,7 +837,7 @@ export default function App() {
 
             <SmoothCameraController
               cameraPos={activeViewData.cameraPos}
-              lookAt={activeViewData.target ?? [0, activeViewData.floorY, 0]}
+              lookAt={orbitLookAt}
               mode={controlMode}
               viewId={activeViewData.id}
               isVRPresenting={isVRPresenting}
@@ -824,7 +845,7 @@ export default function App() {
 
             {controlMode === 'drone' ? (
               <DroneFlyByController
-                active={activeView === 'view-drone'}
+                active={activeView === 'view-drone' && !isVRPresenting}
                 speedMultiplier={droneSpeed}
                 paused={dronePaused}
                 scrubProgress={scrubProgress}

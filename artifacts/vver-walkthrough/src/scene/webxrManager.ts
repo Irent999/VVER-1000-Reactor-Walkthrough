@@ -103,7 +103,10 @@ export default function WebXRSceneManager({
   }, [gl, activeSpawnPos, floorY, activeViewId, referenceSpaceType]);
 
   useEffect(() => {
-    const desktopShadowsRef = { enabled: gl.shadowMap.enabled };
+    const desktopShadowsRef = {
+      enabled: gl.shadowMap.enabled,
+      autoUpdate: gl.shadowMap.autoUpdate,
+    };
     let activeSessionRef: XRSession | null = null;
 
     // Перехватываем setSize, setPixelRatio и setReferenceSpaceType на уровне рендерера,
@@ -268,7 +271,9 @@ export default function WebXRSceneManager({
       savedCameraPoseRef.current.captured = true;
 
       desktopShadowsRef.enabled = gl.shadowMap.enabled;
+      desktopShadowsRef.autoUpdate = gl.shadowMap.autoUpdate;
       gl.shadowMap.enabled = false;
+      gl.shadowMap.autoUpdate = false;
 
       if (gl.xr) {
         gl.xr.enabled = true;
@@ -333,6 +338,7 @@ export default function WebXRSceneManager({
       }
 
       gl.shadowMap.enabled = desktopShadowsRef.enabled;
+      gl.shadowMap.autoUpdate = desktopShadowsRef.autoUpdate;
 
       // Возвращаем gl.xr.enabled = true после внутреннего обработчика @react-three/fiber
       const keepXrEnabled = () => {

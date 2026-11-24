@@ -85,6 +85,7 @@ export default function VRControllerManager({
 
   const rightSnapLatchRef = useRef(false);
   const prevTriggerPressedRef = useRef<Record<string, boolean>>({});
+  const prevRayHitRef = useRef<boolean[]>([false, false]);
   const effectiveRefSpaceRef = useRef<XRReferenceSpaceType>(referenceSpaceType);
   const lastAimRef = useRef<{ valid: boolean; x: number; z: number }>({
     valid: false,
@@ -102,20 +103,23 @@ export default function VRControllerManager({
     return effectiveRefSpaceRef.current === 'local' ? safeFloor + EYE_HEIGHT : safeFloor;
   };
 
-  // Перенос VR Rig (<XROrigin>) при смене ракурса в UI без сбивания трекинга шлема
+  // Перенос VR Rig (<XROrigin>) при смене ракурса в UI без лишних срабатываний при перерисовке ссылок
+  const targetX = viewTarget?.[0];
+  const targetY = viewTarget?.[1];
+  const targetZ = viewTarget?.[2];
   const lastTargetKey = useRef<string>('');
   useEffect(() => {
-    if (viewTarget && playerRef.current) {
+    if (targetX !== undefined && targetY !== undefined && targetZ !== undefined && playerRef.current) {
       const safeFloor = Number.isFinite(floorY) ? floorY : 0.4;
-      const key = `${viewTarget[0]}:${viewTarget[1]}:${viewTarget[2]}:${safeFloor}:${referenceSpaceType}`;
+      const key = `${targetX}:${targetY}:${targetZ}:${safeFloor}:${referenceSpaceType}`;
       if (key !== lastTargetKey.current) {
         lastTargetKey.current = key;
-        playerRef.current.position.set(viewTarget[0], resolveOriginY(safeFloor), viewTarget[2]);
+        playerRef.current.position.set(targetX, resolveOriginY(safeFloor), targetZ);
         playerRef.current.updateMatrixWorld(true);
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewTarget, floorY, referenceSpaceType]);
+  }, [targetX, targetY, targetZ, floorY, referenceSpaceType]);
 
   // Слушатели старта/завершения сессии WebXR
   useEffect(() => {
@@ -127,10 +131,13 @@ export default function VRControllerManager({
       if (customEvent.detail?.referenceSpaceType) {
         effectiveRefSpaceRef.current = customEvent.detail.referenceSpaceType;
       }
-      const spawn = customEvent.detail?.spawn || [-32, floorY, -18];
+      const spawn = customEvent.detail?.spawn;
       if (playerRef.current) {
-        const safeFloor = Number.isFinite(spawn[1]) ? spawn[1] : Number.isFinite(floorY) ? floorY : 0.4;
-        playerRef.current.position.set(spawn[0], resolveOriginY(safeFloor), spawn[2]);
+        const sx = spawn ? spawn[0] : -32;
+        const sy = spawn ? spawn[1] : floorY;
+        const sz = spawn ? spawn[2] : -18;
+        const safeFloor = Number.isFinite(sy) ? sy : Number.isFinite(floorY) ? floorY : 0.4;
+        playerRef.current.position.set(sx, resolveOriginY(safeFloor), sz);
         playerRef.current.rotation.set(0, 0, 0);
         playerRef.current.updateMatrixWorld(true);
       }
@@ -139,6 +146,8 @@ export default function VRControllerManager({
     const handleXREnd = () => {
       prevTriggerPressedRef.current = {};
       rightSnapLatchRef.current = false;
+      prevRayHitRef.current[0] = false;
+      prevRayHitRef.current[1] = false;
       if (ringRef.current) {
         ringRef.current.visible = false;
       }
@@ -159,17 +168,16 @@ export default function VRControllerManager({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [floorY]);
 
-  // Начальная позиция при входе в сессию и сброс визуалов при выходе
+  // Начальная позиция при входе в сессию и сброс визуалов при выходе (ключуем по примитивам, чтобы не дёргать при ре-рендере)
   useEffect(() => {
     if (session) {
       if (playerRef.current) {
         const isWalkable =
           Boolean(activeViewId) &&
           (activeViewId!.startsWith('walk') || activeViewId!.includes('reactor'));
-        const defaultSpawn: [number, number, number] = [-32, 0.4, -18];
-        const spawnX = isWalkable && viewTarget ? viewTarget[0] : defaultSpawn[0];
+        const spawnX = isWalkable && targetX !== undefined ? targetX : -32;
         const safeFloor = isWalkable && Number.isFinite(floorY) ? floorY : 0.4;
-        const spawnZ = isWalkable && viewTarget ? viewTarget[2] : defaultSpawn[2];
+        const spawnZ = isWalkable && targetZ !== undefined ? targetZ : -18;
 
         playerRef.current.position.set(spawnX, resolveOriginY(safeFloor), spawnZ);
         playerRef.current.updateMatrixWorld(true);
@@ -185,7 +193,7 @@ export default function VRControllerManager({
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, viewTarget, floorY, activeViewId]);
+  }, [session, targetX, targetZ, floorY, activeViewId]);
 
   // Прямое чтение inputSources (HTC Vive тачпады/стики, курки, лучи) без исключений при отсутствии контроллеров
   useFrame((_, delta, frame) => {
@@ -229,6 +237,7 @@ export default function VRControllerManager({
       if (ray) ray.visible = false;
     }
 
+    let playerMoved = false;
     const inputSources = xrSession.inputSources;
     for (let srcIdx = 0; srcIdx < inputSources.length; srcIdx++) {
       const source = inputSources[srcIdx];
@@ -262,19 +271,25 @@ export default function VRControllerManager({
           const moveSpeed = 5.5;
           player.position.addScaledVector(_camForward, -sy * moveSpeed * dt);
           player.position.addScaledVector(_camRight, sx * moveSpeed * dt);
+          playerMoved = true;
         }
 
         if (hand === 'right') {
           if (Math.abs(sx) > 0.62) {
             if (!rightSnapLatchRef.current) {
               player.rotation.y -= Math.sign(sx) * (Math.PI / 6);
-              player.updateMatrixWorld(true);
+              playerMoved = true;
               rightSnapLatchRef.current = true;
             }
           } else if (Math.abs(sx) < 0.25) {
             rightSnapLatchRef.current = false;
           }
         }
+      }
+
+      if (playerMoved) {
+        player.updateMatrixWorld();
+        playerMoved = false;
       }
 
       // 2. Позиционирование процедурной модели контроллера и луча телепортации
@@ -287,7 +302,6 @@ export default function VRControllerManager({
         }
 
         if (pose) {
-          player.updateMatrixWorld(true);
           _rayOrigin
             .set(pose.transform.position.x, pose.transform.position.y, pose.transform.position.z)
             .applyMatrix4(player.matrixWorld);
@@ -378,9 +392,12 @@ export default function VRControllerManager({
               rayMesh.position.copy(_beamMid);
               rayMesh.quaternion.copy(_beamQuat);
               rayMesh.scale.set(1, 1, rayLength);
-              const mat = rayMesh.material;
-              if (mat instanceof THREE.MeshBasicMaterial) {
-                mat.color.setHex(hitValidFloor ? 0x34d399 : 0x38bdf8);
+              if (prevRayHitRef.current[visualSlot] !== hitValidFloor) {
+                prevRayHitRef.current[visualSlot] = hitValidFloor;
+                const mat = rayMesh.material;
+                if (mat instanceof THREE.MeshBasicMaterial) {
+                  mat.color.setHex(hitValidFloor ? 0x34d399 : 0x38bdf8);
+                }
               }
               rayMesh.visible = true;
             }

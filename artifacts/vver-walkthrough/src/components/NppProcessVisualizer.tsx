@@ -90,6 +90,7 @@ export default function NppProcessVisualizer({ active, anchors }: NppProcessVisu
   const secondaryInstRef = useRef<THREE.InstancedMesh | null>(null);
   const powerInstRef = useRef<THREE.InstancedMesh | null>(null);
   const steamPointsRef = useRef<THREE.Points | null>(null);
+  const vrFrameAccumRef = useRef(0);
 
   const ritmHall = anchors?.ritmHall;
   const ritmFloorY = ritmHall?.minY ?? 0.62;
@@ -408,10 +409,26 @@ export default function NppProcessVisualizer({ active, anchors }: NppProcessVisu
 
   useFrame((state, delta) => {
     if (!active) return;
-    const dt = Math.min(delta, 0.05);
-    const t = state.clock.elapsedTime;
+    const isVR = Boolean(state.gl.xr?.isPresenting);
 
-    // 1. Черенковское свечение активных зон
+    // В активной VR-сессии снижаем частоту обновления частиц и GPU-буферов до ~30 Гц
+    if (isVR) {
+      vrFrameAccumRef.current += delta;
+      if (vrFrameAccumRef.current < 1 / 30) {
+        return;
+      }
+      const dt = Math.min(vrFrameAccumRef.current, 0.08);
+      vrFrameAccumRef.current = 0;
+      updateEffects(state.clock.elapsedTime, dt, true);
+      return;
+    }
+
+    const dt = Math.min(delta, 0.05);
+    updateEffects(state.clock.elapsedTime, dt, false);
+  });
+
+  const updateEffects = (t: number, dt: number, isVR: boolean) => {
+    // 1. Черенковское свечение активных зон (в VR отключаем тяжёлые динамические pointLight на все материалы)
     for (let i = 0; i < coreSpecs.length; i++) {
       const pulse = 0.72 + Math.sin(t * 4.2 + i * 1.3) * 0.22;
       const mesh = cherenkovRefs.current[i];
@@ -421,7 +438,7 @@ export default function NppProcessVisualizer({ active, anchors }: NppProcessVisu
       }
       const light = coreLightRefs.current[i];
       if (light) {
-        light.intensity = 14.0 * pulse;
+        light.intensity = isVR ? 0 : 14.0 * pulse;
       }
     }
 
@@ -554,11 +571,18 @@ export default function NppProcessVisualizer({ active, anchors }: NppProcessVisu
         }
       }
 
+      // В VR вдвое снижаем число пересчитываемых частиц пара (через шаг 2) для экономии fill-rate
+      if (isVR) {
+        for (let idx = 1; idx < steamSystem.total; idx += 2) {
+          alphaArr[idx] = 0;
+        }
+      }
+
       posAttr.needsUpdate = true;
       sizeAttr.needsUpdate = true;
       alphaAttr.needsUpdate = true;
     }
-  });
+  };
 
   if (!active) return null;
 

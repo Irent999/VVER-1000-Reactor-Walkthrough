@@ -111,6 +111,7 @@ export default function EvacuationRoutesVisualizer({
   const chevronInstRef = useRef<THREE.InstancedMesh | null>(null);
   const exitBeaconRefs = useRef<(THREE.Mesh | null)[]>([]);
   const assemblyRingRefs = useRef<(THREE.Mesh | null)[]>([]);
+  const vrFrameAccumRef = useRef(0);
 
   const ritmHall = anchors?.ritmHall;
   const ritmFloorY = ritmHall?.minY ?? 0.62;
@@ -275,8 +276,18 @@ export default function EvacuationRoutesVisualizer({
     inst.instanceMatrix.needsUpdate = true;
   }, [active, segments]);
 
-  useFrame((state) => {
+  useFrame((state, delta) => {
     if (!active) return;
+
+    // В VR снижаем частоту обновления буферов шевронов и маркеров до ~30 Гц для разгрузки CPU/GPU
+    if (state.gl.xr?.isPresenting) {
+      vrFrameAccumRef.current += delta;
+      if (vrFrameAccumRef.current < 1 / 30) {
+        return;
+      }
+      vrFrameAccumRef.current = 0;
+    }
+
     const t = state.clock.elapsedTime;
 
     // 1. Бегущие шевроны направления движения к выходам и зонам сбора

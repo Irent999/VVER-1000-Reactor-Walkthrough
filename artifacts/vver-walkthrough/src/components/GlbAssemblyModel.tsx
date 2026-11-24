@@ -62,6 +62,7 @@ interface GlbAssemblyModelProps {
 
 const MODEL_URL = resolveAssetUrl('assembly.glb');
 const DRACO_DECODER_PATH = resolveAssetUrl('draco/');
+const _camWorldPos = new THREE.Vector3();
 
 export function computeCutawayHeight(opacity: number): number {
   if (opacity >= 0.98) return 60;
@@ -96,6 +97,7 @@ export default function GlbAssemblyModel({
     new THREE.Box3(new THREE.Vector3(23.05, 0.5, -94.33), new THREE.Vector3(48.31, 18.0, -47.48))
   );
   const proximityXrayRef = useRef(false);
+  const lastProximityCheckRef = useRef(0);
 
   const applyShellOpacityState = (transparentMode: boolean, opacityValue = 0.16) => {
     for (const mat of shellMaterialsRef.current) {
@@ -138,11 +140,21 @@ export default function GlbAssemblyModel({
     }
   }, [energyFlowActive, invalidate]);
 
-  // Автоматическая полупрозрачность наружных стен при близком приближении к корпусу РИТМ-200Н
-  useFrame(({ camera }) => {
-    if (shellTransparentRef.current || shellMaterialsRef.current.length === 0) return;
-    const dist = ritmHallBoxRef.current.distanceToPoint(camera.position);
-    const shouldApproachXray = dist > 0.25 && dist <= 9.5 && camera.position.y < 24.0;
+  // Автоматическая полупрозрачность наружных стен при близком приближении к корпусу РИТМ-200Н.
+  // Выполняется с throttling (~5 Гц) и пропускается при активном VR, чтобы не вызывать перекомпиляцию шейдеров в стерео-кадре.
+  useFrame(({ gl, camera, clock }) => {
+    if (gl.xr?.isPresenting || shellTransparentRef.current || shellMaterialsRef.current.length === 0) {
+      return;
+    }
+    const elapsed = clock.elapsedTime;
+    if (elapsed - lastProximityCheckRef.current < 0.2) {
+      return;
+    }
+    lastProximityCheckRef.current = elapsed;
+
+    camera.getWorldPosition(_camWorldPos);
+    const dist = ritmHallBoxRef.current.distanceToPoint(_camWorldPos);
+    const shouldApproachXray = dist > 0.25 && dist <= 9.5 && _camWorldPos.y < 24.0;
     if (shouldApproachXray !== proximityXrayRef.current) {
       proximityXrayRef.current = shouldApproachXray;
       applyShellOpacityState(shouldApproachXray, 0.24);
@@ -208,6 +220,8 @@ export default function GlbAssemblyModel({
 
         const model = gltf.scene;
         model.name = 'MainGLBAssembly';
+        // Отключаем ежекадровый обход всей CAD-иерархии системой @pmndrs/pointer-events внутри VR
+        (model as unknown as { intersectChildren?: boolean }).intersectChildren = false;
 
         // 1. Сброс корневых трансформаций и исправление ориентации (Z-up CAD -> Y-up Three.js)
         // В assembly.glb узел Node0 содержит матрицу -90° по X, из-за чего плита основания стоит вертикально.
