@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
-import { OrbitControls, AdaptiveDpr } from '@react-three/drei';
-import { XR, createXRStore, VRButton, TeleportTarget } from '@react-three/xr';
+import { OrbitControls } from '@react-three/drei';
+import { XR, createXRStore } from '@react-three/xr';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { OrbitControls as OCImpl } from 'three-stdlib';
@@ -14,13 +14,30 @@ import VRControllerManager from '@/components/VRControllerManager';
 import DroneFlyByController, { type DroneWaymark } from '@/components/DroneFlyByController';
 import FirstPersonController from '@/components/FirstPersonController';
 import UIOverlay, { type ThemeMode } from '@/components/UIOverlay';
+import { ErrorBoundary, type ErrorFallbackProps } from '@/components/error-boundary';
 import WebXRSceneManager from '@/scene/webxrManager';
 import { FLOOR_VIEWS, type ViewMode } from '@/data/poiData';
 import { validateAndAdjustCameraLineOfSight } from '@/scene/cameraLineOfSightModule';
 
+// Конфигурация WebXR без внешнего эмулятора и загрузки моделей контроллеров с CDN:
+// поддерживаются HTC Vive / SteamVR / OpenXR / Meta Quest с фолбэком по referenceSpace.
 const xrStore = createXRStore({
-  controller: { teleportPointer: true, rayPointer: true },
-  offerSession: true,
+  emulate: false,
+  offerSession: false,
+  enterGrantedSession: false,
+  baseAssetPath: './',
+  foveation: 1.0,
+  frameRate: false,
+  bounded: false,
+  hand: false,
+  controller: false,
+  gaze: false,
+  screenInput: false,
+  transientPointer: false,
+  customSessionInit: {
+    requiredFeatures: [],
+    optionalFeatures: ['local-floor', 'bounded-floor', 'local', 'hand-tracking', 'layers'],
+  },
 });
 
 interface SmoothCameraControllerProps {
@@ -255,6 +272,35 @@ function SceneUnavailable({ onRetry }: { onRetry: () => void }) {
   );
 }
 
+function CanvasErrorFallback({ error, resetError }: ErrorFallbackProps) {
+  return (
+    <div
+      data-testid="status-scene-error"
+      className="absolute inset-0 grid place-items-center bg-slate-100 dark:bg-slate-950 px-6 text-center"
+      role="alert"
+    >
+      <div className="max-w-md rounded-2xl border border-slate-900/10 dark:border-white/10 bg-white/90 dark:bg-slate-900/90 p-7 shadow-xl">
+        <p className="mono text-xs uppercase tracking-widest text-amber-600 dark:text-amber-400">
+          WebGL / WebXR fallback
+        </p>
+        <h1 className="mt-3 text-lg font-semibold text-slate-900 dark:text-slate-100">
+          Сбой 3D-рендера или VR-сессии
+        </h1>
+        <p className="mt-2 text-xs leading-5 text-slate-600 dark:text-slate-400">
+          {error.message || 'Произошла ошибка графической подсистемы.'}
+        </p>
+        <button
+          type="button"
+          onClick={resetError}
+          className="mt-5 rounded-xl bg-slate-900 dark:bg-white px-4 py-2 text-xs font-semibold text-white dark:text-slate-950 transition hover:opacity-90"
+        >
+          Вернуться в Desktop-режим
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [theme, setTheme] = useState<ThemeMode>('light');
   const [webglAvailable, setWebglAvailable] = useState(canCreateWebGL2);
@@ -266,6 +312,8 @@ export default function App() {
   const [evacuationRoutesActive, setEvacuationRoutesActive] = useState(false);
   const [vrSupported, setVrSupported] = useState<boolean | null>(null);
   const [isVRPresenting, setIsVRPresenting] = useState(false);
+  const [xrRefSpaceType, setXrRefSpaceType] = useState<XRReferenceSpaceType>('local-floor');
+  const [vrError, setVrError] = useState<{ title: string; message: string } | null>(null);
 
   const [reloadKey, setReloadKey] = useState(0);
   const [glbStatus, setGlbStatus] = useState<GlbLoadState>({
@@ -279,6 +327,7 @@ export default function App() {
   });
   const [hudDismissed, setHudDismissed] = useState(false);
   const envRenderTargetRef = useRef<THREE.WebGLRenderTarget | null>(null);
+  const glRef = useRef<THREE.WebGLRenderer | null>(null);
 
   // Drone Fly-By state
   const [droneSpeed, setDroneSpeed] = useState(1.0);
@@ -334,9 +383,19 @@ export default function App() {
     const onEnd = () => setIsVRPresenting(false);
     window.addEventListener('webxr-session-start', onStart);
     window.addEventListener('webxr-session-end', onEnd);
+
+    const unsubscribeStore = xrStore.subscribe((state, prevState) => {
+      if (state.session && !prevState.session) {
+        setIsVRPresenting(true);
+      } else if (!state.session && prevState.session) {
+        setIsVRPresenting(false);
+      }
+    });
+
     return () => {
       window.removeEventListener('webxr-session-start', onStart);
       window.removeEventListener('webxr-session-end', onEnd);
+      unsubscribeStore();
     };
   }, []);
 
@@ -395,9 +454,94 @@ export default function App() {
     });
   }, [activeViewData.mode]);
 
-  const handleVRClick = useCallback(() => {
-    const btn = document.getElementById('vr-btn');
-    if (btn) btn.click();
+  // Безопасный запуск/завершение WebXR-сессии с перехватом всех ошибок и фолбэком 'local-floor' -> 'local'
+  const handleVRClick = useCallback(async () => {
+    if (typeof navigator === 'undefined' || !navigator.xr) {
+      setVrError({
+        title: 'WebXR недоступен',
+        message:
+          'Браузер не поддерживает WebXR или приложение открыто не через HTTPS/localhost. Продолжена работа в Desktop-режиме.',
+      });
+      return;
+    }
+
+    const activeSession = xrStore.getState().session;
+    if (activeSession) {
+      try {
+        await activeSession.end();
+      } catch {
+        setIsVRPresenting(false);
+      }
+      return;
+    }
+
+    try {
+      const supported = await navigator.xr.isSessionSupported('immersive-vr');
+      if (!supported) {
+        setVrSupported(false);
+        setVrError({
+          title: 'VR-гарнитура не обнаружена',
+          message:
+            'Подключите VR-шлем (HTC Vive / SteamVR / OpenXR / Quest) и перезапустите браузер, либо продолжайте работу в Desktop-режиме.',
+        });
+        return;
+      }
+      setVrSupported(true);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setVrError({
+        title: 'Ошибка проверки WebXR',
+        message: `${msg}. Приложение продолжает работу в Desktop-режиме.`,
+      });
+      return;
+    }
+
+    try {
+      setXrRefSpaceType('local-floor');
+      if (glRef.current?.xr) {
+        glRef.current.xr.enabled = true;
+        glRef.current.xr.setReferenceSpaceType('local-floor');
+      }
+      await xrStore.enterVR();
+    } catch (primaryErr: unknown) {
+      const leftover = xrStore.getState().session;
+      if (leftover) {
+        try {
+          await leftover.end();
+        } catch {
+          // Игнорируем ошибку закрытия прерванной сессии
+        }
+      }
+
+      const primaryMsg = primaryErr instanceof Error ? primaryErr.message : String(primaryErr);
+      const isRefSpaceMismatch = /reference|local-floor|bounded-floor|NotSupportedError/i.test(
+        primaryMsg
+      );
+
+      if (isRefSpaceMismatch && glRef.current?.xr) {
+        try {
+          setXrRefSpaceType('local');
+          glRef.current.xr.enabled = true;
+          glRef.current.xr.setReferenceSpaceType('local');
+          await xrStore.enterVR();
+          return;
+        } catch (fallbackErr: unknown) {
+          const fbMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
+          setIsVRPresenting(false);
+          setVrError({
+            title: 'Не удалось запустить VR-сессию',
+            message: `${fbMsg}. Приложение остаётся в Desktop-режиме.`,
+          });
+          return;
+        }
+      }
+
+      setIsVRPresenting(false);
+      setVrError({
+        title: 'Не удалось войти в VR',
+        message: `${primaryMsg}. Приложение остаётся в Desktop-режиме.`,
+      });
+    }
   }, []);
 
   const handlePointerLockChange = useCallback((locked: boolean) => {
@@ -419,29 +563,30 @@ export default function App() {
 
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden bg-[#dce8f2] dark:bg-[#1a2430] transition-colors duration-200">
-      <div className="pointer-events-none absolute right-0 top-0 opacity-0">
-        <VRButton store={xrStore} id="vr-btn" />
-      </div>
-
       {webglAvailable ? (
-        <div id="vver-canvas-wrapper" className="h-full w-full">
-          <Canvas
-            frameloop="always"
-            shadows={!isVRPresenting}
-            camera={{ position: [-32, 2.05, -18], fov: 55, near: 0.15, far: 1400 }}
-          gl={{
-            antialias: false,
-            alpha: false,
-            stencil: false,
-            depth: true,
-            toneMapping: THREE.ACESFilmicToneMapping,
-            toneMappingExposure: 1.05,
-            powerPreference: 'high-performance',
-          }}
-          dpr={isVRPresenting ? 1 : [1, 1.25]}
-          onCreated={({ gl, scene, camera }) => {
-            const bgColor = new THREE.Color(theme === 'dark' ? '#1a2430' : '#dce8f2');
-            scene.background = bgColor;
+        <ErrorBoundary FallbackComponent={CanvasErrorFallback} resetKey={reloadKey}>
+          <div id="vver-canvas-wrapper" className="h-full w-full">
+            <Canvas
+              frameloop="always"
+              shadows
+              camera={{ position: [-32, 2.05, -18], fov: 55, near: 0.15, far: 1400 }}
+              gl={{
+                antialias: false,
+                alpha: false,
+                stencil: false,
+                depth: true,
+                toneMapping: THREE.ACESFilmicToneMapping,
+                toneMappingExposure: 1.05,
+                powerPreference: 'high-performance',
+              }}
+              dpr={[1, 1.25]}
+              onCreated={({ gl, scene, camera }) => {
+                glRef.current = gl;
+                if (gl.xr) {
+                  gl.xr.enabled = true;
+                }
+                const bgColor = new THREE.Color(theme === 'dark' ? '#1a2430' : '#dce8f2');
+                scene.background = bgColor;
             gl.setClearColor(bgColor, 1.0);
             gl.localClippingEnabled = true;
             gl.setPixelRatio(Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, 1.25));
@@ -480,9 +625,8 @@ export default function App() {
               activeSpawnPos={vrSpawnTarget}
               floorY={activeViewData.floorY}
               activeViewId={activeViewData.id}
+              referenceSpaceType={xrRefSpaceType}
             />
-
-            {!isVRPresenting && <AdaptiveDpr pixelated />}
 
             <ambientLight intensity={theme === 'dark' ? 0.42 : 0.34} color="#ffffff" />
             <hemisphereLight args={['#eef6ff', '#8d96a2', theme === 'dark' ? 0.82 : 0.94]} />
@@ -503,28 +647,19 @@ export default function App() {
             <directionalLight position={[-120, 95, -110]} intensity={0.62} color="#cfe4ff" />
 
             <XR store={xrStore}>
-              <TeleportTarget
-                onTeleport={(point) => {
-                  window.dispatchEvent(
-                    new CustomEvent('vr-teleport-to', {
-                      detail: { x: point.x, y: point.y, z: point.z },
-                    })
-                  );
-                }}
-              >
-                <SceneContent
-                  reloadKey={reloadKey}
-                  containmentOpacity={containmentOpacity}
-                  shellTransparent={shellTransparent}
-                  energyFlowActive={energyFlowActive}
-                  evacuationRoutesActive={evacuationRoutesActive}
-                  onStatusChange={handleGlbStatusChange}
-                />
-              </TeleportTarget>
+              <SceneContent
+                reloadKey={reloadKey}
+                containmentOpacity={containmentOpacity}
+                shellTransparent={shellTransparent}
+                energyFlowActive={energyFlowActive}
+                evacuationRoutesActive={evacuationRoutesActive}
+                onStatusChange={handleGlbStatusChange}
+              />
               <VRControllerManager
                 viewTarget={vrSpawnTarget}
                 floorY={activeViewData.floorY}
                 activeViewId={activeViewData.id}
+                referenceSpaceType={xrRefSpaceType}
               />
             </XR>
 
@@ -555,8 +690,9 @@ export default function App() {
                 freeGroundY={activeViewData.floorY}
               />
             ) : null}
-          </Canvas>
-        </div>
+            </Canvas>
+          </div>
+        </ErrorBoundary>
       ) : (
         <SceneUnavailable onRetry={() => setWebglAvailable(canCreateWebGL2())} />
       )}
@@ -640,6 +776,8 @@ export default function App() {
         controlMode={controlMode}
         onVRClick={handleVRClick}
         vrSupported={vrSupported}
+        vrError={vrError}
+        onClearVrError={() => setVrError(null)}
         droneSpeed={droneSpeed}
         onDroneSpeedChange={setDroneSpeed}
         dronePaused={dronePaused}

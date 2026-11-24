@@ -37,8 +37,10 @@ interface UIOverlayProps {
   evacuationRoutesActive: boolean;
   onToggleEvacuationRoutes: () => void;
   controlMode: ViewMode;
-  onVRClick: () => void;
+  onVRClick: () => void | Promise<void>;
   vrSupported: boolean | null;
+  vrError?: { title: string; message: string } | null;
+  onClearVrError?: () => void;
   telemetry?: TelemetrySnapshot;
   droneSpeed?: number;
   onDroneSpeedChange?: (speed: number) => void;
@@ -74,6 +76,8 @@ export default function UIOverlay({
   onToggleEvacuationRoutes,
   controlMode,
   onVRClick,
+  vrError,
+  onClearVrError,
   telemetry: propTelemetry,
   droneSpeed = 1.0,
   onDroneSpeedChange,
@@ -133,33 +137,26 @@ export default function UIOverlay({
     return () => window.removeEventListener('mousedown', onOutsideClick);
   }, [zonesOpen]);
 
-  const handleEnterVR = async () => {
-    if (typeof navigator === 'undefined' || !navigator.xr) {
-      setVrModal({
-        open: true,
-        title: 'WebXR недоступен',
-        message: 'Используйте совместимый браузер (Chrome / Edge / Oculus Browser) для запуска VR-сессии.',
-      });
-      return;
+  useEffect(() => {
+    if (vrError) {
+      setVrModal({ open: true, title: vrError.title, message: vrError.message });
     }
+  }, [vrError]);
 
+  const closeVrModal = () => {
+    setVrModal((prev) => ({ ...prev, open: false }));
+    onClearVrError?.();
+  };
+
+  const handleEnterVR = async () => {
     try {
-      const supported = await navigator.xr.isSessionSupported('immersive-vr');
-      if (supported) {
-        onVRClick();
-        return;
-      }
-      setVrModal({
-        open: true,
-        title: 'VR-гарнитура не обнаружена',
-        message: 'Подключите VR-шлем (Meta Quest, SteamVR, Pico) или откройте приложение в браузере шлема.',
-      });
+      await onVRClick();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setVrModal({
         open: true,
         title: 'Ошибка инициализации VR',
-        message: msg,
+        message: `${msg}. Продолжена работа в Desktop-режиме.`,
       });
     }
   };
@@ -592,7 +589,7 @@ export default function UIOverlay({
       {vrModal.open && (
         <div
           className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm"
-          onClick={() => setVrModal((prev) => ({ ...prev, open: false }))}
+          onClick={closeVrModal}
         >
           <div
             className={`${glassSurface} panel-enter relative w-full max-w-sm rounded-2xl p-6 text-center`}
@@ -600,7 +597,7 @@ export default function UIOverlay({
           >
             <button
               type="button"
-              onClick={() => setVrModal((prev) => ({ ...prev, open: false }))}
+              onClick={closeVrModal}
               aria-label="Закрыть"
               className="absolute right-4 top-4 rounded-lg p-1.5 text-slate-500 hover:bg-slate-900/5 dark:text-slate-400 dark:hover:bg-white/10"
             >
@@ -615,7 +612,7 @@ export default function UIOverlay({
             </p>
             <button
               type="button"
-              onClick={() => setVrModal((prev) => ({ ...prev, open: false }))}
+              onClick={closeVrModal}
               className="mt-5 w-full rounded-xl bg-slate-900 py-2 text-xs font-semibold text-white transition hover:opacity-90 dark:bg-white dark:text-slate-950"
             >
               Понятно

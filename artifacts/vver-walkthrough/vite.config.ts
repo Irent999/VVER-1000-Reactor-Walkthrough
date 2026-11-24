@@ -5,7 +5,6 @@ import tailwindcss from '@tailwindcss/vite';
 import { defineConfig, type Plugin } from 'vite';
 
 const port = Number(process.env.PORT) || 3000;
-const basePath = process.env.BASE_PATH || '/';
 
 function aistudioAssetsFallbackPlugin(): Plugin {
   const localPublicDir = path.resolve(import.meta.dirname, 'public');
@@ -87,8 +86,10 @@ function aistudioAssetsFallbackPlugin(): Plugin {
   };
 }
 
-export default defineConfig({
-  base: basePath,
+export default defineConfig(({ command }) => ({
+  // В релизной сборке (vite build) по умолчанию используется относительный base: './',
+  // чтобы приложение корректно запускалось из подпапки, локального сервера или оболочки установщика.
+  base: process.env.BASE_PATH || (command === 'build' ? './' : '/'),
   plugins: [
     react(),
     tailwindcss(),
@@ -110,6 +111,15 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, 'dist'),
     emptyOutDir: true,
+    chunkSizeWarningLimit: 1800,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-three': ['three', '@react-three/fiber', '@react-three/drei', '@react-three/xr'],
+        },
+      },
+    },
   },
   server: {
     port,
@@ -124,4 +134,4 @@ export default defineConfig({
     host: '0.0.0.0',
     allowedHosts: true,
   },
-});
+}));

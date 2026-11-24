@@ -1,11 +1,14 @@
 /**
  * ============================================================================
- * МОДУЛЬ КОНФИГУРАЦИИ WEBXR И РЕНДЕРИНГА
+ * МОДУЛЬ КОНФИГУРАЦИИ WEBXR И РЕНДЕРИНГА (HTC VIVE / STEAMVR / OPENXR)
  * ============================================================================
  *
- * Настраивает gl.xr.enabled = true, фовеальный рендеринг, плоскости отсечения
- * камеры (near/far) и события жизненного цикла сессии WebXR без перехвата
- * родительского узла камеры у <XROrigin>.
+ * - Гарантирует gl.xr.enabled = true до старта, во время и после завершения
+ *   VR-сессии (компенсирует сброс флага в @react-three/fiber на sessionend).
+ * - Настраивает referenceSpaceType ('local-floor' с безопасным фолбэком 'local').
+ * - Синхронизирует ближнюю/дальнюю плоскости отсечения XR-камеры и стереопары.
+ * - Корректно восстанавливает размер, pixelRatio, тени и Desktop-режим при
+ *   выходе из шлема или ошибке WebXR.
  */
 
 import { useEffect, useRef } from 'react';
@@ -13,41 +16,58 @@ import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
 export interface WebXRSceneManagerProps {
-  /** Текущие координаты выбранного ракурса камеры [x, y, z] */
+  /** Текущие координаты выбранного ракурса/спавна [x, y, z] */
   activeSpawnPos?: [number, number, number];
-  /** Отметка пола в метрах (0м для площадки) */
+  /** Отметка пола в метрах (0.40 м для площадки, 0.62 м / 14.41 м / 19.71 м для залов) */
   floorY?: number;
   /** Идентификатор текущего ракурса */
   activeViewId?: string;
+  /** Предпочтительный тип пространства отсчёта WebXR */
+  referenceSpaceType?: XRReferenceSpaceType;
 }
 
 export default function WebXRSceneManager({
-  activeSpawnPos = [64, 0, -18],
-  floorY = 0,
+  activeSpawnPos = [-32, 0.4, -18],
+  floorY = 0.4,
   activeViewId,
+  referenceSpaceType = 'local-floor',
 }: WebXRSceneManagerProps) {
   const { gl, scene, camera } = useThree();
+
   const currentSpawnRef = useRef<[number, number, number]>(activeSpawnPos);
   const currentFloorYRef = useRef<number>(floorY);
+  const currentViewIdRef = useRef<string | undefined>(activeViewId);
+  const currentRefSpaceRef = useRef<XRReferenceSpaceType>(referenceSpaceType);
 
   useEffect(() => {
     currentSpawnRef.current = activeSpawnPos;
-    currentFloorYRef.current = floorY;
-  }, [activeSpawnPos, floorY]);
+    currentFloorYRef.current = Number.isFinite(floorY) ? floorY : 0.4;
+    currentViewIdRef.current = activeViewId;
+    currentRefSpaceRef.current = referenceSpaceType;
+    if (gl.xr && !gl.xr.isPresenting) {
+      try {
+        gl.xr.setReferenceSpaceType(referenceSpaceType);
+      } catch {
+        // Игнорируем ошибку установки неподдерживаемого referenceSpaceType до старта сессии
+      }
+    }
+  }, [gl, activeSpawnPos, floorY, activeViewId, referenceSpaceType]);
 
   useEffect(() => {
+    const desktopShadowsRef = { enabled: gl.shadowMap.enabled };
+
     if (gl.xr) {
       gl.xr.enabled = true;
       try {
+        gl.xr.setReferenceSpaceType(currentRefSpaceRef.current);
         gl.xr.setFoveation?.(1.0);
-        gl.xr.setFramebufferScaleFactor?.(0.9);
       } catch {
-        // Безопасный фолбэк для браузеров без поддержки setFoveation
+        // Безопасный фолбэк для браузеров/драйверов без поддержки setFoveation
       }
     }
 
     if (!scene.background) {
-      const bgColor = new THREE.Color('#131c24');
+      const bgColor = new THREE.Color('#dce8f2');
       scene.background = bgColor;
       gl.setClearColor(bgColor, 1.0);
     }
@@ -65,24 +85,20 @@ export default function WebXRSceneManager({
           camera.aspect = width / height;
           camera.updateProjectionMatrix();
         }
-        gl.setSize(width, height);
+        gl.setSize(width, height, false);
         gl.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
       }
     };
+
     window.addEventListener('resize', handleResize);
     handleResize();
 
-    const prevShadowEnabled = gl.shadowMap.enabled;
-
     const onSessionStart = () => {
+      desktopShadowsRef.enabled = gl.shadowMap.enabled;
       gl.shadowMap.enabled = false;
-      gl.setPixelRatio(1);
-
-      camera.near = 0.15;
-      camera.far = 1400;
-      camera.updateProjectionMatrix();
 
       if (gl.xr) {
+        gl.xr.enabled = true;
         try {
           gl.xr.setFoveation?.(1.0);
           const xrCamera = gl.xr.getCamera();
@@ -97,35 +113,63 @@ export default function WebXRSceneManager({
             });
           }
         } catch {
-          // Safe fallback
+          // Безопасный фолбэк при нестандартной XR-камере
         }
       }
 
-      const isWalk =
-        activeViewId && (activeViewId.startsWith('walk') || activeViewId.includes('steam'));
-      const spawnX = isWalk && currentSpawnRef.current ? currentSpawnRef.current[0] : 64;
-      const spawnY = isWalk && currentFloorYRef.current !== undefined ? currentFloorYRef.current : 0;
-      const spawnZ = isWalk && currentSpawnRef.current ? currentSpawnRef.current[2] : -18;
+      const viewId = currentViewIdRef.current;
+      const isWalkable =
+        Boolean(viewId) &&
+        (viewId!.startsWith('walk') || viewId!.includes('steam') || viewId!.includes('reactor'));
+      const spawnCandidate = currentSpawnRef.current;
+      const safeFloorY = Number.isFinite(currentFloorYRef.current) ? currentFloorYRef.current : 0.4;
+      const spawnX = isWalkable && spawnCandidate ? spawnCandidate[0] : -32;
+      const spawnY = isWalkable ? safeFloorY : 0.4;
+      const spawnZ = isWalkable && spawnCandidate ? spawnCandidate[2] : -18;
+
+      // Проверяем фактически полученное пространство отсчёта (local-floor или фолбэк local)
+      let activeRefSpaceType: XRReferenceSpaceType = currentRefSpaceRef.current;
+      try {
+        const refSpace = gl.xr?.getReferenceSpace();
+        if (!refSpace && activeRefSpaceType !== 'local') {
+          activeRefSpaceType = 'local';
+        }
+      } catch {
+        activeRefSpaceType = 'local';
+      }
 
       try {
         window.dispatchEvent(
           new CustomEvent('webxr-session-start', {
-            detail: { spawn: [spawnX, spawnY, spawnZ] },
+            detail: {
+              spawn: [spawnX, spawnY, spawnZ] as [number, number, number],
+              referenceSpaceType: activeRefSpaceType,
+            },
           })
         );
       } catch {
-        // Safe fallback
+        // Игнорируем ошибку диспатча в изолированных окружениях
       }
     };
 
     const onSessionEnd = () => {
-      gl.shadowMap.enabled = prevShadowEnabled;
-      gl.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
+      gl.shadowMap.enabled = desktopShadowsRef.enabled;
+
+      // Восстанавливаем gl.xr.enabled = true после внутреннего обработчика @react-three/fiber
+      const keepXrEnabled = () => {
+        if (gl.xr) {
+          gl.xr.enabled = true;
+        }
+      };
+      keepXrEnabled();
+      queueMicrotask(keepXrEnabled);
+
+      handleResize();
 
       try {
         window.dispatchEvent(new CustomEvent('webxr-session-end'));
       } catch {
-        // Safe fallback
+        // Игнорируем ошибку диспатча
       }
     };
 
@@ -141,7 +185,7 @@ export default function WebXRSceneManager({
         gl.xr.removeEventListener('sessionend', onSessionEnd);
       }
     };
-  }, [gl, scene, camera, activeViewId]);
+  }, [gl, scene, camera]);
 
   return null;
 }

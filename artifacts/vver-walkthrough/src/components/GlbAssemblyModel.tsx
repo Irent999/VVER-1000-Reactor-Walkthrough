@@ -59,7 +59,11 @@ interface GlbAssemblyModelProps {
   onAnchorsReady?: (anchors: SiteBox3Anchors) => void;
 }
 
-const MODEL_URL = '/assembly.glb';
+const BASE_URL = import.meta.env.BASE_URL.endsWith('/')
+  ? import.meta.env.BASE_URL
+  : `${import.meta.env.BASE_URL}/`;
+const MODEL_URL = `${BASE_URL}assembly.glb`;
+const DRACO_DECODER_PATH = `${BASE_URL}draco/`;
 
 export function computeCutawayHeight(opacity: number): number {
   if (opacity >= 0.98) return 60;
@@ -148,12 +152,10 @@ export default function GlbAssemblyModel({
     }
   });
 
-  // Критично для frameloop="demand": вызываем invalidate() ПОСЛЕ монтирования <primitive /> в сцену
+  // Принудительное обновление кадра сразу после монтирования <primitive /> без ручного requestAnimationFrame
   useEffect(() => {
     if (!loadedScene) return;
     invalidate();
-    const rafId = requestAnimationFrame(() => invalidate());
-    return () => cancelAnimationFrame(rafId);
   }, [loadedScene, invalidate]);
 
   useEffect(() => {
@@ -188,7 +190,8 @@ export default function GlbAssemblyModel({
     };
 
     const dracoLoader = new DRACOLoader(manager);
-    dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+    // Локальный оффлайн-декодер из public/draco/ вместо внешнего CDN gstatic.com
+    dracoLoader.setDecoderPath(DRACO_DECODER_PATH);
 
     const gltfLoader = new GLTFLoader(manager);
     gltfLoader.setDRACOLoader(dracoLoader);
