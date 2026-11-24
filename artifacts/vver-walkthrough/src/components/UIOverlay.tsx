@@ -29,6 +29,20 @@ export interface VRAvailabilityInfo {
   reason: string;
 }
 
+export interface VRDiagnosticDetails {
+  isSecureContext: boolean;
+  hasNavigatorXr: boolean;
+  isSessionSupported: string;
+  errorName?: string;
+  errorMessage?: string;
+}
+
+export interface VRErrorState {
+  title: string;
+  message: string;
+  diagnostics?: VRDiagnosticDetails;
+}
+
 interface UIOverlayProps {
   activeView: string;
   onViewChange: (viewId: string) => void;
@@ -45,7 +59,7 @@ interface UIOverlayProps {
   onVRClick: () => void | Promise<void>;
   vrSupported: boolean | null;
   vrAvailability?: VRAvailabilityInfo;
-  vrError?: { title: string; message: string } | null;
+  vrError?: VRErrorState | null;
   onClearVrError?: () => void;
   telemetry?: TelemetrySnapshot;
   droneSpeed?: number;
@@ -103,7 +117,12 @@ export default function UIOverlay({
   const [informerOpen, setInformerOpen] = useState(true);
   const [zonesOpen, setZonesOpen] = useState(false);
   const [isVRPresenting, setIsVRPresenting] = useState(false);
-  const [vrModal, setVrModal] = useState<{ open: boolean; title: string; message: string }>({
+  const [vrModal, setVrModal] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    diagnostics?: VRDiagnosticDetails;
+  }>({
     open: false,
     title: '',
     message: '',
@@ -147,7 +166,12 @@ export default function UIOverlay({
 
   useEffect(() => {
     if (vrError) {
-      setVrModal({ open: true, title: vrError.title, message: vrError.message });
+      setVrModal({
+        open: true,
+        title: vrError.title,
+        message: vrError.message,
+        diagnostics: vrError.diagnostics,
+      });
     }
   }, [vrError]);
 
@@ -580,36 +604,40 @@ export default function UIOverlay({
 
           <span className="hidden sm:block h-5 w-px bg-slate-900/10 dark:bg-white/10" aria-hidden="true" />
 
-          {/* Кнопка входа в VR с видимым статусом и диагностикой доступности */}
+          {/* Кнопка входа в VR: не блокируется при isSessionSupported === false, если доступен navigator.xr */}
           <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              data-testid="button-enter-vr-prominent"
-              onClick={handleEnterVR}
-              title={
-                vrAvailability?.reason ||
-                (vrSupported === false
-                  ? 'VR-шлем не обнаружен — доступен Desktop-режим'
-                  : 'Запуск VR-сессии (WebXR / HTC Vive / SteamVR)')
-              }
-              className={`flex items-center gap-1.5 whitespace-nowrap rounded-xl px-3.5 py-2 text-xs font-semibold shadow-sm transition ${
-                vrAvailability?.status === 'ready' || vrSupported === true
-                  ? 'bg-emerald-600 text-white hover:bg-emerald-500 dark:bg-emerald-500 dark:text-slate-950 dark:hover:bg-emerald-400'
-                  : 'border border-amber-500/35 bg-amber-500/15 text-amber-800 hover:bg-amber-500/25 dark:border-amber-400/30 dark:bg-amber-400/15 dark:text-amber-200 dark:hover:bg-amber-400/25'
-              }`}
-            >
-              <Glasses size={15} />
-              <span>
-                {vrAvailability?.status === 'ready' || vrSupported === true
-                  ? 'Войти в VR'
-                  : 'VR недоступен'}
-              </span>
-            </button>
+            {(() => {
+              const isHardBlocked =
+                vrAvailability?.status === 'insecure-context' ||
+                vrAvailability?.status === 'no-webxr';
+              const isReady = vrAvailability?.status === 'ready' || vrSupported === true;
+              return (
+                <button
+                  type="button"
+                  data-testid="button-enter-vr-prominent"
+                  onClick={handleEnterVR}
+                  title={
+                    vrAvailability?.reason ||
+                    'Запуск VR-сессии (WebXR / HTC Vive / SteamVR)'
+                  }
+                  className={`flex items-center gap-1.5 whitespace-nowrap rounded-xl px-3.5 py-2 text-xs font-semibold shadow-sm transition ${
+                    isReady
+                      ? 'bg-emerald-600 text-white hover:bg-emerald-500 dark:bg-emerald-500 dark:text-slate-950 dark:hover:bg-emerald-400'
+                      : isHardBlocked
+                      ? 'border border-amber-500/35 bg-amber-500/15 text-amber-800 hover:bg-amber-500/25 dark:border-amber-400/30 dark:bg-amber-400/15 dark:text-amber-200 dark:hover:bg-amber-400/25'
+                      : 'border border-sky-500/35 bg-sky-500/15 text-sky-800 hover:bg-sky-500/25 dark:border-sky-400/30 dark:bg-sky-400/15 dark:text-sky-200 dark:hover:bg-sky-400/25'
+                  }`}
+                >
+                  <Glasses size={15} />
+                  <span>{isHardBlocked ? 'VR недоступен' : 'Войти в VR'}</span>
+                </button>
+              );
+            })()}
             {vrAvailability && vrAvailability.status !== 'ready' && vrAvailability.status !== 'checking' && (
               <span
                 data-testid="vr-unavailable-reason"
                 title={vrAvailability.reason}
-                className="hidden xl:inline-block max-w-[200px] truncate rounded-lg bg-slate-900/5 px-2 py-1 text-[10px] font-medium text-slate-600 dark:bg-white/10 dark:text-slate-300"
+                className="hidden xl:inline-block max-w-[220px] truncate rounded-lg bg-slate-900/5 px-2 py-1 text-[10px] font-medium text-slate-600 dark:bg-white/10 dark:text-slate-300"
               >
                 {vrAvailability.reason}
               </span>
@@ -618,14 +646,15 @@ export default function UIOverlay({
         </div>
       </nav>
 
-      {/* Модальное окно статуса WebXR VR */}
+      {/* Модальное окно статуса и технической диагностики WebXR VR */}
       {vrModal.open && (
         <div
           className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm"
           onClick={closeVrModal}
         >
           <div
-            className={`${glassSurface} panel-enter relative w-full max-w-sm rounded-2xl p-6 text-center`}
+            data-testid="vr-diagnostic-modal"
+            className={`${glassSurface} panel-enter relative w-full max-w-md rounded-2xl p-6 text-center`}
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -643,6 +672,63 @@ export default function UIOverlay({
             <p className="mt-2 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
               {vrModal.message}
             </p>
+
+            {vrModal.diagnostics && (
+              <div
+                data-testid="vr-diagnostic-details"
+                className="mt-4 rounded-xl border border-slate-900/10 bg-slate-900/[0.04] p-3 text-left text-[11px] dark:border-white/10 dark:bg-white/[0.04]"
+              >
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Техническая диагностика WebXR
+                </p>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-slate-600 dark:text-slate-400">isSecureContext</span>
+                    <span
+                      className={`mono font-semibold ${
+                        vrModal.diagnostics.isSecureContext
+                          ? 'text-emerald-700 dark:text-emerald-400'
+                          : 'text-amber-700 dark:text-amber-400'
+                      }`}
+                    >
+                      {String(vrModal.diagnostics.isSecureContext)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-slate-600 dark:text-slate-400">navigator.xr</span>
+                    <span
+                      className={`mono font-semibold ${
+                        vrModal.diagnostics.hasNavigatorXr
+                          ? 'text-emerald-700 dark:text-emerald-400'
+                          : 'text-amber-700 dark:text-amber-400'
+                      }`}
+                    >
+                      {vrModal.diagnostics.hasNavigatorXr ? 'доступен' : 'отсутствует'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-slate-600 dark:text-slate-400">
+                      isSessionSupported(&apos;immersive-vr&apos;)
+                    </span>
+                    <span className="mono font-semibold text-slate-800 dark:text-slate-200">
+                      {vrModal.diagnostics.isSessionSupported}
+                    </span>
+                  </div>
+                  {(vrModal.diagnostics.errorName || vrModal.diagnostics.errorMessage) && (
+                    <div className="mt-2 border-t border-slate-900/10 pt-2 dark:border-white/10">
+                      <span className="block text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                        Ошибка requestSession:
+                      </span>
+                      <p className="mono mt-0.5 break-words text-[11px] font-medium text-rose-700 dark:text-rose-300">
+                        {vrModal.diagnostics.errorName ? `${vrModal.diagnostics.errorName}: ` : ''}
+                        {vrModal.diagnostics.errorMessage || 'Неизвестная ошибка'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             <button
               type="button"
               onClick={closeVrModal}

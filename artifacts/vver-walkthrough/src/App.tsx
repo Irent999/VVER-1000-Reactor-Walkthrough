@@ -13,7 +13,11 @@ import EvacuationRoutesVisualizer from '@/components/EvacuationRoutesVisualizer'
 import VRControllerManager from '@/components/VRControllerManager';
 import DroneFlyByController, { type DroneWaymark } from '@/components/DroneFlyByController';
 import FirstPersonController from '@/components/FirstPersonController';
-import UIOverlay, { type ThemeMode, type VRAvailabilityInfo } from '@/components/UIOverlay';
+import UIOverlay, {
+  type ThemeMode,
+  type VRAvailabilityInfo,
+  type VRErrorState,
+} from '@/components/UIOverlay';
 import { ErrorBoundary, type ErrorFallbackProps } from '@/components/error-boundary';
 import WebXRSceneManager, {
   isXRPresentingOrActive,
@@ -40,8 +44,7 @@ const xrStore = createXRStore({
   screenInput: false,
   transientPointer: false,
   customSessionInit: {
-    requiredFeatures: [],
-    optionalFeatures: ['local-floor', 'bounded-floor', 'local', 'hand-tracking', 'layers'],
+    optionalFeatures: ['local-floor', 'bounded-floor'],
   },
 });
 
@@ -318,13 +321,15 @@ export default function App() {
   const [energyFlowActive, setEnergyFlowActive] = useState(false);
   const [evacuationRoutesActive, setEvacuationRoutesActive] = useState(false);
   const [vrSupported, setVrSupported] = useState<boolean | null>(null);
+  const vrSupportedRef = useRef<boolean | null>(null);
+  vrSupportedRef.current = vrSupported;
   const [vrAvailability, setVrAvailability] = useState<VRAvailabilityInfo>({
     status: 'checking',
     reason: 'Проверка доступности WebXR...',
   });
   const [isVRPresenting, setIsVRPresenting] = useState(false);
   const [xrRefSpaceType, setXrRefSpaceType] = useState<XRReferenceSpaceType>('local-floor');
-  const [vrError, setVrError] = useState<{ title: string; message: string } | null>(null);
+  const [vrError, setVrError] = useState<VRErrorState | null>(null);
 
   const [reloadKey, setReloadKey] = useState(0);
   const [glbStatus, setGlbStatus] = useState<GlbLoadState>({
@@ -408,7 +413,7 @@ export default function App() {
               ? { status: 'ready', reason: 'Шлем готов к запуску VR' }
               : {
                   status: 'unsupported',
-                  reason: 'Шлем / SteamVR не обнаружен',
+                  reason: 'isSessionSupported: false (можно попробовать запуск)',
                 }
           );
         }
@@ -445,8 +450,9 @@ export default function App() {
     };
     const onUnhandledRejection = (event: PromiseRejectionEvent) => {
       const reason = event.reason;
+      const errName = reason instanceof Error ? reason.name : 'UnhandledRejection';
       const msg = reason instanceof Error ? reason.message : String(reason ?? '');
-      if (/xr|webxr|vr|immersive|referenceSpace|session/i.test(msg)) {
+      if (/xr|webxr|vr|immersive|referenceSpace|session/i.test(`${errName} ${msg}`)) {
         event.preventDefault();
         setIsVRPresenting(false);
         const staleSession = xrStore.getState().session;
@@ -456,6 +462,14 @@ export default function App() {
         setVrError({
           title: 'Асинхронная ошибка WebXR',
           message: `${msg || 'Сбой драйвера VR'}. Продолжена работа в Desktop-режиме.`,
+          diagnostics: {
+            isSecureContext: typeof window !== 'undefined' ? window.isSecureContext : false,
+            hasNavigatorXr: typeof navigator !== 'undefined' && Boolean(navigator.xr),
+            isSessionSupported:
+              vrSupportedRef.current === null ? 'не проверялось' : String(vrSupportedRef.current),
+            errorName: errName,
+            errorMessage: msg || 'Неизвестная асинхронная ошибка WebXR',
+          },
         });
       }
     };
@@ -539,9 +553,13 @@ export default function App() {
     });
   }, [activeViewData.mode]);
 
-  // Безопасный запуск/завершение WebXR-сессии строго по клику пользователя
+  // Безопасный запуск/завершение WebXR-сессии строго по клику пользователя.
+  // Не блокируем попытку запуска requestSession('immersive-vr') из-за isSessionSupported === false.
   const handleVRClick = useCallback(async () => {
-    if (typeof window !== 'undefined' && !window.isSecureContext) {
+    const secureCtx = typeof window !== 'undefined' ? window.isSecureContext : false;
+    const hasXr = typeof navigator !== 'undefined' && Boolean(navigator.xr);
+
+    if (!secureCtx) {
       setVrAvailability({
         status: 'insecure-context',
         reason: 'Требуется HTTPS или localhost',
@@ -550,11 +568,18 @@ export default function App() {
         title: 'WebXR заблокирован небезопасным адресом',
         message:
           'Откройте приложение по HTTPS или через http://localhost / http://127.0.0.1. Работа продолжена в Desktop-режиме.',
+        diagnostics: {
+          isSecureContext: false,
+          hasNavigatorXr: hasXr,
+          isSessionSupported: 'не проверялось (небезопасный контекст)',
+          errorName: 'SecurityError',
+          errorMessage: 'WebXR API требует защищённый контекст (HTTPS или localhost).',
+        },
       });
       return;
     }
 
-    if (typeof navigator === 'undefined' || !navigator.xr) {
+    if (!hasXr || !navigator.xr) {
       setVrAvailability({
         status: 'no-webxr',
         reason: 'navigator.xr недоступен',
@@ -563,11 +588,18 @@ export default function App() {
         title: 'WebXR не поддерживается браузером',
         message:
           'В текущем браузере отсутствует navigator.xr. Используйте Chrome / Edge (SteamVR OpenXR) или оставайтесь в Desktop-режиме.',
+        diagnostics: {
+          isSecureContext: secureCtx,
+          hasNavigatorXr: false,
+          isSessionSupported: 'недоступно (navigator.xr отсутствует)',
+          errorName: 'NotSupportedError',
+          errorMessage: 'navigator.xr не определён в текущем браузере или контексте iframe.',
+        },
       });
       return;
     }
 
-    const activeSession = xrStore.getState().session;
+    const activeSession = xrStore.getState().session ?? glRef.current?.xr?.getSession?.() ?? null;
     if (activeSession) {
       try {
         await activeSession.end();
@@ -577,39 +609,8 @@ export default function App() {
       return;
     }
 
-    try {
-      const supported = await navigator.xr.isSessionSupported('immersive-vr');
-      if (!supported) {
-        setVrSupported(false);
-        setVrAvailability({
-          status: 'unsupported',
-          reason: 'Шлем / SteamVR не обнаружен',
-        });
-        setVrError({
-          title: 'VR-гарнитура не обнаружена',
-          message:
-            'Режим immersive-vr не поддерживается текущим рантаймом. Подключите HTC Vive и запустите SteamVR (OpenXR), либо продолжайте в Desktop-режиме.',
-        });
-        return;
-      }
-      setVrSupported(true);
-      setVrAvailability({
-        status: 'ready',
-        reason: 'Шлем готов к запуску VR',
-      });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setVrAvailability({
-        status: 'error',
-        reason: `Ошибка WebXR: ${msg}`,
-      });
-      setVrError({
-        title: 'Ошибка проверки WebXR',
-        message: `${msg}. Приложение продолжает работу в Desktop-режиме.`,
-      });
-      return;
-    }
-
+    // Сразу пробуем прямой запуск immersive-vr без блокировки по isSessionSupported === false,
+    // чтобы сохранить user activation и дать рантайму SteamVR/OpenXR шанс ответить на requestSession.
     try {
       if (!isXRPresentingOrActive(glRef.current?.xr)) {
         setXrRefSpaceType('local-floor');
@@ -618,7 +619,15 @@ export default function App() {
           safeSetReferenceSpaceType(glRef.current.xr, 'local-floor');
         }
       }
+
+      // xrStore.enterVR() вызывает navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor', 'bounded-floor'] })
+      // и при успехе сразу связывает сессию с WebXRManager и сценой.
       await xrStore.enterVR();
+      setVrSupported(true);
+      setVrAvailability({
+        status: 'ready',
+        reason: 'VR-сессия активна',
+      });
     } catch (primaryErr: unknown) {
       const leftover = xrStore.getState().session;
       if (leftover) {
@@ -629,12 +638,37 @@ export default function App() {
         }
       }
 
-      const primaryMsg = primaryErr instanceof Error ? primaryErr.message : String(primaryErr);
-      const isRefSpaceMismatch = /reference|local-floor|bounded-floor|NotSupportedError/i.test(
-        primaryMsg
-      );
+      let primaryName = primaryErr instanceof Error ? primaryErr.name : 'Error';
+      let primaryMsg = primaryErr instanceof Error ? primaryErr.message : String(primaryErr);
 
-      if (isRefSpaceMismatch && glRef.current?.xr && !isXRPresentingOrActive(glRef.current.xr)) {
+      // Запрашиваем актуальный статус isSessionSupported для точной диагностики в модальном окне
+      let supportedNow: boolean | null = null;
+      let supportedText = 'неизвестно';
+      try {
+        supportedNow = await navigator.xr.isSessionSupported('immersive-vr');
+        supportedText = String(supportedNow);
+        setVrSupported(supportedNow);
+        setVrAvailability(
+          supportedNow
+            ? { status: 'ready', reason: 'Шлем обнаружен, ошибка запуска сессии' }
+            : {
+                status: 'unsupported',
+                reason: 'isSessionSupported: false (можно попробовать запуск)',
+              }
+        );
+      } catch (supErr: unknown) {
+        const supMsg = supErr instanceof Error ? supErr.message : String(supErr);
+        supportedText = `ошибка (${supMsg})`;
+      }
+
+      const isRefSpaceMismatch = /reference|local-floor|bounded-floor/i.test(primaryMsg);
+
+      if (
+        supportedNow === true &&
+        isRefSpaceMismatch &&
+        glRef.current?.xr &&
+        !isXRPresentingOrActive(glRef.current.xr)
+      ) {
         try {
           setXrRefSpaceType('local');
           glRef.current.xr.enabled = true;
@@ -642,20 +676,26 @@ export default function App() {
           await xrStore.enterVR();
           return;
         } catch (fallbackErr: unknown) {
-          const fbMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
-          setIsVRPresenting(false);
-          setVrError({
-            title: 'Не удалось запустить VR-сессию',
-            message: `${fbMsg}. Приложение остаётся в Desktop-режиме.`,
-          });
-          return;
+          primaryName = fallbackErr instanceof Error ? fallbackErr.name : 'Error';
+          primaryMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
         }
       }
 
       setIsVRPresenting(false);
       setVrError({
-        title: 'Не удалось войти в VR',
-        message: `${primaryMsg}. Приложение остаётся в Desktop-режиме.`,
+        title:
+          supportedNow === false || /NotFoundError|NotSupportedError/i.test(primaryName)
+            ? 'VR-гарнитура не обнаружена'
+            : 'Не удалось войти в VR',
+        message:
+          'Запрос immersive-vr сессии отклонён текущим рантаймом. Подключите HTC Vive и запустите SteamVR (OpenXR), либо продолжайте в Desktop-режиме.',
+        diagnostics: {
+          isSecureContext: secureCtx,
+          hasNavigatorXr: hasXr,
+          isSessionSupported: supportedText,
+          errorName: primaryName,
+          errorMessage: primaryMsg,
+        },
       });
     }
   }, []);
