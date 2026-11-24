@@ -119,7 +119,9 @@ export default function WebXRSceneManager({
       : null;
 
     gl.setSize = (width: number, height: number, updateStyle?: boolean) => {
-      if (isXRPresentingOrActive(gl.xr)) {
+      // Во время gl.xr.setSession (до поднятия isPresenting) Three.js сам задаёт размер XR-слоя;
+      // блокируем и откладываем ресайз только когда VR-презентация уже активна.
+      if (Boolean(gl.xr?.isPresenting)) {
         pendingResizeRef.current = { width, height, updateStyle };
         return;
       }
@@ -127,7 +129,7 @@ export default function WebXRSceneManager({
     };
 
     gl.setPixelRatio = (value: number) => {
-      if (isXRPresentingOrActive(gl.xr)) {
+      if (Boolean(gl.xr?.isPresenting)) {
         pendingPixelRatioRef.current = value;
         return;
       }
@@ -166,7 +168,7 @@ export default function WebXRSceneManager({
 
     const applyDesktopResize = (width: number, height: number, updateStyle = false) => {
       if (width <= 0 || height <= 0) return;
-      if (isXRPresentingOrActive(gl.xr)) {
+      if (Boolean(gl.xr?.isPresenting)) {
         pendingResizeRef.current = { width, height, updateStyle };
         return;
       }
@@ -184,7 +186,7 @@ export default function WebXRSceneManager({
     const handleResize = () => {
       const width = window.innerWidth;
       const height = window.innerHeight;
-      if (isXRPresentingOrActive(gl.xr)) {
+      if (Boolean(gl.xr?.isPresenting)) {
         if (width > 0 && height > 0) {
           pendingResizeRef.current = { width, height, updateStyle: false };
         }
@@ -194,7 +196,7 @@ export default function WebXRSceneManager({
     };
 
     const flushDeferredResizeAfterXR = () => {
-      if (isXRPresentingOrActive(gl.xr)) return;
+      if (Boolean(gl.xr?.isPresenting)) return;
 
       const deferredDpr = pendingPixelRatioRef.current;
       pendingPixelRatioRef.current = null;

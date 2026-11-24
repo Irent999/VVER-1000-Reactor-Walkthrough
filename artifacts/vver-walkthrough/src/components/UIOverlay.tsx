@@ -33,6 +33,7 @@ export interface VRDiagnosticDetails {
   isSecureContext: boolean;
   hasNavigatorXr: boolean;
   isSessionSupported: string;
+  requestedConfig?: string;
   errorName?: string;
   errorMessage?: string;
 }
@@ -714,6 +715,16 @@ export default function UIOverlay({
                       {vrModal.diagnostics.isSessionSupported}
                     </span>
                   </div>
+                  {vrModal.diagnostics.requestedConfig && (
+                    <div className="mt-2 border-t border-slate-900/10 pt-2 dark:border-white/10">
+                      <span className="block text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                        Переданные параметры / фичи сессии:
+                      </span>
+                      <p className="mono mt-0.5 whitespace-pre-line break-words text-[10px] leading-relaxed text-slate-700 dark:text-slate-300">
+                        {vrModal.diagnostics.requestedConfig}
+                      </p>
+                    </div>
+                  )}
                   {(vrModal.diagnostics.errorName || vrModal.diagnostics.errorMessage) && (
                     <div className="mt-2 border-t border-slate-900/10 pt-2 dark:border-white/10">
                       <span className="block text-[10px] font-medium text-slate-500 dark:text-slate-400">

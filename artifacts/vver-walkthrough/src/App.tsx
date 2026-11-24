@@ -29,8 +29,9 @@ import { resolveAssetBaseUrl } from '@/utils/resolveAssetUrl';
 
 const _orbitForwardDir = new THREE.Vector3();
 
-// Конфигурация WebXR без внешнего эмулятора и загрузки моделей контроллеров с CDN:
-// поддерживаются HTC Vive / SteamVR / OpenXR / Meta Quest с фолбэком по referenceSpace.
+// Конфигурация WebXR без внешнего эмулятора, CDN-моделей и жёстких requiredFeatures:
+// оставляем только безопасный optionalFeatures: ['local-floor'] (без 'bounded-floor' и requiredFeatures),
+// чтобы OpenXR / SteamVR / HTC Vive не отклоняли сессию с NotSupportedError.
 // frameBufferScaling: 0.72 снижает нагрузку стерео-рендеринга на GPU без зависания при старте VR.
 // baseAssetPath формируется через resolveAssetBaseUrl('./'), чтобы new URL(...) в @pmndrs/xr никогда не падал с Invalid base URL.
 const xrStore = createXRStore({
@@ -48,7 +49,7 @@ const xrStore = createXRStore({
   screenInput: false,
   transientPointer: false,
   customSessionInit: {
-    optionalFeatures: ['local-floor', 'bounded-floor'],
+    optionalFeatures: ['local-floor'],
   },
 });
 
@@ -583,6 +584,7 @@ export default function App() {
           isSecureContext: false,
           hasNavigatorXr: hasXr,
           isSessionSupported: 'не проверялось (небезопасный контекст)',
+          requestedConfig: 'запрос не выполнялся (требуется HTTPS / localhost)',
           errorName: 'SecurityError',
           errorMessage: 'WebXR API требует защищённый контекст (HTTPS или localhost).',
         },
@@ -603,12 +605,30 @@ export default function App() {
           isSecureContext: secureCtx,
           hasNavigatorXr: false,
           isSessionSupported: 'недоступно (navigator.xr отсутствует)',
+          requestedConfig: 'запрос не выполнялся (navigator.xr отсутствует)',
           errorName: 'NotSupportedError',
           errorMessage: 'navigator.xr не определён в текущем браузере или контексте iframe.',
         },
       });
       return;
     }
+
+    // Вспомогательная очистка незавершённой XR-сессии (как в xrStore, так и в Three.js WebXRManager)
+    const cleanupDanglingSession = async () => {
+      const storeSession = xrStore.getState().session ?? null;
+      const mgrSession = glRef.current?.xr?.getSession?.() ?? null;
+      const seen = new Set<XRSession>();
+      for (const s of [storeSession, mgrSession]) {
+        if (s && !seen.has(s)) {
+          seen.add(s);
+          try {
+            await s.end();
+          } catch {
+            // Игнорируем ошибку закрытия уже остановленной сессии
+          }
+        }
+      }
+    };
 
     const activeSession = xrStore.getState().session ?? glRef.current?.xr?.getSession?.() ?? null;
     if (activeSession) {
@@ -620,8 +640,11 @@ export default function App() {
       return;
     }
 
-    // Сразу пробуем прямой запуск immersive-vr без блокировки по isSessionSupported === false,
-    // чтобы сохранить user activation и дать рантайму SteamVR/OpenXR шанс ответить на requestSession.
+    const primaryConfigDesc =
+      "1) requestSession('immersive-vr', { optionalFeatures: ['local-floor'] }), requiredFeatures: [], refSpace: 'local-floor'";
+    const attemptLogs: string[] = [];
+
+    // Попытка 1: облегчённый профиль без requiredFeatures и без bounded-floor
     try {
       if (!isXRPresentingOrActive(glRef.current?.xr)) {
         setXrRefSpaceType('local-floor');
@@ -631,26 +654,71 @@ export default function App() {
         }
       }
 
-      // xrStore.enterVR() вызывает navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor', 'bounded-floor'] })
-      // и при успехе сразу связывает сессию с WebXRManager и сценой.
       await xrStore.enterVR();
       setVrSupported(true);
       setVrAvailability({
         status: 'ready',
         reason: 'VR-сессия активна',
       });
+      return;
     } catch (primaryErr: unknown) {
-      const leftover = xrStore.getState().session;
-      if (leftover) {
+      await cleanupDanglingSession();
+
+      const primaryName = primaryErr instanceof Error ? primaryErr.name : 'Error';
+      const primaryMsg = primaryErr instanceof Error ? primaryErr.message : String(primaryErr);
+      attemptLogs.push(`${primaryConfigDesc} -> ${primaryName}: ${primaryMsg}`);
+
+      let finalName = primaryName;
+      let finalMsg = primaryMsg;
+
+      // Попытка 2: базовый вызов navigator.xr.requestSession('immersive-vr') БЕЗ опций
+      // и без необязательных фич, с привязкой к Three.js gl.xr и пространству 'local' (рост 1.65 м сохраняется).
+      const shouldTryBareSession =
+        primaryName === 'NotSupportedError' ||
+        /not supported|configuration|feature|reference|local-floor|bounded-floor|session/i.test(
+          `${primaryName} ${primaryMsg}`
+        );
+
+      if (shouldTryBareSession && !isXRPresentingOrActive(glRef.current?.xr)) {
+        const bareConfigDesc =
+          "2) requestSession('immersive-vr') без опций, refSpace: 'local'";
+        let fallbackSession: XRSession | null = null;
         try {
-          await leftover.end();
-        } catch {
-          // Игнорируем ошибку закрытия прерванной сессии
+          fallbackSession = await navigator.xr.requestSession('immersive-vr');
+          const xrManager = glRef.current?.xr;
+          if (!xrManager) {
+            throw new Error('WebXRManager рендерера не инициализирован');
+          }
+          setXrRefSpaceType('local');
+          xrManager.enabled = true;
+          safeSetReferenceSpaceType(xrManager, 'local');
+          try {
+            xrManager.setFramebufferScaleFactor?.(0.72);
+          } catch {
+            // Игнорируем, если драйвер не поддерживает масштабирование буфера
+          }
+          // Привязываем полученную сессию напрямую к Three.js gl.xr; xrStore подхватит её через событие sessionstart
+          await xrManager.setSession(fallbackSession);
+          setVrSupported(true);
+          setVrAvailability({
+            status: 'ready',
+            reason: 'VR-сессия активна (базовый профиль local)',
+          });
+          return;
+        } catch (fallbackErr: unknown) {
+          if (fallbackSession) {
+            try {
+              await fallbackSession.end();
+            } catch {
+              // Игнорируем ошибку очистки неудавшейся фолбэк-сессии
+            }
+          }
+          await cleanupDanglingSession();
+          finalName = fallbackErr instanceof Error ? fallbackErr.name : 'Error';
+          finalMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
+          attemptLogs.push(`${bareConfigDesc} -> ${finalName}: ${finalMsg}`);
         }
       }
-
-      let primaryName = primaryErr instanceof Error ? primaryErr.name : 'Error';
-      let primaryMsg = primaryErr instanceof Error ? primaryErr.message : String(primaryErr);
 
       // Запрашиваем актуальный статус isSessionSupported для точной диагностики в модальном окне
       let supportedNow: boolean | null = null;
@@ -672,40 +740,21 @@ export default function App() {
         supportedText = `ошибка (${supMsg})`;
       }
 
-      const isRefSpaceMismatch = /reference|local-floor|bounded-floor/i.test(primaryMsg);
-
-      if (
-        supportedNow === true &&
-        isRefSpaceMismatch &&
-        glRef.current?.xr &&
-        !isXRPresentingOrActive(glRef.current.xr)
-      ) {
-        try {
-          setXrRefSpaceType('local');
-          glRef.current.xr.enabled = true;
-          safeSetReferenceSpaceType(glRef.current.xr, 'local');
-          await xrStore.enterVR();
-          return;
-        } catch (fallbackErr: unknown) {
-          primaryName = fallbackErr instanceof Error ? fallbackErr.name : 'Error';
-          primaryMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
-        }
-      }
-
       setIsVRPresenting(false);
       setVrError({
         title:
-          supportedNow === false || /NotFoundError|NotSupportedError/i.test(primaryName)
-            ? 'VR-гарнитура не обнаружена'
+          supportedNow === false || /NotFoundError|NotSupportedError/i.test(finalName)
+            ? 'VR-гарнитура не обнаружена или профиль не поддерживается'
             : 'Не удалось войти в VR',
         message:
-          'Запрос immersive-vr сессии отклонён текущим рантаймом. Подключите HTC Vive и запустите SteamVR (OpenXR), либо продолжайте в Desktop-режиме.',
+          'Запрос immersive-vr сессии отклонён текущим рантаймом даже в базовой конфигурации без опций. Проверьте активный OpenXR-рантайм в SteamVR и браузер (Chrome/Edge), либо продолжайте в Desktop-режиме.',
         diagnostics: {
           isSecureContext: secureCtx,
           hasNavigatorXr: hasXr,
           isSessionSupported: supportedText,
-          errorName: primaryName,
-          errorMessage: primaryMsg,
+          requestedConfig: attemptLogs.join('\n'),
+          errorName: finalName,
+          errorMessage: finalMsg,
         },
       });
     }
