@@ -15,6 +15,38 @@ import { useEffect, useRef } from 'react';
 import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
+/**
+ * Проверяет, активна ли в данный момент WebXR-презентация или сессия.
+ */
+export function isXRPresentingOrActive(xr: THREE.WebXRManager | undefined | null): boolean {
+  if (!xr) return false;
+  if (xr.isPresenting) return true;
+  try {
+    return xr.getSession?.() != null;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Безопасно задаёт referenceSpaceType только до старта WebXR-сессии.
+ * Никогда не вызывает Three.js setReferenceSpaceType при активном VR-показе.
+ */
+export function safeSetReferenceSpaceType(
+  xr: THREE.WebXRManager | undefined | null,
+  refSpaceType: XRReferenceSpaceType
+): boolean {
+  if (!xr || isXRPresentingOrActive(xr)) {
+    return false;
+  }
+  try {
+    xr.setReferenceSpaceType(refSpaceType);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export interface WebXRSceneManagerProps {
   /** Текущие координаты выбранного ракурса/спавна [x, y, z] */
   activeSpawnPos?: [number, number, number];
@@ -39,6 +71,14 @@ export default function WebXRSceneManager({
   const currentViewIdRef = useRef<string | undefined>(activeViewId);
   const currentRefSpaceRef = useRef<XRReferenceSpaceType>(referenceSpaceType);
 
+  // Отложенные размеры и DPR, накопленные во время активной VR-сессии
+  const pendingResizeRef = useRef<{
+    width: number;
+    height: number;
+    updateStyle?: boolean;
+  } | null>(null);
+  const pendingPixelRatioRef = useRef<number | null>(null);
+
   // Снимок десктопной камеры до входа в VR для аккуратного возврата на sessionend
   const savedCameraPoseRef = useRef<{
     position: THREE.Vector3;
@@ -59,23 +99,52 @@ export default function WebXRSceneManager({
     currentFloorYRef.current = Number.isFinite(floorY) ? floorY : 0.4;
     currentViewIdRef.current = activeViewId;
     currentRefSpaceRef.current = referenceSpaceType;
-    if (gl.xr && !gl.xr.isPresenting) {
-      try {
-        gl.xr.setReferenceSpaceType(referenceSpaceType);
-      } catch {
-        // Игнорируем ошибку установки неподдерживаемого referenceSpaceType до старта сессии
-      }
-    }
+    safeSetReferenceSpaceType(gl.xr, referenceSpaceType);
   }, [gl, activeSpawnPos, floorY, activeViewId, referenceSpaceType]);
 
   useEffect(() => {
     const desktopShadowsRef = { enabled: gl.shadowMap.enabled };
     let activeSessionRef: XRSession | null = null;
 
+    // Перехватываем setSize, setPixelRatio и setReferenceSpaceType на уровне рендерера,
+    // чтобы ни R3F ResizeObserver, ни сторонние эффекты не меняли их во время VR-презентации.
+    const origSetSize = gl.setSize.bind(gl);
+    const origSetPixelRatio = gl.setPixelRatio.bind(gl);
+    const xrManager = gl.xr;
+    const origSetReferenceSpaceType = xrManager?.setReferenceSpaceType
+      ? xrManager.setReferenceSpaceType.bind(xrManager)
+      : null;
+
+    gl.setSize = (width: number, height: number, updateStyle?: boolean) => {
+      if (isXRPresentingOrActive(gl.xr)) {
+        pendingResizeRef.current = { width, height, updateStyle };
+        return;
+      }
+      origSetSize(width, height, updateStyle);
+    };
+
+    gl.setPixelRatio = (value: number) => {
+      if (isXRPresentingOrActive(gl.xr)) {
+        pendingPixelRatioRef.current = value;
+        return;
+      }
+      origSetPixelRatio(value);
+    };
+
+    if (xrManager && origSetReferenceSpaceType) {
+      xrManager.setReferenceSpaceType = (value: XRReferenceSpaceType) => {
+        if (isXRPresentingOrActive(xrManager)) {
+          currentRefSpaceRef.current = value;
+          return;
+        }
+        origSetReferenceSpaceType(value);
+      };
+    }
+
     if (gl.xr) {
       gl.xr.enabled = true;
+      safeSetReferenceSpaceType(gl.xr, currentRefSpaceRef.current);
       try {
-        gl.xr.setReferenceSpaceType(currentRefSpaceRef.current);
         gl.xr.setFoveation?.(1.0);
       } catch {
         // Безопасный фолбэк при отсутствии поддержки foveation
@@ -92,17 +161,54 @@ export default function WebXRSceneManager({
     camera.far = 1400;
     camera.updateProjectionMatrix();
 
+    const applyDesktopResize = (width: number, height: number, updateStyle = false) => {
+      if (width <= 0 || height <= 0) return;
+      if (isXRPresentingOrActive(gl.xr)) {
+        pendingResizeRef.current = { width, height, updateStyle };
+        return;
+      }
+      if (camera instanceof THREE.PerspectiveCamera) {
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix();
+      }
+      origSetSize(width, height, updateStyle);
+      const targetDpr =
+        pendingPixelRatioRef.current ?? Math.min(window.devicePixelRatio || 1, 1.25);
+      pendingPixelRatioRef.current = null;
+      origSetPixelRatio(targetDpr);
+    };
+
     const handleResize = () => {
-      if (gl.xr?.isPresenting) return;
       const width = window.innerWidth;
       const height = window.innerHeight;
-      if (width > 0 && height > 0) {
+      if (isXRPresentingOrActive(gl.xr)) {
+        if (width > 0 && height > 0) {
+          pendingResizeRef.current = { width, height, updateStyle: false };
+        }
+        return;
+      }
+      applyDesktopResize(width, height, false);
+    };
+
+    const flushDeferredResizeAfterXR = () => {
+      if (isXRPresentingOrActive(gl.xr)) return;
+
+      const deferredDpr = pendingPixelRatioRef.current;
+      pendingPixelRatioRef.current = null;
+      if (deferredDpr !== null) {
+        origSetPixelRatio(deferredDpr);
+      }
+
+      const deferred = pendingResizeRef.current;
+      pendingResizeRef.current = null;
+      if (deferred && deferred.width > 0 && deferred.height > 0) {
         if (camera instanceof THREE.PerspectiveCamera) {
-          camera.aspect = width / height;
+          camera.aspect = deferred.width / deferred.height;
           camera.updateProjectionMatrix();
         }
-        gl.setSize(width, height, false);
-        gl.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
+        origSetSize(deferred.width, deferred.height, deferred.updateStyle);
+      } else {
+        handleResize();
       }
     };
 
@@ -118,7 +224,7 @@ export default function WebXRSceneManager({
     };
 
     const onDocumentVisibilityChange = () => {
-      if (!document.hidden && !gl.xr?.isPresenting) {
+      if (!document.hidden && !isXRPresentingOrActive(gl.xr)) {
         handleResize();
         invalidate();
       }
@@ -143,11 +249,7 @@ export default function WebXRSceneManager({
       gl.localClippingEnabled = true;
       if (gl.xr) {
         gl.xr.enabled = true;
-        try {
-          gl.xr.setReferenceSpaceType(currentRefSpaceRef.current);
-        } catch {
-          // Игнорируем ошибку referenceSpaceType
-        }
+        safeSetReferenceSpaceType(gl.xr, currentRefSpaceRef.current);
       }
       handleResize();
       invalidate();
@@ -251,7 +353,9 @@ export default function WebXRSceneManager({
         savedCameraPoseRef.current.captured = false;
       }
 
-      handleResize();
+      // Применяем отложенные во время VR-сессии размеры canvas и DPR уже после sessionend
+      flushDeferredResizeAfterXR();
+      queueMicrotask(flushDeferredResizeAfterXR);
       invalidate();
 
       try {
@@ -267,6 +371,11 @@ export default function WebXRSceneManager({
     }
 
     return () => {
+      gl.setSize = origSetSize;
+      gl.setPixelRatio = origSetPixelRatio;
+      if (xrManager && origSetReferenceSpaceType) {
+        xrManager.setReferenceSpaceType = origSetReferenceSpaceType;
+      }
       window.removeEventListener('resize', handleResize);
       document.removeEventListener('visibilitychange', onDocumentVisibilityChange);
       canvasEl.removeEventListener('webglcontextlost', onWebGLContextLost);
@@ -284,3 +393,4 @@ export default function WebXRSceneManager({
 
   return null;
 }
+

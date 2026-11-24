@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
+import { resolveAssetUrl } from '@/utils/resolveAssetUrl';
 
 export interface GlbLoadState {
   status: 'loading' | 'loaded' | 'error';
@@ -59,11 +60,8 @@ interface GlbAssemblyModelProps {
   onAnchorsReady?: (anchors: SiteBox3Anchors) => void;
 }
 
-const BASE_URL = import.meta.env.BASE_URL.endsWith('/')
-  ? import.meta.env.BASE_URL
-  : `${import.meta.env.BASE_URL}/`;
-const MODEL_URL = `${BASE_URL}assembly.glb`;
-const DRACO_DECODER_PATH = `${BASE_URL}draco/`;
+const MODEL_URL = resolveAssetUrl('assembly.glb');
+const DRACO_DECODER_PATH = resolveAssetUrl('draco/');
 
 export function computeCutawayHeight(opacity: number): number {
   if (opacity >= 0.98) return 60;

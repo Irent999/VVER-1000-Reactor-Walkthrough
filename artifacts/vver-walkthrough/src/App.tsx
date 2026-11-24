@@ -15,17 +15,22 @@ import DroneFlyByController, { type DroneWaymark } from '@/components/DroneFlyBy
 import FirstPersonController from '@/components/FirstPersonController';
 import UIOverlay, { type ThemeMode, type VRAvailabilityInfo } from '@/components/UIOverlay';
 import { ErrorBoundary, type ErrorFallbackProps } from '@/components/error-boundary';
-import WebXRSceneManager from '@/scene/webxrManager';
+import WebXRSceneManager, {
+  isXRPresentingOrActive,
+  safeSetReferenceSpaceType,
+} from '@/scene/webxrManager';
 import { FLOOR_VIEWS, type ViewMode } from '@/data/poiData';
 import { validateAndAdjustCameraLineOfSight } from '@/scene/cameraLineOfSightModule';
+import { resolveAssetBaseUrl } from '@/utils/resolveAssetUrl';
 
 // Конфигурация WebXR без внешнего эмулятора и загрузки моделей контроллеров с CDN:
 // поддерживаются HTC Vive / SteamVR / OpenXR / Meta Quest с фолбэком по referenceSpace.
+// baseAssetPath формируется через resolveAssetBaseUrl('./'), чтобы new URL(...) в @pmndrs/xr никогда не падал с Invalid base URL.
 const xrStore = createXRStore({
   emulate: false,
   offerSession: false,
   enterGrantedSession: false,
-  baseAssetPath: './',
+  baseAssetPath: resolveAssetBaseUrl('./'),
   foveation: 1.0,
   frameRate: false,
   bounded: false,
@@ -606,10 +611,12 @@ export default function App() {
     }
 
     try {
-      setXrRefSpaceType('local-floor');
-      if (glRef.current?.xr) {
-        glRef.current.xr.enabled = true;
-        glRef.current.xr.setReferenceSpaceType('local-floor');
+      if (!isXRPresentingOrActive(glRef.current?.xr)) {
+        setXrRefSpaceType('local-floor');
+        if (glRef.current?.xr) {
+          glRef.current.xr.enabled = true;
+          safeSetReferenceSpaceType(glRef.current.xr, 'local-floor');
+        }
       }
       await xrStore.enterVR();
     } catch (primaryErr: unknown) {
@@ -627,11 +634,11 @@ export default function App() {
         primaryMsg
       );
 
-      if (isRefSpaceMismatch && glRef.current?.xr) {
+      if (isRefSpaceMismatch && glRef.current?.xr && !isXRPresentingOrActive(glRef.current.xr)) {
         try {
           setXrRefSpaceType('local');
           glRef.current.xr.enabled = true;
-          glRef.current.xr.setReferenceSpaceType('local');
+          safeSetReferenceSpaceType(glRef.current.xr, 'local');
           await xrStore.enterVR();
           return;
         } catch (fallbackErr: unknown) {
@@ -698,7 +705,9 @@ export default function App() {
                 scene.background = bgColor;
             gl.setClearColor(bgColor, 1.0);
             gl.localClippingEnabled = true;
-            gl.setPixelRatio(Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, 1.25));
+            if (!isXRPresentingOrActive(gl.xr)) {
+              gl.setPixelRatio(Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, 1.25));
+            }
             gl.domElement.tabIndex = 0;
             gl.domElement.style.outline = 'none';
             camera.near = 0.15;

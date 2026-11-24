@@ -225,10 +225,12 @@ export function configureNPPRenderer(
     enableSoftShadows = false,
   } = options;
 
-  // Ограничение PixelRatio до Math.min(window.devicePixelRatio, 1.5)
+  // Ограничение PixelRatio до Math.min(window.devicePixelRatio, 1.5) (только вне VR-презентации)
   const currentDpr = typeof window !== 'undefined' ? window.devicePixelRatio : 1;
   const clampedDpr = Math.min(currentDpr, maxPixelRatio);
-  renderer.setPixelRatio(clampedDpr);
+  if (!renderer.xr?.isPresenting) {
+    renderer.setPixelRatio(clampedDpr);
+  }
 
   // Цветопередача, очистка буфера и тоновое отображение (защита от черного экрана)
   renderer.setClearColor(new THREE.Color(0x9cb0c3), 1.0);
@@ -244,15 +246,14 @@ export function configureNPPRenderer(
     renderer.shadowMap.enabled = false;
   }
 
-  // WebXR готовность и события: динамическая подстройка DPR для 72/90 FPS в очках виртуальной реальности
+  // WebXR готовность: не меняем setPixelRatio/setSize внутри sessionstart (пока isPresenting === true),
+  // а восстанавливаем целевой DPR только после sessionend.
   if (renderer.xr) {
     renderer.xr.enabled = true;
-    renderer.xr.addEventListener('sessionstart', () => {
-      // Для стабильного 90 FPS на автономных шлемах фиксируем pixelRatio = 1.0 или 1.2
-      renderer.setPixelRatio(Math.min(currentDpr, 1.25));
-    });
     renderer.xr.addEventListener('sessionend', () => {
-      renderer.setPixelRatio(clampedDpr);
+      if (!renderer.xr.isPresenting) {
+        renderer.setPixelRatio(clampedDpr);
+      }
     });
   }
 }
