@@ -18,7 +18,6 @@
  *    графиков мощности 3000 МВт(т) / 1000 МВт(э), давлений и температур теплоносителя.
  */
 
-import { useRef } from 'react';
 import * as THREE from 'three';
 import {
   InteractiveMCRButton,

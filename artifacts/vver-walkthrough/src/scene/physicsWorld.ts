@@ -6,7 +6,6 @@ import {
   STEAM_GEN,
   MCP,
   ECCS_TANKS,
-  FLOOR_LEVELS,
   EYE_HEIGHT,
 } from './constants';
 
@@ -15,9 +14,9 @@ export class VVERPhysicsWorld {
   public playerBody: CANNON.Body;
   public playerRadius = 0.38;
   public playerHeight = 1.6;
+  public isInitialized = false;
   private defaultMaterial: CANNON.Material;
   private playerMaterial: CANNON.Material;
-  private isInitialized = false;
 
   constructor() {
     this.world = new CANNON.World({

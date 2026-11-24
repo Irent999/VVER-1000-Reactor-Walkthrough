@@ -223,7 +223,6 @@ export function configureNPPRenderer(
   const {
     maxPixelRatio = 1.5,
     enableSoftShadows = false,
-    shadowMapSize = 512,
   } = options;
 
   // Ограничение PixelRatio до Math.min(window.devicePixelRatio, 1.5)

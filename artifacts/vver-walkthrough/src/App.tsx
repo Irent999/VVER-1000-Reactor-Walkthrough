@@ -13,7 +13,7 @@ import EvacuationRoutesVisualizer from '@/components/EvacuationRoutesVisualizer'
 import VRControllerManager from '@/components/VRControllerManager';
 import DroneFlyByController, { type DroneWaymark } from '@/components/DroneFlyByController';
 import FirstPersonController from '@/components/FirstPersonController';
-import UIOverlay, { type ThemeMode } from '@/components/UIOverlay';
+import UIOverlay, { type ThemeMode, type VRAvailabilityInfo } from '@/components/UIOverlay';
 import { ErrorBoundary, type ErrorFallbackProps } from '@/components/error-boundary';
 import WebXRSceneManager from '@/scene/webxrManager';
 import { FLOOR_VIEWS, type ViewMode } from '@/data/poiData';
@@ -45,6 +45,7 @@ interface SmoothCameraControllerProps {
   lookAt: [number, number, number];
   mode: ViewMode;
   viewId?: string;
+  isVRPresenting?: boolean;
   onTransitionEnd?: () => void;
 }
 
@@ -68,6 +69,7 @@ function SmoothCameraController({
   lookAt,
   mode,
   viewId,
+  isVRPresenting = false,
   onTransitionEnd,
 }: SmoothCameraControllerProps) {
   const { camera, scene } = useThree();
@@ -127,7 +129,7 @@ function SmoothCameraController({
   }, [camera, cameraPos, lookAt, mode, scene, viewId, currentKey]);
 
   useFrame(() => {
-    if (mode !== 'orbit') {
+    if (isVRPresenting || mode !== 'orbit') {
       if (controlsRef.current) {
         controlsRef.current.enabled = false;
       }
@@ -169,12 +171,12 @@ function SmoothCameraController({
     }
   });
 
-  if (mode !== 'orbit') return null;
+  if (mode !== 'orbit' || isVRPresenting) return null;
 
   return (
     <OrbitControls
       ref={controlsRef}
-      enabled={mode === 'orbit'}
+      enabled={mode === 'orbit' && !isVRPresenting}
       enableDamping={true}
       dampingFactor={0.05}
       minDistance={2}
@@ -311,6 +313,10 @@ export default function App() {
   const [energyFlowActive, setEnergyFlowActive] = useState(false);
   const [evacuationRoutesActive, setEvacuationRoutesActive] = useState(false);
   const [vrSupported, setVrSupported] = useState<boolean | null>(null);
+  const [vrAvailability, setVrAvailability] = useState<VRAvailabilityInfo>({
+    status: 'checking',
+    reason: 'Проверка доступности WebXR...',
+  });
   const [isVRPresenting, setIsVRPresenting] = useState(false);
   const [xrRefSpaceType, setXrRefSpaceType] = useState<XRReferenceSpaceType>('local-floor');
   const [vrError, setVrError] = useState<{ title: string; message: string } | null>(null);
@@ -362,27 +368,98 @@ export default function App() {
     }
   }, [theme]);
 
+  // Полная диагностика доступности WebXR при старте (HTTPS/localhost, navigator.xr, immersive-vr)
   useEffect(() => {
+    let cancelled = false;
     const check = async () => {
-      if (typeof navigator !== 'undefined' && navigator.xr) {
-        try {
-          const ok = await navigator.xr.isSessionSupported('immersive-vr');
-          setVrSupported(ok);
-        } catch {
+      if (typeof window !== 'undefined' && !window.isSecureContext) {
+        if (!cancelled) {
           setVrSupported(false);
+          setVrAvailability({
+            status: 'insecure-context',
+            reason: 'Требуется HTTPS или localhost',
+          });
         }
-      } else {
-        setVrSupported(false);
+        return;
+      }
+
+      if (typeof navigator === 'undefined' || !navigator.xr) {
+        if (!cancelled) {
+          setVrSupported(false);
+          setVrAvailability({
+            status: 'no-webxr',
+            reason: 'navigator.xr недоступен',
+          });
+        }
+        return;
+      }
+
+      try {
+        const ok = await navigator.xr.isSessionSupported('immersive-vr');
+        if (!cancelled) {
+          setVrSupported(ok);
+          setVrAvailability(
+            ok
+              ? { status: 'ready', reason: 'Шлем готов к запуску VR' }
+              : {
+                  status: 'unsupported',
+                  reason: 'Шлем / SteamVR не обнаружен',
+                }
+          );
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (!cancelled) {
+          setVrSupported(false);
+          setVrAvailability({
+            status: 'error',
+            reason: `Ошибка WebXR: ${msg}`,
+          });
+        }
       }
     };
-    check();
+    void check();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
+  // Подписки на события XR-сессии, потерю WebGL-контекста и асинхронные unhandledrejection
   useEffect(() => {
     const onStart = () => setIsVRPresenting(true);
     const onEnd = () => setIsVRPresenting(false);
+    const onContextLost = () => {
+      setIsVRPresenting(false);
+      setVrError({
+        title: 'Контекст WebGL приостановлен',
+        message: 'Графический драйвер временно сбросил WebGL-контекст. Идёт восстановление Desktop-режима.',
+      });
+    };
+    const onContextRestored = () => {
+      setWebglAvailable(true);
+    };
+    const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const reason = event.reason;
+      const msg = reason instanceof Error ? reason.message : String(reason ?? '');
+      if (/xr|webxr|vr|immersive|referenceSpace|session/i.test(msg)) {
+        event.preventDefault();
+        setIsVRPresenting(false);
+        const staleSession = xrStore.getState().session;
+        if (staleSession) {
+          void staleSession.end().catch(() => undefined);
+        }
+        setVrError({
+          title: 'Асинхронная ошибка WebXR',
+          message: `${msg || 'Сбой драйвера VR'}. Продолжена работа в Desktop-режиме.`,
+        });
+      }
+    };
+
     window.addEventListener('webxr-session-start', onStart);
     window.addEventListener('webxr-session-end', onEnd);
+    window.addEventListener('webxr-context-lost', onContextLost);
+    window.addEventListener('webxr-context-restored', onContextRestored);
+    window.addEventListener('unhandledrejection', onUnhandledRejection);
 
     const unsubscribeStore = xrStore.subscribe((state, prevState) => {
       if (state.session && !prevState.session) {
@@ -395,6 +472,9 @@ export default function App() {
     return () => {
       window.removeEventListener('webxr-session-start', onStart);
       window.removeEventListener('webxr-session-end', onEnd);
+      window.removeEventListener('webxr-context-lost', onContextLost);
+      window.removeEventListener('webxr-context-restored', onContextRestored);
+      window.removeEventListener('unhandledrejection', onUnhandledRejection);
       unsubscribeStore();
     };
   }, []);
@@ -454,13 +534,30 @@ export default function App() {
     });
   }, [activeViewData.mode]);
 
-  // Безопасный запуск/завершение WebXR-сессии с перехватом всех ошибок и фолбэком 'local-floor' -> 'local'
+  // Безопасный запуск/завершение WebXR-сессии строго по клику пользователя
   const handleVRClick = useCallback(async () => {
-    if (typeof navigator === 'undefined' || !navigator.xr) {
+    if (typeof window !== 'undefined' && !window.isSecureContext) {
+      setVrAvailability({
+        status: 'insecure-context',
+        reason: 'Требуется HTTPS или localhost',
+      });
       setVrError({
-        title: 'WebXR недоступен',
+        title: 'WebXR заблокирован небезопасным адресом',
         message:
-          'Браузер не поддерживает WebXR или приложение открыто не через HTTPS/localhost. Продолжена работа в Desktop-режиме.',
+          'Откройте приложение по HTTPS или через http://localhost / http://127.0.0.1. Работа продолжена в Desktop-режиме.',
+      });
+      return;
+    }
+
+    if (typeof navigator === 'undefined' || !navigator.xr) {
+      setVrAvailability({
+        status: 'no-webxr',
+        reason: 'navigator.xr недоступен',
+      });
+      setVrError({
+        title: 'WebXR не поддерживается браузером',
+        message:
+          'В текущем браузере отсутствует navigator.xr. Используйте Chrome / Edge (SteamVR OpenXR) или оставайтесь в Desktop-режиме.',
       });
       return;
     }
@@ -479,16 +576,28 @@ export default function App() {
       const supported = await navigator.xr.isSessionSupported('immersive-vr');
       if (!supported) {
         setVrSupported(false);
+        setVrAvailability({
+          status: 'unsupported',
+          reason: 'Шлем / SteamVR не обнаружен',
+        });
         setVrError({
           title: 'VR-гарнитура не обнаружена',
           message:
-            'Подключите VR-шлем (HTC Vive / SteamVR / OpenXR / Quest) и перезапустите браузер, либо продолжайте работу в Desktop-режиме.',
+            'Режим immersive-vr не поддерживается текущим рантаймом. Подключите HTC Vive и запустите SteamVR (OpenXR), либо продолжайте в Desktop-режиме.',
         });
         return;
       }
       setVrSupported(true);
+      setVrAvailability({
+        status: 'ready',
+        reason: 'Шлем готов к запуску VR',
+      });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
+      setVrAvailability({
+        status: 'error',
+        reason: `Ошибка WebXR: ${msg}`,
+      });
       setVrError({
         title: 'Ошибка проверки WebXR',
         message: `${msg}. Приложение продолжает работу в Desktop-режиме.`,
@@ -596,13 +705,6 @@ export default function App() {
             camera.far = 1400;
             camera.updateProjectionMatrix();
 
-            gl.domElement.addEventListener('webglcontextlost', (e) => {
-              e.preventDefault();
-            });
-            gl.domElement.addEventListener('webglcontextrestored', () => {
-              setWebglAvailable(true);
-            });
-
             try {
               const pmrem = new THREE.PMREMGenerator(gl);
               pmrem.compileEquirectangularShader();
@@ -668,6 +770,7 @@ export default function App() {
               lookAt={activeViewData.target ?? [0, activeViewData.floorY, 0]}
               mode={controlMode}
               viewId={activeViewData.id}
+              isVRPresenting={isVRPresenting}
             />
 
             {controlMode === 'drone' ? (
@@ -776,6 +879,7 @@ export default function App() {
         controlMode={controlMode}
         onVRClick={handleVRClick}
         vrSupported={vrSupported}
+        vrAvailability={vrAvailability}
         vrError={vrError}
         onClearVrError={() => setVrError(null)}
         droneSpeed={droneSpeed}

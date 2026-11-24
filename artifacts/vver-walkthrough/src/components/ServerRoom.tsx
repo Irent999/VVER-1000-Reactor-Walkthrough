@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { FLOOR_LEVELS, SAFETY_YELLOW, DARK_STEEL_COLOR } from '@/scene/constants';
+import { FLOOR_LEVELS, SAFETY_YELLOW } from '@/scene/constants';
 import {
   concreteMap,
   concreteNormalMap,

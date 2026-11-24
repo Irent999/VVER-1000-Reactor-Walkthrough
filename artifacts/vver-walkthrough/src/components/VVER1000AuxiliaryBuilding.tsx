@@ -16,7 +16,6 @@
  *   - Кровля с парапетом: отметка +25.50м / +26.50м
  */
 
-import React, { useMemo } from 'react';
 import * as THREE from 'three';
 import { FLOOR_LEVELS } from '@/scene/constants';
 import {

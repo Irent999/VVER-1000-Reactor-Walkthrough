@@ -1,7 +1,7 @@
 import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { SAFETY_YELLOW, DARK_STEEL_COLOR, ROSATOM_LIME_GREEN } from '@/scene/constants';
+import { SAFETY_YELLOW, ROSATOM_LIME_GREEN } from '@/scene/constants';
 import {
   diamondPlateMap, diamondPlateNormalMap, diamondPlateRoughnessMap,
   brushedSteelMap, brushedSteelNormalMap, brushedSteelRoughnessMap,

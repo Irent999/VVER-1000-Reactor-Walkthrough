@@ -1,11 +1,10 @@
 import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import VVER1000MainControlRoom from './VVER1000MainControlRoom';
 import SpentFuelPool from './SpentFuelPool';
 import EmergencyAlarmSystem from './EmergencyAlarmSystem';
 import {
-  CONTAINMENT, CONTAINMENT_GEOMETRY, DECK, POLAR_CRANE, SAFETY_YELLOW,
+  CONTAINMENT_GEOMETRY, DECK, POLAR_CRANE, SAFETY_YELLOW,
   DARK_STEEL_COLOR, FLOOR_LEVELS, HIGH_BAY_LIGHTS, RAIL_TRACKS, STAIRS,
 } from '@/scene/constants';
 import {
@@ -351,37 +350,6 @@ function HighBayLightingRing() {
           </group>
         );
       })}
-    </group>
-  );
-}
-
-/** Invisible physical collision walls enclosing floor boundaries, pits, and handrails */
-function InvisibleCollisionWalls() {
-  return (
-    <group>
-      {/* 1. +15m Main Deck central reactor pit barrier (cylinder r=5.45, h=3.2m) */}
-      <mesh position={[0, DECK.mainY + 1.6, 0]} visible={false}>
-        <cylinderGeometry args={[5.45, 5.45, 3.2, 14, 1, true]} />
-        <meshBasicMaterial transparent opacity={0} wireframe />
-      </mesh>
-
-      {/* 2. +36m Upper Deck central void barrier (cylinder guarding central opening at r = 8.35m) */}
-      <mesh position={[0, DECK.upperY + 2.0, 0]} visible={false}>
-        <cylinderGeometry args={[DECK.upperHoleRadius + 0.35, DECK.upperHoleRadius + 0.35, 4.0, 14, 1, true]} />
-        <meshBasicMaterial transparent opacity={0} wireframe />
-      </mesh>
-
-      {/* 3. Outer containment boundary barrier (cylinder r=21.6, h=60m) */}
-      <mesh position={[0, 20, 0]} visible={false}>
-        <cylinderGeometry args={[CONTAINMENT.innerRadius - 0.4, CONTAINMENT.innerRadius - 0.4, 60, 14, 1, true]} />
-        <meshBasicMaterial transparent opacity={0} wireframe />
-      </mesh>
-
-      {/* 4. -5m Basement DCS bio-shield vault cylinder barrier (cylinder r=7.25, h=6m) */}
-      <mesh position={[0, FLOOR_LEVELS.basement + 3.0, 0]} visible={false}>
-        <cylinderGeometry args={[7.25, 7.25, 6.0, 14, 1, true]} />
-        <meshBasicMaterial transparent opacity={0} wireframe />
-      </mesh>
     </group>
   );
 }

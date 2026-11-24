@@ -419,7 +419,7 @@ export function MainGSUTransformers() {
 
   return (
     <group name="MainGSUTransformers_500kV">
-      {allBays.map((bay, bayIdx) => (
+      {allBays.map((bay) => (
         <group key={bay.name} position={[trafoX, gY, bay.z]}>
           {/* 1. Gravel Oil Catchment Basin (Маслоприемник с гравийной засыпкой) */}
           <mesh position={[0, 0.3, 0]}>

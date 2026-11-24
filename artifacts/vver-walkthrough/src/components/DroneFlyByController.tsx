@@ -125,7 +125,6 @@ export default function DroneFlyByController({
   // When drone mode becomes active, align smoothly to the current spline point
   useEffect(() => {
     if (active) {
-      const pos = cameraPath.getPointAt(progress.current % 1);
       const tgt = targetPath.getPointAt(progress.current % 1);
       lookTarget.current.copy(tgt);
       smoothedTarget.current.copy(tgt);

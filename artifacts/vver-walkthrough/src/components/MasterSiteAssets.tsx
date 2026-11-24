@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import * as THREE from 'three';
 import { FLOOR_LEVELS, CONTAINMENT_GEOMETRY } from '@/scene/constants';
 import {
@@ -83,19 +82,6 @@ const ventWhiteBandMat = new THREE.MeshStandardMaterial({
   color: '#f2f2ec',
   roughness: 0.65,
   metalness: 0.15,
-});
-
-// SMR RITM-200N Special Materials: Distinctive Deep Navy Blue Cladding (#1F4E79)
-const smrBlueRoofMat = new THREE.MeshStandardMaterial({
-  color: '#1F4E79',
-  roughness: 0.42,
-  metalness: 0.48,
-});
-
-const smrWallGreyMat = new THREE.MeshStandardMaterial({
-  color: '#dcdedc',
-  roughness: 0.78,
-  metalness: 0.1,
 });
 
 const waterTankDarkMat = new THREE.MeshStandardMaterial({

@@ -206,6 +206,9 @@ export default function VRControllerManager({
     const player = playerRef.current;
     const activeFloorY = Number.isFinite(floorY) ? floorY : 0.4;
 
+    // Если шлем снят или открыт системный оверлей SteamVR (visible-blurred / hidden), не двигаем игрока
+    const isInputVisible = xrSession.visibilityState === undefined || xrSession.visibilityState === 'visible';
+
     let xrCam: THREE.Camera | null = null;
     let refSpace: XRReferenceSpace | null = null;
     try {
@@ -236,7 +239,7 @@ export default function VRControllerManager({
       const sourceKey = `${hand}:${srcIdx}`;
 
       // 1. Считывание тачпада (HTC Vive Wand axes[0..1]) или стика (OpenXR / Quest axes[2..3])
-      if (gp && gp.axes && gp.axes.length >= 2) {
+      if (isInputVisible && gp && gp.axes && gp.axes.length >= 2) {
         const primaryMag = Math.hypot(gp.axes[0] ?? 0, gp.axes[1] ?? 0);
         const secondaryMag =
           gp.axes.length >= 4 ? Math.hypot(gp.axes[2] ?? 0, gp.axes[3] ?? 0) : 0;
@@ -342,10 +345,12 @@ export default function VRControllerManager({
             _ray.set(_rayOrigin, _rayDir);
 
             let rayLength = 10;
-            if (_ray.intersectPlane(_groundPlane, _hitPoint)) {
+            let hitValidFloor = false;
+            if (isInputVisible && _ray.intersectPlane(_groundPlane, _hitPoint)) {
               const dist = _hitPoint.distanceTo(_rayOrigin);
               if (dist > 0.5 && dist < 120) {
                 rayLength = dist;
+                hitValidFloor = true;
                 const targetX = THREE.MathUtils.clamp(_hitPoint.x, -114, 114);
                 const targetZ = THREE.MathUtils.clamp(_hitPoint.z, -114, 114);
 
@@ -373,6 +378,10 @@ export default function VRControllerManager({
               rayMesh.position.copy(_beamMid);
               rayMesh.quaternion.copy(_beamQuat);
               rayMesh.scale.set(1, 1, rayLength);
+              const mat = rayMesh.material;
+              if (mat instanceof THREE.MeshBasicMaterial) {
+                mat.color.setHex(hitValidFloor ? 0x34d399 : 0x38bdf8);
+              }
               rayMesh.visible = true;
             }
 

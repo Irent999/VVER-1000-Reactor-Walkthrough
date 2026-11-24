@@ -7,7 +7,7 @@ import PrimaryCoolantFlow from './PrimaryCoolantFlow';
 import PressurizerSystem from './PressurizerSystem';
 import ECCSAndMakeUpSystem from './ECCSAndMakeUpSystem';
 import {
-  RPV, STEAM_GEN, MCP, DECK, DARK_STEEL_COLOR, ROSATOM_LIME_GREEN, SAFETY_YELLOW, ECCS_TANKS,
+  RPV, STEAM_GEN, MCP, DARK_STEEL_COLOR, ROSATOM_LIME_GREEN, SAFETY_YELLOW,
 } from '@/scene/constants';
 import {
   brushedSteelMap, brushedSteelNormalMap, brushedSteelRoughnessMap,
@@ -66,33 +66,6 @@ const pipeMat = new THREE.MeshStandardMaterial({
   roughness: 0.3,
   metalness: 0.88,
 });
-
-/** Blue Cherenkov-like glow inside the reactor vessel top aperture */
-function CherenkovGlow() {
-  const matRef = useRef<THREE.MeshBasicMaterial>(null);
-  useFrame((state) => {
-    if (matRef.current) {
-      const v = reactorStateManager.vverState;
-      const t = state.clock.elapsedTime;
-      const normP = v.powerPercent / 100;
-      if (v.scramActive || normP < 0.05) {
-        // Затухающее остаточное тепловыделение после сброса АЗ-5
-        matRef.current.color.set('#441111');
-        matRef.current.opacity = 0.2;
-      } else {
-        // Яркое васильковое Черенковское свечение
-        matRef.current.color.set('#00b4ff');
-        matRef.current.opacity = (0.4 + Math.sin(t * 2.5) * 0.15) * (0.3 + normP * 0.7);
-      }
-    }
-  });
-  return (
-    <mesh position={[0, RPV.headTopY + 0.5, 0]}>
-      <cylinderGeometry args={[1.2, 1.2, 0.3, 20]} />
-      <meshBasicMaterial ref={matRef} color="#00aaff" transparent opacity={0.6} side={THREE.DoubleSide} />
-    </mesh>
-  );
-}
 
 /** Reactor Pressure Vessel (12m high, 4.5m diameter) */
 function ReactorVessel() {

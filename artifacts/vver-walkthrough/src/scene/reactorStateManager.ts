@@ -534,7 +534,7 @@ export const ritmSimulation = {
     };
   },
   subscribe(cb: (state: any) => void) {
-    return reactorStateManager.subscribeRITM((s) => cb(this.state));
+    return reactorStateManager.subscribeRITM(() => cb(this.state));
   },
   dispatch(action: string) {
     reactorStateManager.dispatch('ritm200n', action);

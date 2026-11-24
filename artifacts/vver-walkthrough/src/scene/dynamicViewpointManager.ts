@@ -20,7 +20,7 @@
  */
 
 import * as THREE from 'three';
-import { POI_LIST, FLOOR_VIEWS, type POIInfo, type FloorTarget, type ViewMode } from '@/data/poiData';
+import { POI_LIST, FLOOR_VIEWS, type POIInfo, type FloorTarget } from '@/data/poiData';
 
 // Базовые локальные координаты POI комплекса РИТМ-200Н относительно точки привязки здания
 export const RITM_LOCAL_POI_OFFSETS: Record<string, [number, number, number]> = {

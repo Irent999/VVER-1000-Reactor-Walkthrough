@@ -41,7 +41,6 @@ export interface InteractiveButtonProps {
  */
 export function InteractiveMCRButton({
   label,
-  subLabel,
   color = '#00d2ff',
   reactorId = 'ritm200n',
   action,

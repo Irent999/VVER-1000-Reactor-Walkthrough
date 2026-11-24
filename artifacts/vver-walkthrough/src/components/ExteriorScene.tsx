@@ -14,16 +14,6 @@ import { siteGrassLawnMaterial } from '@/scene/nppEnvironment';
 // PBR MATERIALS - NOVOVORONEZH NPP UNIT 6 INDUSTRIAL PALETTE
 // ============================================================================
 
-const concretePBRMat = new THREE.MeshStandardMaterial({
-  color: '#E3E5E8', // Свежий автоклавный светло-серый бетон НВАЭС (#E3E5E8)
-  map: concreteMap,
-  roughnessMap: concreteRoughnessMap,
-  normalMap: concreteNormalMap,
-  normalScale: new THREE.Vector2(0.28, 0.28),
-  roughness: 0.86,
-  metalness: 0.04,
-});
-
 const concreteDarkPBRMat = new THREE.MeshStandardMaterial({
   color: '#8A8E94',
   map: concreteMap,
@@ -41,12 +31,6 @@ const wallBeigePanelMat = new THREE.MeshStandardMaterial({
   metalness: 0.12,
   normalMap: brushedSteelNormalMap,
   normalScale: new THREE.Vector2(0.06, 0.06),
-});
-
-const wallCreamPanelMat = new THREE.MeshStandardMaterial({
-  color: '#D3C3AD', // Cream accent panels
-  roughness: 0.8,
-  metalness: 0.1,
 });
 
 // NVNPP Unit 6 Base Trim: Red-brown protective skirt
@@ -315,11 +299,6 @@ const specialBuildingConcreteMat = new THREE.MeshStandardMaterial({
   metalness: 0.04,
 });
 
-const transformerOrangeMat = new THREE.MeshStandardMaterial({
-  color: '#D35400', // Сигнальный оранжевый цвет энергооборудования Росатома
-  roughness: 0.42,
-  metalness: 0.45,
-});
 
 const busbarAluMat = new THREE.MeshStandardMaterial({
   color: '#e8ecef',
@@ -1665,85 +1644,6 @@ function OutdoorSwitchyard({ position }: { position: [number, number, number] })
           <boxGeometry args={[0.08, 0.08, 32]} />
           <primitive object={transmissionCableMat} attach="material" />
         </mesh>
-      ))}
-    </group>
-  );
-}
-
-// ============================================================================
-// 9. GENERATOR STEP-UP TRANSFORMERS (БЛОЧНЫЕ ТРАНСФОРМАТОРЫ ТЦ-1000000/500)
-// ============================================================================
-
-function StepUpTransformers({ position = [112, 0, -12] }: { position?: [number, number, number] }) {
-  const gY = FLOOR_LEVELS.ground;
-
-  const transformerBays = [
-    { name: 'Unit1_Trafo_A', z: -28 },
-    { name: 'Unit1_Trafo_B', z: -12 },
-    { name: 'Unit1_Trafo_C', z: 4 },
-    { name: 'Unit2_Trafo_A', z: 44 },
-    { name: 'Unit2_Trafo_B', z: 60 },
-    { name: 'Unit2_Trafo_C', z: 76 },
-  ];
-
-  return (
-    <group position={position} name="StepUpTransformers_500kV">
-      {transformerBays.map((bay) => (
-        <group key={bay.name} position={[0, gY, bay.z]}>
-          {/* Crushed-stone gravel oil containment basin */}
-          <mesh position={[0, 0.25, 0]} receiveShadow>
-            <boxGeometry args={[11, 0.5, 12]} />
-            <primitive object={concreteDarkPBRMat} attach="material" />
-          </mesh>
-          <mesh position={[0, 0.52, 0]}>
-            <boxGeometry args={[10.2, 0.1, 11.2]} />
-            <meshStandardMaterial color="#4f5358" roughness={0.95} />
-          </mesh>
-
-          {/* Reinforced Concrete Fire Separation Blast Wall (Брандмауэр) */}
-          <mesh position={[0, 5.8, 6.2]} castShadow receiveShadow>
-            <boxGeometry args={[11.5, 11.0, 0.9]} />
-            <primitive object={concreteDarkPBRMat} attach="material" />
-          </mesh>
-
-          {/* Transformer Main Steel Tank */}
-          <mesh position={[0, 4.4, 0]} castShadow receiveShadow>
-            <boxGeometry args={[6.8, 7.2, 7.5]} />
-            <primitive object={industrialMetalDarkMat} attach="material" />
-          </mesh>
-
-          {/* Conservator Oil Expansion Tank on top */}
-          <mesh position={[0, 8.8, -1.8]} rotation={[0, 0, Math.PI / 2]} castShadow>
-            <cylinderGeometry args={[0.9, 0.9, 6.0, 16]} />
-            <primitive object={transformerOrangeMat} attach="material" />
-          </mesh>
-
-          {/* 500 kV High-Voltage Porcelain Bushings */}
-          {[-1.8, 0, 1.8].map((bx) => (
-            <group key={`trafo-bush-${bx}`} position={[bx, 8.6, 1.2]} rotation={[0, 0, 0.12]}>
-              <mesh castShadow>
-                <cylinderGeometry args={[0.22, 0.42, 3.6, 12]} />
-                <primitive object={ceramicInsulatorMat} attach="material" />
-              </mesh>
-              <mesh position={[0, 1.7, 0]} rotation={[Math.PI / 2, 0, 0]}>
-                <torusGeometry args={[0.35, 0.04, 6, 16]} />
-                <primitive object={busbarAluMat} attach="material" />
-              </mesh>
-            </group>
-          ))}
-
-          {/* Forced Oil-Air Cooling Radiator Bank with Fans */}
-          <mesh position={[-4.2, 4.0, 0]} castShadow>
-            <boxGeometry args={[1.5, 5.8, 7.0]} />
-            <primitive object={steelTrussMat} attach="material" />
-          </mesh>
-
-          {/* Low-voltage generator bus duct connection (Токопроводы 24 кВ) from turbine hall */}
-          <mesh position={[4.6, 4.8, 0]} rotation={[0, 0, Math.PI / 2]}>
-            <cylinderGeometry args={[0.65, 0.65, 2.6, 16]} />
-            <primitive object={wallBeigePanelMat} attach="material" />
-          </mesh>
-        </group>
       ))}
     </group>
   );

@@ -24,6 +24,11 @@ import type { DroneWaymark } from '@/components/DroneFlyByController';
 
 export type ThemeMode = 'dark' | 'light';
 
+export interface VRAvailabilityInfo {
+  status: 'checking' | 'ready' | 'insecure-context' | 'no-webxr' | 'unsupported' | 'error';
+  reason: string;
+}
+
 interface UIOverlayProps {
   activeView: string;
   onViewChange: (viewId: string) => void;
@@ -39,6 +44,7 @@ interface UIOverlayProps {
   controlMode: ViewMode;
   onVRClick: () => void | Promise<void>;
   vrSupported: boolean | null;
+  vrAvailability?: VRAvailabilityInfo;
   vrError?: { title: string; message: string } | null;
   onClearVrError?: () => void;
   telemetry?: TelemetrySnapshot;
@@ -76,6 +82,8 @@ export default function UIOverlay({
   onToggleEvacuationRoutes,
   controlMode,
   onVRClick,
+  vrSupported,
+  vrAvailability,
   vrError,
   onClearVrError,
   telemetry: propTelemetry,
@@ -572,16 +580,41 @@ export default function UIOverlay({
 
           <span className="hidden sm:block h-5 w-px bg-slate-900/10 dark:bg-white/10" aria-hidden="true" />
 
-          {/* Кнопка входа в VR */}
-          <button
-            type="button"
-            data-testid="button-enter-vr-prominent"
-            onClick={handleEnterVR}
-            className="flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-500 dark:bg-emerald-500 dark:text-slate-950 dark:hover:bg-emerald-400"
-          >
-            <Glasses size={15} />
-            <span>Войти в VR</span>
-          </button>
+          {/* Кнопка входа в VR с видимым статусом и диагностикой доступности */}
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              data-testid="button-enter-vr-prominent"
+              onClick={handleEnterVR}
+              title={
+                vrAvailability?.reason ||
+                (vrSupported === false
+                  ? 'VR-шлем не обнаружен — доступен Desktop-режим'
+                  : 'Запуск VR-сессии (WebXR / HTC Vive / SteamVR)')
+              }
+              className={`flex items-center gap-1.5 whitespace-nowrap rounded-xl px-3.5 py-2 text-xs font-semibold shadow-sm transition ${
+                vrAvailability?.status === 'ready' || vrSupported === true
+                  ? 'bg-emerald-600 text-white hover:bg-emerald-500 dark:bg-emerald-500 dark:text-slate-950 dark:hover:bg-emerald-400'
+                  : 'border border-amber-500/35 bg-amber-500/15 text-amber-800 hover:bg-amber-500/25 dark:border-amber-400/30 dark:bg-amber-400/15 dark:text-amber-200 dark:hover:bg-amber-400/25'
+              }`}
+            >
+              <Glasses size={15} />
+              <span>
+                {vrAvailability?.status === 'ready' || vrSupported === true
+                  ? 'Войти в VR'
+                  : 'VR недоступен'}
+              </span>
+            </button>
+            {vrAvailability && vrAvailability.status !== 'ready' && vrAvailability.status !== 'checking' && (
+              <span
+                data-testid="vr-unavailable-reason"
+                title={vrAvailability.reason}
+                className="hidden xl:inline-block max-w-[200px] truncate rounded-lg bg-slate-900/5 px-2 py-1 text-[10px] font-medium text-slate-600 dark:bg-white/10 dark:text-slate-300"
+              >
+                {vrAvailability.reason}
+              </span>
+            )}
+          </div>
         </div>
       </nav>
 
